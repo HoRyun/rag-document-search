@@ -3,11 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import shutil
 from datetime import datetime
-from langchain.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import Chroma
-from langchain.llms import Ollama
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
+from langchain_community.llms import Ollama
 from langchain.chains import RetrievalQA
 import requests
 

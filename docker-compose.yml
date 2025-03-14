@@ -33,7 +33,7 @@ services:
       - "8001:8000"
 
   ollama:
-    image: ollama/ollama:latest
+    build: ./ollama
     volumes:
       - ollama-data:/root/.ollama
     ports:

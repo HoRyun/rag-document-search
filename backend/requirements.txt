@@ -40,7 +40,9 @@ charset-normalizer==3.4.1
 chroma-hnswlib==0.7.6
     # via chromadb
 chromadb==0.6.3
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   langchain-chroma
 click==8.1.8
     # via
     #   typer
@@ -107,6 +109,7 @@ httpx==0.28.1
     #   langsmith
 huggingface-hub==0.29.3
     # via
+    #   langchain-huggingface
     #   sentence-transformers
     #   tokenizers
     #   transformers
@@ -136,13 +139,19 @@ langchain==0.2.17
     # via
     #   -r requirements.in
     #   langchain-community
+langchain-chroma==0.2.2
+    # via -r requirements.in
 langchain-community==0.2.19
     # via -r requirements.in
 langchain-core==0.2.43
     # via
     #   langchain
+    #   langchain-chroma
     #   langchain-community
+    #   langchain-huggingface
     #   langchain-text-splitters
+langchain-huggingface==0.0.3
+    # via -r requirements.in
 langchain-text-splitters==0.2.4
     # via langchain
 langsmith==0.1.147
@@ -177,6 +186,7 @@ numpy==1.26.4
     #   chroma-hnswlib
     #   chromadb
     #   langchain
+    #   langchain-chroma
     #   langchain-community
     #   onnxruntime
     #   scikit-learn
@@ -330,7 +340,9 @@ scipy==1.15.2
     #   scikit-learn
     #   sentence-transformers
 sentence-transformers==3.4.1
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   langchain-huggingface
 shellingham==1.5.4
     # via typer
 six==1.17.0
@@ -361,6 +373,7 @@ threadpoolctl==3.6.0
 tokenizers==0.21.1
     # via
     #   chromadb
+    #   langchain-huggingface
     #   transformers
 torch==2.6.0
     # via sentence-transformers
@@ -371,7 +384,9 @@ tqdm==4.67.1
     #   sentence-transformers
     #   transformers
 transformers==4.49.0
-    # via sentence-transformers
+    # via
+    #   langchain-huggingface
+    #   sentence-transformers
 typer==0.15.2
     # via chromadb
 typing-extensions==4.12.2
