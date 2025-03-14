@@ -27,7 +27,7 @@ UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Chroma 클라이언트 설정
-CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
+CHROMA_HOST = os.getenv("CHROMA_HOST", "chroma")
 CHROMA_PORT = os.getenv("CHROMA_PORT", "8000")
 
 # Ollama 설정
@@ -39,10 +39,21 @@ embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-
 
 # 벡터 스토어 설정
 def get_vector_store():
+    from chromadb.config import Settings
+    
+    persist_directory = os.path.join(DATA_DIR, "chroma_db")
+    os.makedirs(persist_directory, exist_ok=True)
+    
+    client_settings = Settings(
+        chroma_server_host=CHROMA_HOST,
+        chroma_server_http_port=CHROMA_PORT
+    )
+    
     return Chroma(
         collection_name="documents",
         embedding_function=embeddings,
-        client_settings={"chroma_server_host": CHROMA_HOST, "chroma_server_http_port": CHROMA_PORT}
+        persist_directory=persist_directory,
+        client_settings=client_settings
     )
 
 # LLM 설정
