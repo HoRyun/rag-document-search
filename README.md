@@ -26,4 +26,4 @@ LLM: Ollama (llama2 모델)
 
 2. 현재 레포지토리 로컬에 Clone 한 후 터미널에서 해당 위치로 이동
 
-3. docker compose up --build 입력력
+3. docker compose up --build 입력
