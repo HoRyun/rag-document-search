@@ -75,12 +75,11 @@ function App() {
         <section className="upload-section">
           <h2>Upload Document</h2>
           <div className="upload-form">
-            <input 
-              type="file" 
-              accept=".pdf" 
-              onChange={handleFileChange} 
-              disabled={isUploading}
-            />
+          <input 
+            type="file" 
+            accept=".pdf,.docx,.hwp,.hwpx" 
+            onChange={handleFileChange} 
+          />
             <button 
               onClick={handleUpload} 
               disabled={!file || isUploading}
