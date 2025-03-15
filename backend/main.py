@@ -2,14 +2,17 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import shutil
+import subprocess
+import tempfile
 from datetime import datetime
-from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_community.llms import Ollama
 from langchain.chains import RetrievalQA
 import requests
+import docx2txt
 
 app = FastAPI()
 
@@ -60,6 +63,8 @@ def get_vector_store():
 def get_llm():
     return Ollama(base_url=f"http://{OLLAMA_HOST}:{OLLAMA_PORT}", model="llama2")
 
+
+
 @app.get("/")
 def read_root():
     return {"message": "RAG API is running"}
@@ -70,8 +75,13 @@ def health_check():
 
 @app.post("/upload")
 async def upload_document(file: UploadFile = File(...)):
-    if not file.filename.endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+    file_extension = file.filename.split('.')[-1].lower()
+    supported_extensions = ['pdf', 'hwp', 'hwpx', 'docx']
+    
+    print(f"Processing file: {file.filename} with extension: {file_extension}")
+    
+    if file_extension not in supported_extensions:
+        raise HTTPException(status_code=400, detail=f"Only {', '.join(supported_extensions)} files are supported")
     
     # 파일 저장
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -80,14 +90,67 @@ async def upload_document(file: UploadFile = File(...)):
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
+    print(f"File saved to: {file_path}")
+    
     try:
-        # PDF 로드
-        loader = PyPDFLoader(file_path)
-        documents = loader.load()
+        # 문서 로드 및 텍스트 추출
+        if file_extension == 'pdf':
+            # PDF 처리
+            print("Processing PDF file...")
+            loader = PyPDFLoader(file_path)
+            documents = loader.load()
+            print(f"Extracted {len(documents)} pages from PDF")
+            for i, doc in enumerate(documents[:1]):  # 첫 페이지만 출력
+                print(f"Sample text from page {i+1} (first 200 chars): {doc.page_content[:200]}")
+                
+        elif file_extension == 'docx':
+            # Word 문서 처리
+            print("Processing DOCX file...")
+            text = docx2txt.process(file_path)
+            print(f"Extracted text from DOCX (first 200 chars): {text[:200]}")
+            
+            # TextLoader를 사용하기 위해 임시 텍스트 파일 생성
+            with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as temp:
+                temp.write(text)
+                temp_path = temp.name
+            
+            loader = TextLoader(temp_path)
+            documents = loader.load()
+            print(f"Created {len(documents)} document(s) from DOCX")
+            os.unlink(temp_path)  # 임시 파일 삭제
+            
+        elif file_extension in ['hwp', 'hwpx']:
+            # HWP 문서 처리
+            print(f"Processing {file_extension.upper()} file...")
+            # hwp5txt 명령어 사용 (pyhwp 패키지 필요)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as temp:
+                temp_path = temp.name
+            
+            try:
+                print(f"Running hwp5txt on {file_path} with output to {temp_path}")
+                subprocess.run(['hwp5txt', file_path, '--output', temp_path], check=True)
+                
+                # 추출된 텍스트 확인
+                with open(temp_path, 'r', encoding='utf-8') as f:
+                    extracted_text = f.read()
+                print(f"Extracted text from {file_extension.upper()} (first 200 chars): {extracted_text[:200]}")
+                
+                loader = TextLoader(temp_path, encoding='utf-8')
+                documents = loader.load()
+                print(f"Created {len(documents)} document(s) from {file_extension.upper()}")
+            except Exception as e:
+                print(f"Error processing {file_extension.upper()} file: {str(e)}")
+                import traceback
+                print(traceback.format_exc())
+                raise
+            finally:
+                os.unlink(temp_path)  # 임시 파일 삭제
         
         # 텍스트 분할
+        print("Splitting text into chunks...")
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
         chunks = text_splitter.split_documents(documents)
+        print(f"Created {len(chunks)} chunks from document")
         
         # 메타데이터 추가
         for chunk in chunks:
@@ -95,8 +158,10 @@ async def upload_document(file: UploadFile = File(...)):
             chunk.metadata["upload_time"] = timestamp
         
         # 벡터 스토어에 추가
+        print("Adding chunks to vector store...")
         vector_store = get_vector_store()
         vector_store.add_documents(chunks)
+        print("Successfully added to vector store")
         
         return {
             "message": f"Document {file.filename} uploaded and processed successfully",
@@ -104,8 +169,10 @@ async def upload_document(file: UploadFile = File(...)):
             "path": file_path
         }
     except Exception as e:
+        import traceback
+        print(f"Error processing document: {str(e)}")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error processing document: {str(e)}")
-
 @app.post("/query")
 async def query_documents(query: str = Form(...)):
     try:
@@ -134,7 +201,8 @@ def list_documents():
     try:
         files = []
         for filename in os.listdir(UPLOAD_DIR):
-            if filename.endswith('.pdf'):
+            file_extension = filename.split('.')[-1].lower()
+            if file_extension in ['pdf', 'hwp', 'hwpx', 'docx']:
                 file_path = os.path.join(UPLOAD_DIR, filename)
                 file_stat = os.stat(file_path)
                 files.append({
@@ -146,6 +214,7 @@ def list_documents():
         return {"documents": files}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error listing documents: {str(e)}")
+
 
 if __name__ == "__main__":
     import uvicorn
