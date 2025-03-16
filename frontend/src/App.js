@@ -47,6 +47,7 @@ function App() {
     }
   };
 
+  // 질문 입력 후 서버에 질문을 보내고 답변을 받아오는 함수
   const handleQuery = async () => {
     if (!query.trim()) return;
 
@@ -110,6 +111,7 @@ function App() {
               placeholder="Enter your question here..."
               rows={3}
             />
+
             <button
               onClick={handleQuery}
               disabled={!query.trim() || isQuerying}

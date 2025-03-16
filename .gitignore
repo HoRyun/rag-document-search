@@ -54,3 +54,4 @@ docker-volumes/
 *.tmp
 *.temp
 .cache/
+.pyc
