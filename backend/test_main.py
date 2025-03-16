@@ -1,8 +1,9 @@
-# backend/test_main.py
-import os
-import tempfile
+# backend/test_main.py 
 import pytest
 from fastapi.testclient import TestClient
+from unittest.mock import MagicMock, patch
+import os
+import tempfile
 from langchain.schema import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
@@ -10,8 +11,8 @@ from langchain_chroma import Chroma
 # 테스트 모드 설정
 os.environ['TEST_MODE'] = 'True'
 
-# 이제 main을 임포트
-from main import app, get_llm
+# main.py에서 필요한 함수와 앱 가져오기
+from main import app
 
 # 테스트 클라이언트 생성
 client = TestClient(app)
@@ -48,34 +49,42 @@ def test_vector_store():
     import shutil
     shutil.rmtree(temp_dir)
 
-# 모의 LLM 응답을 위한 패치 설정
-@pytest.fixture(autouse=True)
-def mock_llm(monkeypatch):
-    """LLM을 모의 객체로 대체"""
-    def mock_get_llm():
-        class MockLLM:
-            def invoke(self, prompt):
-                return "이것은 테스트 응답입니다."
-        return MockLLM()
-    
-    # get_llm 함수를 모의 함수로 대체
-    monkeypatch.setattr("main.get_llm", mock_get_llm)
+# 모의 LLM 클래스
+class MockLLM:
+    def invoke(self, prompt):
+        return "이것은 테스트 응답입니다."
 
-def test_query_endpoint(test_vector_store, monkeypatch):
+@pytest.fixture
+def mock_dependencies(monkeypatch):
+    """모든 외부 의존성을 모의 객체로 대체"""
+    # 벡터 스토어 모의 객체
+    mock_vector_store = MagicMock()
+    mock_vector_store.as_retriever.return_value = MagicMock()
+    mock_vector_store.as_retriever.return_value.get_relevant_documents.return_value = [
+        Document(page_content="테스트 문서 내용", metadata={"source": "test.txt"})
+    ]
+    
+    # LLM 모의 객체
+    mock_llm = MockLLM()
+    
+    # 함수 패치
+    monkeypatch.setattr("main.get_vector_store", lambda: mock_vector_store)
+    monkeypatch.setattr("main.get_llm", lambda: mock_llm)
+    
+    return {
+        "vector_store": mock_vector_store,
+        "llm": mock_llm
+    }
+
+def test_query_endpoint(mock_dependencies):
     """쿼리 엔드포인트 테스트"""
-    # 벡터 스토어 가져오기 함수를 모의 함수로 대체
-    def mock_get_vector_store():
-        return test_vector_store
-    
-    monkeypatch.setattr("main.get_vector_store", mock_get_vector_store)
-    
     # 쿼리 요청 테스트
     response = client.post("/query", data={"query": "인공지능이란 무엇인가요?"})
     
     # 응답 검증
     assert response.status_code == 200
     assert "answer" in response.json()
-    
+
 def test_dummy():
     """더미 테스트 - 항상 통과"""
     assert True
