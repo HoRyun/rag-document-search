@@ -1,0 +1,150 @@
+name: RAG System CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop-front, develop-backend, develop-rag ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  determine-scope:
+    runs-on: ubuntu-latest
+    outputs:
+      test-frontend: ${{ steps.filter.outputs.frontend == 'true' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop-front' }}
+      test-backend: ${{ steps.filter.outputs.backend == 'true' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop-backend' }}
+      test-rag: ${{ steps.filter.outputs.rag == 'true' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop-rag' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+            backend:
+              - 'backend/**'
+            rag:
+              - 'ollama/**'
+              - 'backend/rag/**'
+
+  test-backend:
+    needs: determine-scope
+    if: ${{ needs.determine-scope.outputs.test-backend == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pytest
+          pip install -r backend/requirements.txt
+
+      - name: Lint with flake8
+        run: |
+          flake8 backend --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 backend --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Test with pytest
+        run: |
+          cd backend
+          export TEST_MODE=True
+          pytest
+
+  test-frontend:
+    needs: determine-scope
+    if: ${{ needs.determine-scope.outputs.test-frontend == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install frontend dependencies and build
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+  test-rag:
+    needs: determine-scope
+    if: ${{ needs.determine-scope.outputs.test-rag == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      # RAG 관련 테스트가 있다면 이곳에 추가 (현재는 없으므로 빈 상태로 둡니다)
+      - run: echo "RAG tests placeholder"
+
+  build:
+    needs: [test-frontend, test-backend, test-rag]
+    if: always() && (needs.test-frontend.result != 'failure') && (needs.test-backend.result != 'failure') && (needs.test-rag.result != 'failure')
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        service:
+          - {name: frontend, context: ./frontend, condition-output-name: test-frontend}
+          - {name: backend, context: ./backend, condition-output-name: test-backend}
+          - {name: ollama, context: ./ollama, condition-output-name: test-rag}
+
+    steps:
+      - uses: actions/checkout@v4
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache-${{ matrix.service.name }}
+          key: ${{ runner.os }}-buildx-${{ matrix.service.name }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-${{ matrix.service.name }}-
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push image (${{ matrix.service.name }})
+        uses: docker/build-push-action@v4
+        with:
+          context: ${{ matrix.service.context }}
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/rag-${{ matrix.service.name }}:${{ github.sha }},${{ secrets.DOCKER_USERNAME }}/rag-${{ matrix.service.name }}:${{ github.ref_name }},${{ secrets.DOCKER_USERNAME }}/rag-${{ matrix.service.name }}:${{ github.run_number }}
+          cache-from: type=local,src=/tmp/.buildx-cache-${{ matrix.service.name }}
+          cache-to: type=local,dest=/tmp/.buildx-cache-new-${{ matrix.service.name }},mode=max
+
+      # 캐시 업데이트 (각 서비스별로 별도 관리)
+      - name: Move cache (${{ matrix.service.name }})
+        run : |
+          rm -rf /tmp/.buildx-cache-${{ matrix.service.name }}
+          mv /tmp/.buildx-cache-new-${{ matrix.service.name }} /tmp/.buildx-cache-${{ matrix.service.name }}
+
+  integration-test:
+    needs : build
+    if : github.ref == 'refs/heads/main' && needs.build.result == 'success'
+    runs-on : ubuntu-latest
+    
+    steps :
+      # 실제 통합 테스트 명령어를 추가하세요.
+      # 현재는 플레이스홀더로 둡니다.
+      - run : echo "Integration tests placeholder"

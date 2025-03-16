@@ -12,3 +12,4 @@ pydantic==1.10.8
 requests==2.31.0
 docx2txt
 pyhwp
+pytest
