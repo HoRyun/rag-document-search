@@ -35,6 +35,8 @@ certifi==2025.1.31
     #   httpx
     #   kubernetes
     #   requests
+cffi==1.17.1
+    # via cryptography
 charset-normalizer==3.4.1
     # via requests
 chroma-hnswlib==0.7.6
@@ -55,6 +57,8 @@ colorama==0.4.6
     #   uvicorn
 coloredlogs==15.0.1
     # via onnxruntime
+cryptography==44.0.2
+    # via pyhwp
 dataclasses-json==0.6.7
     # via langchain-community
 deprecated==1.2.18
@@ -64,6 +68,8 @@ deprecated==1.2.18
     #   opentelemetry-semantic-conventions
 distro==1.9.0
     # via posthog
+docx2txt==0.8
+    # via -r requirements.in
 durationpy==0.9
     # via kubernetes
 fastapi==0.115.11
@@ -159,6 +165,8 @@ langsmith==0.1.147
     #   langchain
     #   langchain-community
     #   langchain-core
+lxml==5.3.1
+    # via pyhwp
 markdown-it-py==3.0.0
     # via rich
 markupsafe==3.0.2
@@ -196,6 +204,8 @@ oauthlib==3.2.2
     # via
     #   kubernetes
     #   requests-oauthlib
+olefile==0.47
+    # via pyhwp
 onnxruntime==1.21.0
     # via chromadb
 opentelemetry-api==1.31.0
@@ -271,6 +281,8 @@ pyasn1==0.6.1
     #   rsa
 pyasn1-modules==0.4.1
     # via google-auth
+pycparser==2.22
+    # via cffi
 pydantic==1.10.8
     # via
     #   -r requirements.in
@@ -281,6 +293,8 @@ pydantic==1.10.8
     #   langsmith
 pygments==2.19.1
     # via rich
+pyhwp==0.1b15
+    # via -r requirements.in
 pypdf==5.3.1
     # via -r requirements.in
 pypika==0.48.9

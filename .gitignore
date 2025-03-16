@@ -1,0 +1,56 @@
+# 업로드된 문서 파일
+data/uploads/
+*.pdf
+*.docx
+*.doc
+*.hwp
+*.hwpx
+*.ppt
+*.pptx
+*.xls
+*.xlsx
+
+# 데이터베이스 및 벡터 저장소
+data/chroma_db/
+
+# 환경 변수
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 로그 파일
+*.log
+logs/
+
+# 의존성 디렉토리
+node_modules/
+__pycache__/
+.pytest_cache/
+.coverage
+htmlcov/
+venv/
+env/
+.venv/
+.env/
+
+# 빌드 결과물
+dist/
+build/
+*.egg-info/
+
+# IDE 및 편집기 설정
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Docker 볼륨 데이터
+docker-volumes/
+
+# 임시 파일
+*.tmp
+*.temp
+.cache/

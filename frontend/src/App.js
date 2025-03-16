@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import './App.css';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import "./App.css";
 
 function App() {
   const [file, setFile] = useState(null);
   const [documents, setDocuments] = useState([]);
-  const [query, setQuery] = useState('');
-  const [answer, setAnswer] = useState('');
+  const [query, setQuery] = useState("");
+  const [answer, setAnswer] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [isQuerying, setIsQuerying] = useState(false);
 
@@ -16,10 +16,10 @@ function App() {
 
   const fetchDocuments = async () => {
     try {
-      const response = await axios.get('http://localhost:8000/documents');
+      const response = await axios.get("http://localhost:8000/documents");
       setDocuments(response.data.documents || []);
     } catch (error) {
-      console.error('Error fetching documents:', error);
+      console.error("Error fetching documents:", error);
     }
   };
 
@@ -31,17 +31,17 @@ function App() {
     if (!file) return;
 
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append("file", file);
 
     setIsUploading(true);
     try {
-      await axios.post('http://localhost:8000/upload', formData);
-      setFile(null);
+      await axios.post("http://localhost:8000/upload", formData);
+      setFile(null); // 파일 업로드가 성공적으로 완료된 후에 파일 상태를 초기화하는 작업
       fetchDocuments();
-      alert('Document uploaded successfully');
+      alert("Document uploaded successfully");
     } catch (error) {
-      console.error('Error uploading document:', error);
-      alert('Error uploading document');
+      console.error("Error uploading document:", error);
+      alert("Error uploading document");
     } finally {
       setIsUploading(false);
     }
@@ -51,15 +51,18 @@ function App() {
     if (!query.trim()) return;
 
     const formData = new FormData();
-    formData.append('query', query);
+    formData.append("query", query);
 
     setIsQuerying(true);
     try {
-      const response = await axios.post('http://localhost:8000/query', formData);
+      const response = await axios.post(
+        "http://localhost:8000/query",
+        formData
+      );
       setAnswer(response.data.answer);
     } catch (error) {
-      console.error('Error querying:', error);
-      setAnswer('Error processing your query');
+      console.error("Error querying:", error);
+      setAnswer("Error processing your query");
     } finally {
       setIsQuerying(false);
     }
@@ -70,26 +73,22 @@ function App() {
       <header className="App-header">
         <h1>RAG Document Search</h1>
       </header>
-      
+
       <main>
         <section className="upload-section">
           <h2>Upload Document</h2>
           <div className="upload-form">
-            <input 
-              type="file" 
-              accept=".pdf" 
-              onChange={handleFileChange} 
-              disabled={isUploading}
+            <input /* 유저가 파일을 업로드하는 필드*/
+              type="file"
+              accept=".pdf,.docx,.hwp,.hwpx"
+              onChange={handleFileChange}
             />
-            <button 
-              onClick={handleUpload} 
-              disabled={!file || isUploading}
-            >
-              {isUploading ? 'Uploading...' : 'Upload'}
+            <button onClick={handleUpload} disabled={!file || isUploading}>
+              {isUploading ? "Uploading..." : "Upload"}
             </button>
           </div>
         </section>
-        
+
         <section className="documents-section">
           <h2>Documents ({documents.length})</h2>
           <ul className="document-list">
@@ -101,7 +100,7 @@ function App() {
             ))}
           </ul>
         </section>
-        
+
         <section className="query-section">
           <h2>Ask a Question</h2>
           <div className="query-form">
@@ -111,14 +110,14 @@ function App() {
               placeholder="Enter your question here..."
               rows={3}
             />
-            <button 
+            <button
               onClick={handleQuery}
               disabled={!query.trim() || isQuerying}
             >
-              {isQuerying ? 'Processing...' : 'Ask'}
+              {isQuerying ? "Processing..." : "Ask"}
             </button>
           </div>
-          
+
           {answer && (
             <div className="answer-container">
               <h3>Answer:</h3>
