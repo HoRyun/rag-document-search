@@ -23,7 +23,7 @@ services:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
-      - backend
+     - backend
 
   chroma:
     image: ghcr.io/chroma-core/chroma:latest
