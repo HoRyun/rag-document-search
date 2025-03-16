@@ -80,6 +80,7 @@ async def upload_document(file: UploadFile = File(...)):
     
     print(f"Processing file: {file.filename} with extension: {file_extension}")
     
+    # 파일 확장자 확인
     if file_extension not in supported_extensions:
         raise HTTPException(status_code=400, detail=f"Only {', '.join(supported_extensions)} files are supported")
     
@@ -163,6 +164,7 @@ async def upload_document(file: UploadFile = File(...)):
         vector_store.add_documents(chunks)
         print("Successfully added to vector store")
         
+        # 파일 업로드 및 처리가 완료되면 성공 메시지를 반환
         return {
             "message": f"Document {file.filename} uploaded and processed successfully",
             "chunks": len(chunks),
@@ -173,6 +175,8 @@ async def upload_document(file: UploadFile = File(...)):
         print(f"Error processing document: {str(e)}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error processing document: {str(e)}")
+    
+    
 @app.post("/query")
 async def query_documents(query: str = Form(...)):
     try:
