@@ -25,6 +25,7 @@ app.add_middleware(
 
 # 디렉토리 설정
 # 환경 변수에서 업로드 디렉토리를 가져오거나 기본값 사용
+DATA_DIR = "/data"
 UPLOAD_DIR = os.environ.get('UPLOAD_DIR', '/data/uploads')
 
 # 테스트 모드 확인 (환경 변수로 설정)
