@@ -34,6 +34,7 @@ jobs:
     - name: Test with pytest
       run: |
         cd backend
+        export TEST_MODE=True
         pytest
         
   build:

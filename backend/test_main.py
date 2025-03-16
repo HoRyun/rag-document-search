@@ -7,7 +7,10 @@ from langchain.schema import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 
-# main.py에서 필요한 함수와 앱 가져오기
+# 테스트 모드 설정
+os.environ['TEST_MODE'] = 'True'
+
+# 이제 main을 임포트
 from main import app, get_llm
 
 # 테스트 클라이언트 생성

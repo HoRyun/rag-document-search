@@ -24,8 +24,18 @@ app.add_middleware(
 )
 
 # 디렉토리 설정
-DATA_DIR = "/data"
-UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
+# 환경 변수에서 업로드 디렉토리를 가져오거나 기본값 사용
+UPLOAD_DIR = os.environ.get('UPLOAD_DIR', '/data/uploads')
+
+# 테스트 모드 확인 (환경 변수로 설정)
+TEST_MODE = os.environ.get('TEST_MODE', 'False').lower() == 'true'
+
+# 테스트 모드일 경우 임시 디렉토리 사용
+if TEST_MODE:
+    UPLOAD_DIR = tempfile.mkdtemp()
+    print(f"Using temporary directory for uploads: {UPLOAD_DIR}")
+
+# 디렉토리 생성
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Chroma 클라이언트 설정
