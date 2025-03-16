@@ -1,3 +1,4 @@
+[![RAG System CI/CD Pipeline](https://github.com/HoRyun/rag-document-search/actions/workflows/rag-ci-cd.yml/badge.svg)](https://github.com/HoRyun/rag-document-search/actions/workflows/rag-ci-cd.yml)
 RAG Document Search는 Retrieval-Augmented Generation(RAG) 기술을 활용한 문서 검색 및 질의응답 시스템입니다. 이 시스템은 문서를 업로드하고, 해당 문서에 대한 질문을 할 수 있는 기능을 제공합니다.
 
 주요 기능
