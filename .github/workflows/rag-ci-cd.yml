@@ -103,7 +103,7 @@ jobs:
         service:
           - {name: frontend, context: ./frontend, condition-output-name: test-frontend}
           - {name: backend, context: ./backend, condition-output-name: test-backend}
-          - {name: db, context: ., dockerfile: ./Dockerfile.postgres, condition-output-name: test-backend}
+          - {name: db, context: ., dockerfile: ./postgres/Dockerfile, condition-output-name: test-backend}
 
     steps:
       - uses: actions/checkout@v4
