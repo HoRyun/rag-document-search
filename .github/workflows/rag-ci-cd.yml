@@ -1,8 +1,8 @@
-name: RAG System CI/CD Pipeline
+name: RAG Document Search CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop-front, develop-backend, develop-rag ]
+    branches: [ main, develop-front, develop-backend, develop-rag, feature/postgresql-integration ]
   pull_request:
     branches: [ main ]
 
@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       test-frontend: ${{ steps.filter.outputs.frontend == 'true' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop-front' }}
-      test-backend: ${{ steps.filter.outputs.backend == 'true' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop-backend' }}
+      test-backend: ${{ steps.filter.outputs.backend == 'true' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop-backend' || github.ref == 'refs/heads/feature/postgresql-integration' }}
       test-rag: ${{ steps.filter.outputs.rag == 'true' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop-rag' }}
     steps:
       - uses: actions/checkout@v4
@@ -23,8 +23,8 @@ jobs:
               - 'frontend/**'
             backend:
               - 'backend/**'
+              - 'postgres/**'
             rag:
-              - 'ollama/**'
               - 'backend/rag/**'
 
   test-backend:
@@ -52,6 +52,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install flake8 pytest
           pip install -r backend/requirements.txt
+          pip install "pydantic[email]" "passlib[bcrypt]" "python-jose[cryptography]"
 
       - name: Lint with flake8
         run: |
@@ -89,12 +90,12 @@ jobs:
     if: ${{ needs.determine-scope.outputs.test-rag == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      # RAG 관련 테스트가 있다면 이곳에 추가 (현재는 없으므로 빈 상태로 둡니다)
+      # RAG 관련 테스트가 있다면 이곳에 추가
       - run: echo "RAG tests placeholder"
 
   build:
     needs: [test-frontend, test-backend, test-rag]
-    if: always() && (needs.test-frontend.result != 'failure') && (needs.test-backend.result != 'failure') && (needs.test-rag.result != 'failure')
+    if: always() && (needs.test-frontend.result != 'failure' || needs.test-frontend.result == 'skipped') && (needs.test-backend.result != 'failure' || needs.test-backend.result == 'skipped') && (needs.test-rag.result != 'failure' || needs.test-rag.result == 'skipped')
     runs-on: ubuntu-latest
     
     strategy:
@@ -102,7 +103,7 @@ jobs:
         service:
           - {name: frontend, context: ./frontend, condition-output-name: test-frontend}
           - {name: backend, context: ./backend, condition-output-name: test-backend}
-          - {name: ollama, context: ./ollama, condition-output-name: test-rag}
+          - {name: db, context: ., dockerfile: ./Dockerfile.postgres, condition-output-name: test-backend}
 
     steps:
       - uses: actions/checkout@v4
@@ -128,8 +129,9 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile || '' }}
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/rag-${{ matrix.service.name }}:${{ github.sha }},${{ secrets.DOCKER_USERNAME }}/rag-${{ matrix.service.name }}:${{ github.ref_name }},${{ secrets.DOCKER_USERNAME }}/rag-${{ matrix.service.name }}:${{ github.run_number }}
+          tags: ${{ secrets.DOCKER_USERNAME }}/rag-document-${{ matrix.service.name }}:${{ github.sha }},${{ secrets.DOCKER_USERNAME }}/rag-document-${{ matrix.service.name }}:${{ github.ref_name }},${{ secrets.DOCKER_USERNAME }}/rag-document-${{ matrix.service.name }}:latest
           cache-from: type=local,src=/tmp/.buildx-cache-${{ matrix.service.name }}
           cache-to: type=local,dest=/tmp/.buildx-cache-new-${{ matrix.service.name }},mode=max
 
@@ -140,11 +142,25 @@ jobs:
           mv /tmp/.buildx-cache-new-${{ matrix.service.name }} /tmp/.buildx-cache-${{ matrix.service.name }}
 
   integration-test:
-    needs : build
-    if : github.ref == 'refs/heads/main' && needs.build.result == 'success'
-    runs-on : ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && needs.build.result == 'success'
+    runs-on: ubuntu-latest
     
-    steps :
-      # 실제 통합 테스트 명령어를 추가하세요.
-      # 현재는 플레이스홀더로 둡니다.
-      - run : echo "Integration tests placeholder"
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Compose
+        run: |
+          docker-compose -f docker-compose.test.yml up -d
+          
+      - name: Wait for services to start
+        run: sleep 30
+          
+      - name: Run integration tests
+        run: |
+          cd backend
+          export TEST_MODE=True
+          pytest test_integration.py
+          
+      - name: Cleanup
+        run: docker-compose -f docker-compose.test.yml down

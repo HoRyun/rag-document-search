@@ -24,7 +24,9 @@ attrs==25.3.0
 backoff==2.2.1
     # via posthog
 bcrypt==4.3.0
-    # via chromadb
+    # via
+    #   chromadb
+    #   passlib
 build==1.2.2.post1
     # via chromadb
 cachetools==5.5.2
@@ -59,7 +61,9 @@ colorama==0.4.6
 coloredlogs==15.0.1
     # via onnxruntime
 cryptography==44.0.2
-    # via pyhwp
+    # via
+    #   pyhwp
+    #   python-jose
 dataclasses-json==0.6.7
     # via langchain-community
 deprecated==1.2.18
@@ -69,10 +73,18 @@ deprecated==1.2.18
     #   opentelemetry-semantic-conventions
 distro==1.9.0
     # via posthog
+dnspython==2.7.0
+    # via email-validator
 docx2txt==0.8
     # via -r requirements.in
 durationpy==0.9
     # via kubernetes
+ecdsa==0.19.1
+    # via python-jose
+email-validator==2.2.0
+    # via
+    #   -r requirements.in
+    #   pydantic
 fastapi==0.115.11
     # via
     #   -r requirements.in
@@ -127,6 +139,7 @@ humanfriendly==10.0
 idna==3.10
     # via
     #   anyio
+    #   email-validator
     #   httpx
     #   requests
     #   yarl
@@ -273,6 +286,8 @@ packaging==24.2
     #   opentelemetry-instrumentation
     #   pytest
     #   transformers
+passlib[bcrypt]==1.7.4
+    # via -r requirements.in
 pgvector==0.3.6
     # via
     #   -r requirements.in
@@ -301,12 +316,13 @@ psycopg2-binary==2.9.10
 pyasn1==0.6.1
     # via
     #   pyasn1-modules
+    #   python-jose
     #   rsa
 pyasn1-modules==0.4.1
     # via google-auth
 pycparser==2.22
     # via cffi
-pydantic==2.10.6
+pydantic[email]==2.10.6
     # via
     #   -r requirements.in
     #   chromadb
@@ -341,6 +357,8 @@ python-dotenv==1.0.1
     # via
     #   pydantic-settings
     #   uvicorn
+python-jose[cryptography]==3.3.0
+    # via -r requirements.in
 python-multipart==0.0.6
     # via -r requirements.in
 pyyaml==6.0.2
@@ -376,7 +394,9 @@ rich==13.9.4
     #   chromadb
     #   typer
 rsa==4.9
-    # via google-auth
+    # via
+    #   google-auth
+    #   python-jose
 safetensors==0.5.3
     # via transformers
 scikit-learn==1.6.1
@@ -393,6 +413,7 @@ shellingham==1.5.4
     # via typer
 six==1.17.0
     # via
+    #   ecdsa
     #   kubernetes
     #   posthog
     #   python-dateutil

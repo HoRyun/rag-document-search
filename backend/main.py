@@ -1,13 +1,14 @@
-from fastapi import FastAPI, Depends, File, UploadFile, Form, HTTPException
+from fastapi import FastAPI, Depends, File, UploadFile, Form, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import shutil
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from typing import List
 
-# 기존 임포트
+
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -16,10 +17,14 @@ from langchain.chains import RetrievalQA
 import docx2txt
 import subprocess
 
-# 새로운 임포트
+
 from db.database import engine, get_db
 from db.models import Base, User, Document, DocumentChunk
 from langchain_postgres import PGVector
+
+
+import schemas
+from auth import authenticate_user, create_access_token, get_password_hash, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
 
 # 테이블 생성
 Base.metadata.create_all(bind=engine)
@@ -50,13 +55,16 @@ else:
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+
 # 임베딩 모델 함수
 def get_embeddings():
     return HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
+
 # LLM 모델 함수
 def get_llm():
     return Ollama(base_url=f"http://{OLLAMA_HOST}:{OLLAMA_PORT}", model="llama2")
+
 
 # 벡터 스토어 함수 (PostgreSQL 사용)
 def get_vector_store():
@@ -72,6 +80,7 @@ def get_vector_store():
     
     return vector_store
 
+
 def process_pdf(file_path):
     """PDF 파일 처리"""
     print("Processing PDF file...")
@@ -79,6 +88,7 @@ def process_pdf(file_path):
     documents = loader.load()
     print(f"Extracted {len(documents)} pages from PDF")
     return documents
+
 
 def process_docx(file_path):
     """Word 문서 처리"""
@@ -97,6 +107,7 @@ def process_docx(file_path):
         return documents
     finally:
         os.unlink(temp_path)  # 임시 파일 삭제
+
 
 def process_hwp(file_path, file_extension):
     """HWP/HWPX 문서 처리"""
@@ -120,6 +131,7 @@ def process_hwp(file_path, file_extension):
     finally:
         os.unlink(temp_path)  # 임시 파일 삭제
 
+
 def prepare_chunks(documents, file_name, timestamp):
     """문서를 청크로 분할하고 메타데이터 추가"""
     print("Splitting text into chunks...")
@@ -138,9 +150,60 @@ def prepare_chunks(documents, file_name, timestamp):
 def read_root():
     return {"message": "RAG Document Search API"}
 
+
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+
+
+# 회원가입 엔드포인트
+@app.post("/register", response_model=schemas.UserResponse)
+def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    # 사용자 이름 중복 확인
+    db_user = db.query(User).filter(User.username == user.username).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    
+    # 이메일 중복 확인
+    db_user = db.query(User).filter(User.email == user.email).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # 비밀번호 해싱 및 사용자 생성
+    hashed_password = get_password_hash(user.password)
+    db_user = User(username=user.username, email=user.email, password_hash=hashed_password)
+    
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    
+    return db_user
+
+
+# 로그인 엔드포인트
+@app.post("/token", response_model=schemas.Token)
+def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+# 현재 사용자 정보 조회
+@app.get("/users/me", response_model=schemas.UserResponse)
+def read_users_me(current_user: User = Depends(get_current_user)):
+    return current_user
+
 
 @app.get("/documents")
 def list_documents(db: Session = Depends(get_db)):
@@ -156,8 +219,13 @@ def list_documents(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error listing documents: {str(e)}")
 
+
 @app.post("/upload")
-async def upload_document(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_document(
+    file: UploadFile = File(...), 
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     file_extension = file.filename.split('.')[-1].lower()
     supported_extensions = ['pdf', 'hwp', 'hwpx', 'docx']
     
@@ -177,7 +245,11 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
     
     try:
         # 문서 DB에 저장 (임시로 user_id=1 사용)
-        db_document = Document(filename=file.filename, upload_time=datetime.now(), user_id=1)
+        db_document = Document(
+        filename=file.filename, 
+        upload_time=datetime.now(), 
+        user_id=current_user.id  # 하드코딩된 user_id=1 대신 현재 사용자 ID 사용
+        )
         db.add(db_document)
         db.commit()
         db.refresh(db_document)
@@ -223,6 +295,7 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
         print(f"Error processing document: {str(e)}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error processing document: {str(e)}")
+
 
 @app.post("/query")
 async def query_documents(query: str = Form(...)):
