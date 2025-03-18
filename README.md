@@ -16,7 +16,7 @@ RAG Document Search는 Retrieval-Augmented Generation(RAG) 기술을 활용한 �
 
 프론트엔드: React
 
-벡터 데이터베이스: ChromaDB
+벡터 데이터베이스: ChromaDB -> PostgreSQL 변경 예정
 
 사용자 데이터베이스 : PostgreSQL
 
