@@ -1,7 +1,6 @@
 import pytest
 import os
 from fastapi.testclient import TestClient
-import json
 import random
 import string
 from unittest.mock import patch, MagicMock
@@ -11,7 +10,7 @@ from fastapi import HTTPException, status
 # 테스트 모드 설정
 os.environ['TEST_MODE'] = 'True'
 
-# 모의 사용자 객체 생성 (딕셔너리가 아닌 객체로)
+# 모의 사용자 객체 생성 (Pydantic 호환)
 class MockUser:
     def __init__(self):
         self.id = 1
@@ -20,7 +19,18 @@ class MockUser:
         self.password_hash = "hashed_password_string"
         self.created_at = datetime.now()
 
-# 모의 사용자 생성
+    # Pydantic 모델이 dict 형태로 변환할 수 있도록 추가
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+    def __iter__(self):
+        yield from {
+            "id": self.id,
+            "username": self.username,
+            "email": self.email,
+            "created_at": self.created_at,
+        }.items()
+
 mock_user = MockUser()
 
 # 인증 관련 함수 모킹
@@ -47,86 +57,107 @@ def get_test_db():
 def get_test_current_user():
     return mock_user
 
-# 패치 적용
 with patch('auth.verify_password', mock_verify_password), \
      patch('auth.get_password_hash', mock_get_password_hash), \
      patch('auth.authenticate_user', mock_authenticate_user), \
      patch('auth.create_access_token', mock_create_access_token), \
      patch('db.database.engine'), \
      patch('db.database.SessionLocal'):
-    
-    # main 가져오기
+
     from main import app, register_user
     from auth import get_current_user
     from db.database import get_db
 
-    # 의존성 오버라이드
     app.dependency_overrides[get_db] = get_test_db
     app.dependency_overrides[get_current_user] = get_test_current_user
 
-# 테스트 클라이언트 생성
 client = TestClient(app)
 
 def test_dummy():
-    """더미 테스트 - CI/CD 파이프라인이 성공하도록 함"""
     assert True
 
 @pytest.mark.skip(reason="Ollama 서비스 의존성으로 인해 CI/CD 환경에서 건너뜀")
 def test_query_endpoint():
-    """쿼리 엔드포인트 테스트 (현재 건너뜀)"""
-    # 이 테스트는 실행되지 않음
     assert True
 
 def generate_random_string(length=8):
-    """랜덤 문자열 생성 (테스트용 사용자 이름 및 이메일 생성에 사용)"""
     return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
 
-# 회원가입 테스트
-@patch('main.register_user')
-def test_register_endpoint(mock_register):
-    """회원가입 엔드포인트 테스트"""
-    # 모의 응답 설정 - 실제 객체 사용
-    mock_register.return_value = mock_user
-    
-    # 랜덤 사용자 정보 생성
-    random_suffix = generate_random_string()
-    username = f"testuser_{random_suffix}"
-    email = f"test_{random_suffix}@example.com"
-    password = "testpassword123"
-    
-    # 회원가입 요청
-    response = client.post(
-        "/register",
-        json={
-            "username": username,
-            "email": email,
-            "password": password
-        }
-    )
-    
-    # 응답 확인
-    assert response.status_code == 200, f"응답 내용: {response.text}"
-    
-    # 중복 회원가입 시도 시뮬레이션
-    mock_register.side_effect = HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Username already registered"
-    )
-    
-    response = client.post(
-        "/register",
-        json={
-            "username": username,
-            "email": email,
-            "password": password
-        }
-    )
-    assert response.status_code == 400, f"응답 내용: {response.text}"
+def test_register_endpoint_success():
+    """회원가입 성공 테스트"""
+    # DB 세션 모킹 함수 수정
+    def get_test_db_for_register():
+        db = MagicMock()
+        # 중복 사용자 검사에서 None 반환 (중복 없음)
+        db.query().filter().first.return_value = None
 
-# 로그인 테스트
+        # db.add(user) 호출 시 user 객체에 id와 created_at 설정
+        def mock_add(user):
+            user.id = 1  # id를 명시적으로 설정
+            user.created_at = datetime.now()  # created_at을 명시적으로 설정
+
+        db.add.side_effect = mock_add
+
+        try:
+            yield db
+        finally:
+            pass
+
+    # 원래 오버라이드 저장
+    original_overrides = app.dependency_overrides.copy()
+    # DB 세션 의존성 오버라이드
+    app.dependency_overrides[get_db] = get_test_db_for_register
+
+    try:
+        response = client.post(
+            "/register",
+            json={
+                "username": f"testuser_{generate_random_string()}",
+                "email": f"test_{generate_random_string()}@example.com",
+                "password": "testpassword123"
+            }
+        )
+
+        # 응답 확인
+        assert response.status_code == 200, f"응답 내용: {response.text}"
+
+        data = response.json()
+        assert data["id"] == 1
+        assert "created_at" in data
+
+    finally:
+        # 테스트 후 원래 의존성으로 복원
+        app.dependency_overrides = original_overrides
+
+
+
+def test_register_endpoint_duplicate():
+    def mock_duplicate_user(*args, **kwargs):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already registered"
+        )
+    
+    original_overrides = app.dependency_overrides.copy()
+    app.dependency_overrides[register_user] = mock_duplicate_user
+    
+    try:
+        response = client.post(
+            "/register",
+            json={
+                "username": "existing_user",
+                "email": "existing@example.com",
+                "password": "password123"
+            }
+        )
+        
+        assert response.status_code == 400, f"응답 내용: {response.text}"
+        
+    finally:
+        app.dependency_overrides = original_overrides
+
+
 def test_login_endpoint():
-    """로그인 엔드포인트 테스트"""
-    # 로그인 요청
     with patch('auth.authenticate_user', return_value=mock_user):
         response = client.post(
             "/token",
@@ -137,21 +168,21 @@ def test_login_endpoint():
             headers={"Content-Type": "application/x-www-form-urlencoded"}
         )
     
-    # 응답 확인
     assert response.status_code == 200, f"응답 내용: {response.text}"
+    
     data = response.json()
+    
     assert "access_token" in data
     assert data["token_type"] == "bearer"
 
-# 사용자 정보 조회 테스트
+
 def test_user_me_endpoint():
-    """현재 사용자 정보 조회 엔드포인트 테스트"""
-    # 사용자 정보 요청
+    
     response = client.get(
         "/users/me",
         headers={"Authorization": "Bearer fake_token"}
     )
     
-    # 응답 확인
     assert response.status_code == 200, f"응답 내용: {response.text}"
+    
     assert response.json()["username"] == "testuser"
