@@ -107,6 +107,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Prepare Docker Tags
+        id: prep
+        run: |
+          DOCKER_TAG=$(echo "${{ github.ref_name }}" | sed 's/\//-/g')
+          echo "docker_tag=${DOCKER_TAG}" >> $GITHUB_OUTPUT
         
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -131,13 +137,16 @@ jobs:
           context: ${{ matrix.service.context }}
           file: ${{ matrix.service.dockerfile || '' }}
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/rag-document-${{ matrix.service.name }}:${{ github.sha }},${{ secrets.DOCKER_USERNAME }}/rag-document-${{ matrix.service.name }}:${{ github.ref_name }},${{ secrets.DOCKER_USERNAME }}/rag-document-${{ matrix.service.name }}:latest
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/rag-document-${{ matrix.service.name }}:${{ github.sha }}
+            ${{ secrets.DOCKER_USERNAME }}/rag-document-${{ matrix.service.name }}:${{ steps.prep.outputs.docker_tag }}
+            ${{ secrets.DOCKER_USERNAME }}/rag-document-${{ matrix.service.name }}:latest
           cache-from: type=local,src=/tmp/.buildx-cache-${{ matrix.service.name }}
           cache-to: type=local,dest=/tmp/.buildx-cache-new-${{ matrix.service.name }},mode=max
 
       # 캐시 업데이트 (각 서비스별로 별도 관리)
       - name: Move cache (${{ matrix.service.name }})
-        run : |
+        run: |
           rm -rf /tmp/.buildx-cache-${{ matrix.service.name }}
           mv /tmp/.buildx-cache-new-${{ matrix.service.name }} /tmp/.buildx-cache-${{ matrix.service.name }}
 
