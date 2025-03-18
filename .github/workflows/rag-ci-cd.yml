@@ -2,7 +2,7 @@ name: RAG Document Search CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop-front, develop-backend, develop-rag, feature/postgresql-integration ]
+    branches: [ main, develop-front, develop-backend, develop-rag ]
   pull_request:
     branches: [ main ]
 
@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       test-frontend: ${{ steps.filter.outputs.frontend == 'true' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop-front' }}
-      test-backend: ${{ steps.filter.outputs.backend == 'true' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop-backend' || github.ref == 'refs/heads/feature/postgresql-integration' }}
+      test-backend: ${{ steps.filter.outputs.backend == 'true' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop-backend' }}
       test-rag: ${{ steps.filter.outputs.rag == 'true' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop-rag' }}
     steps:
       - uses: actions/checkout@v4
