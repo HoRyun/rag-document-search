@@ -55,3 +55,7 @@ docker-volumes/
 *.temp
 .cache/
 .pyc
+
+
+# 개인 메모 파일
+isu_*.txt
