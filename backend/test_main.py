@@ -57,15 +57,17 @@ def get_test_db():
 def get_test_current_user():
     return mock_user
 
-with patch('auth.verify_password', mock_verify_password), \
-     patch('auth.get_password_hash', mock_get_password_hash), \
-     patch('auth.authenticate_user', mock_authenticate_user), \
-     patch('auth.create_access_token', mock_create_access_token), \
+# 패치 경로 변경 및 모듈화된 구조에 맞게 수정
+with patch('core.security.verify_password', mock_verify_password), \
+     patch('core.security.get_password_hash', mock_get_password_hash), \
+     patch('core.security.authenticate_user', mock_authenticate_user), \
+     patch('core.security.create_access_token', mock_create_access_token), \
      patch('db.database.engine'), \
      patch('db.database.SessionLocal'):
 
-    from main import app, register_user
-    from auth import get_current_user
+    from main import app
+    from api.v1.endpoints.auth import register_user
+    from core.security import get_current_user
     from db.database import get_db
 
     app.dependency_overrides[get_db] = get_test_db
@@ -109,8 +111,9 @@ def test_register_endpoint_success():
     app.dependency_overrides[get_db] = get_test_db_for_register
 
     try:
+        # 엔드포인트 경로 수정
         response = client.post(
-            "/register",
+            "/api/v1/auth/register",
             json={
                 "username": f"testuser_{generate_random_string()}",
                 "email": f"test_{generate_random_string()}@example.com",
@@ -123,7 +126,7 @@ def test_register_endpoint_success():
 
         data = response.json()
         assert data["id"] == 1
-        assert "created_at" in data
+        assert "username" in data
 
     finally:
         # 테스트 후 원래 의존성으로 복원
@@ -142,8 +145,9 @@ def test_register_endpoint_duplicate():
     app.dependency_overrides[register_user] = mock_duplicate_user
     
     try:
+        # 엔드포인트 경로 수정
         response = client.post(
-            "/register",
+            "/api/v1/auth/register",
             json={
                 "username": "existing_user",
                 "email": "existing@example.com",
@@ -158,9 +162,10 @@ def test_register_endpoint_duplicate():
 
 
 def test_login_endpoint():
-    with patch('auth.authenticate_user', return_value=mock_user):
+    with patch('core.security.authenticate_user', return_value=mock_user):
+        # 엔드포인트 경로 수정
         response = client.post(
-            "/token",
+            "/api/v1/auth/token",
             data={
                 "username": "testuser",
                 "password": "password"
@@ -177,9 +182,9 @@ def test_login_endpoint():
 
 
 def test_user_me_endpoint():
-    
+    # 엔드포인트 경로 수정
     response = client.get(
-        "/users/me",
+        "/api/v1/users/me",
         headers={"Authorization": "Bearer fake_token"}
     )
     
