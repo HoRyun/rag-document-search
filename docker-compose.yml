@@ -9,10 +9,10 @@ services:
       - ./backend:/app
       - ./data:/data
     environment:
-      - CHROMA_HOST=chroma
       - OLLAMA_HOST=ollama
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/ragdb
     depends_on:
-      - chroma
+      - db
       - ollama
 
   frontend:
@@ -25,12 +25,18 @@ services:
     depends_on:
      - backend
 
-  chroma:
-    image: ghcr.io/chroma-core/chroma:latest
+  db:
+    image: ankane/pgvector:latest
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ragdb
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
-      - chroma-data:/chroma/chroma
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     ports:
-      - "8001:8000"
+      - "5432:5432"
 
   ollama:
     build: ./ollama
@@ -40,5 +46,5 @@ services:
       - "11434:11434"
 
 volumes:
-  chroma-data:
+  postgres-data:
   ollama-data:

@@ -49,3 +49,67 @@
   .document-list {
     list-style: none;
   }
+
+  /* 인증 관련 스타일 */
+  .auth-container {
+    max-width: 400px;
+    margin: 2rem auto;
+    padding: 2rem;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  .login-form,
+  .register-form {
+    width: 100%;
+  }
+
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+
+  .form-group input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+  }
+
+  .error-message {
+    color: #e74c3c;
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    background-color: #fde2e2;
+    border-radius: 4px;
+    font-size: 0.9rem;
+  }
+
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: white;
+    font-size: 0.9rem;
+  }
+
+  .user-info button {
+    background-color: transparent;
+    border: 1px solid white;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+
+  .user-info button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
