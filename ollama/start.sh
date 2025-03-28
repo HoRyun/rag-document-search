@@ -15,7 +15,7 @@ then
     
     # Llama 2 모델 다운로드
     echo "Llama 2 모델을 다운로드합니다..."
-    ollama pull llama2
+    ollama pull llama2:7b
     
     echo "모델 다운로드가 완료되었습니다."
     
