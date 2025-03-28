@@ -1,0 +1,16 @@
+# Git 속성 정의
+
+# 모든 텍스트 파일의 기본 동작을 설정
+* text=auto
+
+# 셸 스크립트는 항상 LF 줄바꿈 문자 사용 (Linux 스타일)
+*.sh text eol=lf
+
+# 도커 파일도 LF 사용
+Dockerfile text eol=lf
+
+# 실행 파일은 바이너리로 취급
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary 
