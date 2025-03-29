@@ -20,11 +20,13 @@ def manually_create_vector_extension():
     try:
         # 클라이언트 인코딩 옵션 추가
         modified_url = DATABASE_URL
-        if 'postgresql' in DATABASE_URL:
-            if '?' in DATABASE_URL:
-                modified_url = f"{DATABASE_URL}&client_encoding=utf8"
-            else:
-                modified_url = f"{DATABASE_URL}?client_encoding=utf8"
+        if 'postgresql' in DATABASE_URL and not DATABASE_URL.startswith('postgresql+psycopg2://'):
+            modified_url = DATABASE_URL.replace('postgresql://', 'postgresql+psycopg2://')
+            
+        if '?' in modified_url:
+            modified_url = f"{modified_url}&client_encoding=utf8"
+        else:
+            modified_url = f"{modified_url}?client_encoding=utf8"
                 
         engine = create_engine(modified_url)
         with engine.connect() as connection:
@@ -41,12 +43,14 @@ def get_vector_store():
     
     # 클라이언트 인코딩 옵션 추가
     modified_url = DATABASE_URL
-    if 'postgresql' in DATABASE_URL:
-        # 기존 URL에 client_encoding 매개변수 추가
-        if '?' in DATABASE_URL:
-            modified_url = f"{DATABASE_URL}&client_encoding=utf8"
-        else:
-            modified_url = f"{DATABASE_URL}?client_encoding=utf8"
+    if 'postgresql' in DATABASE_URL and not DATABASE_URL.startswith('postgresql+psycopg2://'):
+        modified_url = DATABASE_URL.replace('postgresql://', 'postgresql+psycopg2://')
+    
+    # 기존 URL에 client_encoding 매개변수 추가
+    if '?' in modified_url:
+        modified_url = f"{modified_url}&client_encoding=utf8"
+    else:
+        modified_url = f"{modified_url}?client_encoding=utf8"
     
     # 재시도 로직
     retries = 3
