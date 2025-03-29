@@ -7,9 +7,9 @@ from typing import Tuple, List, Dict, Any
 from langchain_core.documents import Document as LangchainDocument
 from langchain.chains.retrieval_qa.base import RetrievalQA
 
-from models.models import Document, DocumentChunk
-from core.embeddings import get_vector_store, get_llm
-from utils.file_handlers import (
+from db.models import Document, DocumentChunk
+from rag.embeddings import get_vector_store, get_llm
+from rag.file_handlers import (
     process_pdf, 
     process_docx, 
     process_hwp, 
