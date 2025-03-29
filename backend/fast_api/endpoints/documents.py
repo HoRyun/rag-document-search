@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from db.database import get_db
-from models.models import User
-from core.security import get_current_user
-from services.document_service import get_all_documents, process_document, query_documents
+from db.models import User
+from fast_api.security import get_current_user
+from rag.document_service import get_all_documents, process_document, query_documents
 
 router = APIRouter()
 

@@ -1,38 +1,40 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON, Boolean
 from sqlalchemy.orm import relationship
-from pgvector.sqlalchemy import Vector
-import datetime
+from datetime import datetime
 
-from .database import Base
+from db.database import Base
 
 class User(Base):
-    __tablename__ = 'users'
-    
-    id = Column(Integer, primary_key=True)
-    username = Column(String(50), unique=True, nullable=False)
-    email = Column(String(100), unique=True, nullable=False)
-    password_hash = Column(String(128), nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    """사용자 모델"""
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    email = Column(String, unique=True, index=True)
+    password_hash = Column(String)
+    created_at = Column(DateTime, default=datetime.now)
     
     documents = relationship("Document", back_populates="owner")
 
 class Document(Base):
-    __tablename__ = 'documents'
-    
-    id = Column(Integer, primary_key=True)
-    filename = Column(String(255), nullable=False)
-    upload_time = Column(DateTime, default=datetime.datetime.utcnow)
-    user_id = Column(Integer, ForeignKey('users.id'))
+    """문서 모델"""
+    __tablename__ = "documents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String)
+    upload_time = Column(DateTime, default=datetime.now)
+    user_id = Column(Integer, ForeignKey("users.id"))
     
     owner = relationship("User", back_populates="documents")
     chunks = relationship("DocumentChunk", back_populates="document")
 
 class DocumentChunk(Base):
-    __tablename__ = 'document_chunks'
+    """문서 청크 모델"""
+    __tablename__ = "document_chunks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, ForeignKey("documents.id"))
+    content = Column(String)
+    meta = Column(JSON)
     
-    id = Column(Integer, primary_key=True)
-    document_id = Column(Integer, ForeignKey('documents.id'))
-    content = Column(Text, nullable=False)
-    embedding = Column(Vector(1536))  # OpenAI 임베딩 차원에 맞게 조정
-    
-    document = relationship("Document", back_populates="chunks")
+    document = relationship("Document", back_populates="chunks") 

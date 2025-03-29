@@ -59,3 +59,12 @@ docker-volumes/
 
 # 개인 메모 파일
 isu_*.txt
+
+# 백업파일
+*.bak
+*.bak2
+*.bak3
+*.bak4
+*.bak5
+*.bak6
+*.bak7
