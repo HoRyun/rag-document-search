@@ -13,6 +13,8 @@ data/uploads/
 # 데이터베이스 및 벡터 저장소
 data/chroma_db/
 data/faiss_db/
+.pkl
+.faiss
 
 # 환경 변수
 .env
