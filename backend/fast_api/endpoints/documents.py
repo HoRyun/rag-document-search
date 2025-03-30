@@ -3,9 +3,9 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from db.database import get_db
-from models.models import User
-from core.security import get_current_user
-from services.document_service import get_all_documents, process_document, query_documents
+from db.models import User
+from fast_api.security import get_current_user
+from rag.document_service import get_all_documents, process_document, query_documents
 
 router = APIRouter()
 
@@ -31,14 +31,13 @@ async def upload_document(
     db: Session = Depends(get_db)
 ):
     """문서 업로드 엔드포인트"""
-    document_id, chunks_count, file_path = process_document(file, current_user.id, db)
+    # 성공시 code=200, 실패시 code=500
+    code = process_document(file, current_user.id, db)
     
     # 파일 업로드 및 처리가 완료되면 성공 메시지를 반환
     return {
         "message": f"Document {file.filename} uploaded and processed successfully",
-        "chunks": chunks_count,
-        "path": file_path,
-        "document_id": document_id
+        "code": code
     }
 
 @router.post("/query")

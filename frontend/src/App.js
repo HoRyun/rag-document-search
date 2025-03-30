@@ -5,7 +5,7 @@ import LoginForm from "./components/LoginForm";
 import RegisterForm from "./components/RegisterForm";
 
 // API 기본 URL 설정
-const API_BASE_URL = "http://localhost:8000/api/v1";
+const API_BASE_URL = "http://localhost:8000/fast_api";
 
 function App() {
   const [file, setFile] = useState(null);
@@ -35,7 +35,7 @@ function App() {
 
   const fetchUserInfo = async (token) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/auth/users/me`, {
+      const response = await axios.get(`${API_BASE_URL}/auth/me`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -67,28 +67,40 @@ function App() {
     setFile(e.target.files[0]);
   };
 
-  // 파일 업로드 함수
+  // 파일 업로드를 처리하는 비동기 함수 선언
   const handleUpload = async () => {
+    // 파일이 선택되지 않았으면 함수 실행을 중단
     if (!file) return;
 
+    // 파일 전송을 위한 FormData 객체 생성
     const formData = new FormData();
+    // FormData에 'file'이라는 키로 선택된 파일 추가
     formData.append("file", file);
 
+    // 업로드 진행 중 상태를 true로 설정
     setIsUploading(true);
     try {
+      // 로컬 스토리지에서 인증 토큰 가져오기
       const token = localStorage.getItem("token");
+      // axios를 사용하여 서버에 파일 업로드 요청 전송 (인증 헤더 포함)
       await axios.post(`${API_BASE_URL}/documents/upload`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      setFile(null); // 파일 업로드가 성공적으로 완료된 후에 파일 상태를 초기화하는 작업
+      // 업로드 성공 후 파일 상태 초기화
+      setFile(null);
+      // 문서 목록을 새로고침하여 업로드된 파일 표시
       fetchDocuments();
+      // 사용자에게 업로드 성공 메시지 표시
       alert("Document uploaded successfully");
     } catch (error) {
+      // 오류 발생 시 콘솔에 오류 로깅
       console.error("Error uploading document:", error);
+      // 사용자에게 업로드 실패 메시지 표시
       alert("Error uploading document");
     } finally {
+      // 성공이나 실패와 관계없이 업로드 진행 중 상태를 false로 설정
       setIsUploading(false);
     }
   };
