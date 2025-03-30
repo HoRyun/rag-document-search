@@ -28,7 +28,7 @@ def process_pdf(file_path):
     loader = PyPDFLoader(file_path)
     documents = loader.load()
     
-    # PDF 문서 내용 정리
+    # PDF 문서 내용 정리. null이나 기타 문제가 될 수 있는 문자 제거.
     for doc in documents:
         doc.page_content = clean_text(doc.page_content)
         
@@ -113,4 +113,4 @@ def save_uploaded_file(file, filename):
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
-    return file_path, timestamp 
+    return file_path 

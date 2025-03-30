@@ -12,6 +12,7 @@ data/uploads/
 
 # 데이터베이스 및 벡터 저장소
 data/chroma_db/
+data/faiss_db/
 
 # 환경 변수
 .env
@@ -27,6 +28,7 @@ logs/
 # 의존성 디렉토리
 node_modules/
 __pycache__/
+__pycache__
 .pytest_cache/
 .coverage
 htmlcov/

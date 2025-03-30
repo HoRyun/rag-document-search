@@ -7,6 +7,7 @@ TEST_MODE = os.environ.get('TEST_MODE', 'False').lower() == 'true'
 OLLAMA_HOST = os.environ.get('OLLAMA_HOST', 'localhost')
 OLLAMA_PORT = os.environ.get('OLLAMA_PORT', '11434')
 
+
 # 업로드 디렉토리 설정
 if TEST_MODE:
     UPLOAD_DIR = tempfile.mkdtemp()
