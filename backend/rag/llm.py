@@ -1,5 +1,7 @@
 from langchain_core.prompts import PromptTemplate
 from langchain_community.llms import Ollama
+from langchain_openai import ChatOpenAI
+
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 
@@ -24,7 +26,14 @@ def get_llms_answer(query: str, retriever: any) -> str:
     #Answer:"""
     )    
 
-    # 모델(LLM) 을 생성합니다.
+    # OpenAI 모델 사용, .env 파일에 openapi 키 설정 필요
+    # 모델(LLM) 객체를 생성합니다.
+    # llm = ChatOpenAI(
+    # temperature=0,
+    # model_name="gpt-4o-mini",)
+
+
+    # Local Ollama 모델 사용 (Ollama 컨테이너 실행 필요)
     llm = Ollama(base_url=f"http://{OLLAMA_HOST}:{OLLAMA_PORT}", model="llama2")
 
     # 단계 8: 체인(Chain) 생성

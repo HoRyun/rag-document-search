@@ -1,8 +1,4 @@
-from dotenv import load_dotenv
 import os
-
-
-load_dotenv()
 
 from fastapi import UploadFile, HTTPException
 from sqlalchemy.orm import Session
@@ -35,22 +31,22 @@ def get_all_documents(db: Session):
     """모든 문서 조회"""
     return db.query(Document).all()
 
-def safe_json_serializable(data):
-    """JSON으로 직렬화할 수 있는 데이터만 반환.
-    보조 기능 함수.
-    """
-    try:
-        # JSON 직렬화 시도
-        json.dumps(data)
-        return data
-    except (TypeError, OverflowError):
-        # 직렬화할 수 없는 경우 문자열로 변환
-        if isinstance(data, dict):
-            return {k: safe_json_serializable(v) for k, v in data.items()}
-        elif isinstance(data, list):
-            return [safe_json_serializable(item) for item in data]
-        else:
-            return str(data)
+# def safe_json_serializable(data):
+#     """JSON으로 직렬화할 수 있는 데이터만 반환.
+#     보조 기능 함수.
+#     """
+#     try:
+#         # JSON 직렬화 시도
+#         json.dumps(data)
+#         return data
+#     except (TypeError, OverflowError):
+#         # 직렬화할 수 없는 경우 문자열로 변환
+#         if isinstance(data, dict):
+#             return {k: safe_json_serializable(v) for k, v in data.items()}
+#         elif isinstance(data, list):
+#             return [safe_json_serializable(item) for item in data]
+#         else:
+#             return str(data)
 
 def process_document(
     file: UploadFile, 
