@@ -1,19 +1,22 @@
-from pydantic import BaseModel, EmailStr, ConfigDict
-from typing import List, Dict, Any, Optional
+from pydantic import BaseModel, EmailStr, Field
+from typing import Optional, List
 from datetime import datetime
 
 # 사용자 스키마
 class UserBase(BaseModel):
-    username: str
     email: EmailStr
+    username: str
 
 class UserCreate(UserBase):
     password: str
 
 class UserResponse(UserBase):
     id: int
+    username: str
+    created_at: Optional[datetime] = None
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 # 토큰 스키마
 class Token(BaseModel):
@@ -34,12 +37,13 @@ class DocumentResponse(DocumentBase):
     id: int
     upload_time: datetime
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 # 문서 청크 스키마
 class DocumentChunkBase(BaseModel):
     content: str
-    meta: Dict[str, Any]
+    meta: dict
 
 class DocumentChunkCreate(DocumentChunkBase):
     document_id: int
@@ -48,7 +52,8 @@ class DocumentChunkResponse(DocumentChunkBase):
     id: int
     document_id: int
     
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
 # 검색 쿼리 스키마
 class QueryRequest(BaseModel):
