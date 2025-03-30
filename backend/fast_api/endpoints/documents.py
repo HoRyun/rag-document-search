@@ -31,14 +31,13 @@ async def upload_document(
     db: Session = Depends(get_db)
 ):
     """문서 업로드 엔드포인트"""
-    document_id, chunks_count, file_path = process_document(file, current_user.id, db)
+    # 성공시 code=200, 실패시 code=500
+    code = process_document(file, current_user.id, db)
     
     # 파일 업로드 및 처리가 완료되면 성공 메시지를 반환
     return {
         "message": f"Document {file.filename} uploaded and processed successfully",
-        "chunks": chunks_count,
-        "path": file_path,
-        "document_id": document_id
+        "code": code
     }
 
 @router.post("/query")
