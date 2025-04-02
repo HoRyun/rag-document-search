@@ -32,3 +32,12 @@ def get_vector_store():
     )    
 
     return loaded_db
+
+def save_to_vector_store(chunked_documents):
+    # FAISS 벡터 저장소 생성
+    vector_store=create_vector_store(chunked_documents, get_embeddings())
+    
+    # 로컬 disk에 저장. index_name: vectorstore의 이름.
+    vector_store.save_local(folder_path="db/faiss_db", index_name="faiss_index")  
+
+   

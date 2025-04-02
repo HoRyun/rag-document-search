@@ -1,6 +1,10 @@
 from fastapi import FastAPI
 import os
 
+# 추적을 위한 .env 설정 불러오기
+from dotenv import load_dotenv
+load_dotenv()
+
 # LangSmith 추적 활성화
 from langchain_teddynote import logging
 
