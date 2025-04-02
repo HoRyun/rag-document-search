@@ -7,4 +7,7 @@ RUN npm install
 
 COPY . .
 
+ENV CHOKIDAR_USEPOLLING=true
+ENV WATCHPACK_POLLING=true
+
 CMD ["npm", "start"]
