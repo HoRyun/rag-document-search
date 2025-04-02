@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 from datetime import datetime
 from fastapi import HTTPException, status
 
-# 테스트 모드 설정
+# 테스트 모드 설정(github actions 테스트 환경에서 사용)
 os.environ['TEST_MODE'] = 'True'
 
 # 모의 사용자 객체 생성 (Pydantic 호환)

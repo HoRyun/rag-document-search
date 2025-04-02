@@ -75,7 +75,7 @@ function App() {
     // 파일 전송을 위한 FormData 객체 생성
     const formData = new FormData();
     // FormData에 'file'이라는 키로 선택된 파일 추가
-    formData.append("file", file);
+    formData.append("file", file, file.webkitRelativePath);
 
     // 업로드 진행 중 상태를 true로 설정
     setIsUploading(true);
@@ -198,6 +198,8 @@ function App() {
               type="file"
               accept=".pdf,.docx,.hwp,.hwpx"
               onChange={handleFileChange}
+              webkitdirectory=""
+              directory=""
             />
             {/* 유저가 파일을 업로드하는 필드*/}
             <button onClick={handleUpload} disabled={!file || isUploading}>
