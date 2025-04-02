@@ -1,115 +1,48 @@
-.App {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-  }
-  
-  .App-header {
-    margin-bottom: 30px;
-    text-align: center;
-  }
-  
-  section {
-    margin-bottom: 30px;
-    padding: 20px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-  }
-  
-  .upload-form, .query-form {
-    display: flex;
-    gap: 10px;
-    margin-top: 10px;
-  }
-  
-  .query-form {
-    flex-direction: column;
-  }
-  
-  textarea {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-  }
-  
-  button {
-    padding: 10px 20px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-  
-  button:disabled {
-    background-color: #cccccc;
-  }
-  
-  .document-list {
-    list-style: none;
-  }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Roboto', Arial, sans-serif;
+}
 
-  /* 인증 관련 스타일 */
-  .auth-container {
-    max-width: 400px;
-    margin: 2rem auto;
-    padding: 2rem;
-    background-color: #fff;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  }
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+}
 
-  .login-form,
-  .register-form {
-    width: 100%;
-  }
+.main-container {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
 
-  .form-group {
-    margin-bottom: 1rem;
-  }
+/* 인증 화면 컨테이너 */
+.auth-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #f5f5f5;
+  padding: 20px;
+}
 
-  .form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-  }
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
 
-  .form-group input {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 1rem;
-  }
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
 
-  .error-message {
-    color: #e74c3c;
-    margin-bottom: 1rem;
-    padding: 0.5rem;
-    background-color: #fde2e2;
-    border-radius: 4px;
-    font-size: 0.9rem;
-  }
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
 
-  .user-info {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    color: white;
-    font-size: 0.9rem;
-  }
-
-  .user-info button {
-    background-color: transparent;
-    border: 1px solid white;
-    color: white;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.8rem;
-  }
-
-  .user-info button:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-  }
+::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}

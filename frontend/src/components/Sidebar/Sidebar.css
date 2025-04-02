@@ -1,0 +1,67 @@
+.sidebar {
+    width: 250px;
+    height: 100%;
+    background-color: #f5f5f5;
+    border-right: 1px solid #ddd;
+    overflow-y: auto;
+  }
+  
+  .sidebar-header {
+    padding: 15px;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  .sidebar-header h3 {
+    font-size: 16px;
+    color: #333;
+  }
+  
+  .directory-list {
+    padding: 10px 0;
+  }
+  
+  .directory-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  .directory-item:hover {
+    background-color: #ebebeb;
+  }
+  
+  .directory-item.active {
+    background-color: #e0e0e0;
+    font-weight: bold;
+  }
+  
+  .directory-icon {
+    margin-right: 10px;
+  }
+  
+  .folder-icon {
+    display: inline-block;
+    width: 20px;
+    height: 16px;
+    background-color: #ffd04c;
+    position: relative;
+    border-radius: 2px 2px 0 0;
+  }
+  
+  .folder-icon:before {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 3px;
+    background-color: #ffd04c;
+    top: -3px;
+    left: 0;
+    border-radius: 2px 2px 0 0;
+  }
+  
+  .directory-name {
+    font-size: 14px;
+    color: #333;
+  }
