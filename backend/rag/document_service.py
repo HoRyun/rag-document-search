@@ -18,6 +18,7 @@ from langchain_community.docstore.in_memory import InMemoryDocstore
 # 함수 불러오기
 from db.models import Document, DocumentChunk
 
+from rag.retriever import get_reretriever
 from rag.embeddings import get_embeddings
 from rag.vectorstore import create_vector_store, get_vector_store, save_to_vector_store
 from rag.llm import get_llms_answer
@@ -97,7 +98,6 @@ async def process_document(
         # 문서 청킹
         chunked_documents = chunk_documents(documents, file.filename)
 
-
         # 벡터 스토어에 저장
         save_to_vector_store(chunked_documents)
         
@@ -166,8 +166,11 @@ def query_documents(query: str) -> str:
         # 벡터 스토어 가져오기
         vector_store = get_vector_store()
         
+        # reretriever 생성
+        reretriever = get_reretriever(vector_store)
+
         # 질의 실행, 2번째 파라미터로 retriever(검색기) 전달
-        result = get_llms_answer(query, vector_store.as_retriever())
+        result = get_llms_answer(query, reretriever)
         
         return result
     except Exception as e:

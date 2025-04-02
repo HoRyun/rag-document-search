@@ -24,14 +24,20 @@ def get_vector_store():
 
 
     # 로컬에 저장된 vectorstore를 로드
-    loaded_db = FAISS.load_local(
-        folder_path="db/faiss_db",
+    vector_store = FAISS.load_local(
+        folder_path="db/faiss_db/",
         index_name="faiss_index",
         embeddings=embeddings,
         allow_dangerous_deserialization=True,
-    )    
+    )
 
-    return loaded_db
+    print(vector_store)
+    print("--------------------------------")
+    print(vector_store.similarity_search("어떤 문서가 저장되어 있습니까?"))
+    print("--------------------------------")
+    print(len(vector_store.docstore._dict))
+    print("--------------------------------")
+    return vector_store
 
 def save_to_vector_store(chunked_documents):
     # FAISS 벡터 저장소 생성
