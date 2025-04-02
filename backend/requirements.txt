@@ -133,6 +133,7 @@ pydantic_core==2.27.2
 Pygments==2.19.1
 pyhwp==0.1b15
 pypdf==5.4.0
+PyPDF2==3.0.1
 PyPika==0.48.9
 pyproject_hooks==1.2.0
 pyreadline3==3.5.4
