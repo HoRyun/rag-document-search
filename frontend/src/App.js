@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import Header from "./components/Header/Header";
 import Sidebar from "./components/Sidebar/Sidebar";
@@ -22,8 +22,6 @@ function App() {
   const [user, setUser] = useState(null);
 
   // RAG 관련 상태
-  const [query, setQuery] = useState("");
-  const [answer, setAnswer] = useState("");
   const [isQuerying, setIsQuerying] = useState(false);
 
   // 컴포넌트 마운트 시 로그인 상태 확인
@@ -34,13 +32,6 @@ function App() {
       fetchUserInfo(token);
     }
   }, []);
-
-  // 인증 시 문서 목록 가져오기
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchDocuments();
-    }
-  }, [isAuthenticated]);
 
   // 사용자 정보 가져오기
   const fetchUserInfo = async (token) => {
@@ -59,7 +50,7 @@ function App() {
   };
 
   // 문서 목록 가져오기
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(`${API_BASE_URL}/documents`, {
@@ -81,7 +72,14 @@ function App() {
     } catch (error) {
       console.error("Error fetching documents:", error);
     }
-  };
+  }, [currentPath]);
+
+  // 인증 시 문서 목록 가져오기
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchDocuments();
+    }
+  }, [isAuthenticated, fetchDocuments]);
 
   // 파일 타입 유추
   const getFileType = (filename) => {
@@ -124,7 +122,6 @@ function App() {
   const handleQuery = async (queryText) => {
     if (!queryText.trim()) return;
 
-    setQuery(queryText);
     setIsQuerying(true);
 
     try {
@@ -143,7 +140,6 @@ function App() {
       );
 
       const answer = response.data.answer;
-      setAnswer(answer);
 
       // 챗봇에 표시할 응답 반환
       return answer;
