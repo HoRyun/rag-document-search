@@ -26,17 +26,23 @@ def list_documents(db: Session = Depends(get_db)):
 
 @router.post("/upload")
 async def upload_document(
-    file: UploadFile = File(...), 
+    file: List[UploadFile] = File(...), 
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """문서 업로드 엔드포인트"""
     # 성공시 code=200, 실패시 code=500
-    code = process_document(file, current_user.id, db)
+
+    for single_file in file:
+        code = await process_document(single_file, current_user.id, db)
+
+
+
+    # # 여기에 반복문으로 여러 파일 처리하는 코드 작성해야 함.
+    # code = process_document(file, current_user.id, db)
     
     # 파일 업로드 및 처리가 완료되면 성공 메시지를 반환
     return {
-        "message": f"Document {file.filename} uploaded and processed successfully",
         "code": code
     }
 

@@ -8,23 +8,27 @@ from typing import Tuple, List, Dict, Any
 
 from langchain_core.documents import Document as LangchainDocument
 from langchain.chains.retrieval_qa.base import RetrievalQA
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 import faiss
 from langchain_community.vectorstores import FAISS
 from langchain_community.docstore.in_memory import InMemoryDocstore
 
+
+
+# 함수 불러오기
 from db.models import Document, DocumentChunk
+
+from rag.retriever import get_reretriever
 from rag.embeddings import get_embeddings
-from rag.vectorstore import create_vector_store, get_vector_store
+from rag.vectorstore import create_vector_store, get_vector_store, save_to_vector_store
 from rag.llm import get_llms_answer
-from rag.file_handlers import (
-    process_pdf, 
-    process_docx, 
-    process_hwp, 
-    prepare_chunks,
-    save_uploaded_file,
-    clean_text
+from rag.file_load import (
+    load_pdf, 
+    load_docx, 
+    load_hwp, 
 )
+from rag.chunking import chunk_documents
+
 
 
 def get_all_documents(db: Session):
@@ -48,11 +52,11 @@ def get_all_documents(db: Session):
 #         else:
 #             return str(data)
 
-def process_document(
+async def process_document(
     file: UploadFile, 
     user_id: int, 
     db: Session
-) -> Tuple[int, int, str]:
+) -> int:
     """문서 업로드 및 처리
     주 기능 함수.
     """
@@ -66,8 +70,9 @@ def process_document(
             detail=f"Only {', '.join(supported_extensions)} files are supported"
         )
     
-    # 파일 저장
-    file_path= save_uploaded_file(file, file.filename)
+    # # 파일 저장 
+    # 현재 필요하지 않은 기능이므로 우선 주석처리.
+    # file_path= save_uploaded_file(file, file.filename)
     
     try:
         # DB의 documents 테이블에 문서 정보 저장.
@@ -82,31 +87,21 @@ def process_document(
 
 
 
-        # 파일 형식에 따른 처리
+        # 파일 형식에 따라 문서 로드
         if file_extension == 'pdf':
-            documents = process_pdf(file_path)
+            documents = await load_pdf(file)
         elif file_extension == 'docx':
-            documents = process_docx(file_path)
+            documents = load_docx(file)
         elif file_extension in ['hwp', 'hwpx']:
-            documents = process_hwp(file_path, file_extension)
+            documents = load_hwp(file, file_extension)
         
+        # 문서 청킹
+        chunked_documents = chunk_documents(documents, file.filename)
 
-
-        #문서 분할(Split Documents)
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-        split_documents = text_splitter.split_documents(documents)
-
-        #임베딩(Embedding) 생성
-        embeddings = get_embeddings()
-
-
-        # FAISS 벡터 저장소 생성
-        vector_store=create_vector_store(split_documents, embeddings)
-
-        # 로컬 disk에 저장. index_name: vectorstore의 이름.
-        vector_store.save_local(folder_path="db/faiss_db", index_name="faiss_index")
-
-
+        # 벡터 스토어에 저장
+        save_to_vector_store(chunked_documents)
+        
+        print(f"Document {os.path.basename(file.filename)} uploaded and processed successfully")
 
 
         # # 청크 준비
@@ -171,8 +166,11 @@ def query_documents(query: str) -> str:
         # 벡터 스토어 가져오기
         vector_store = get_vector_store()
         
+        # reretriever 생성
+        reretriever = get_reretriever(vector_store)
+
         # 질의 실행, 2번째 파라미터로 retriever(검색기) 전달
-        result = get_llms_answer(query, vector_store.as_retriever())
+        result = get_llms_answer(query, reretriever)
         
         return result
     except Exception as e:

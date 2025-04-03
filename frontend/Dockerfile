@@ -11,6 +11,7 @@ RUN npm install
 # 나머지 소스 코드 복사
 COPY . .
 
+
 # 포트 노출
 EXPOSE 3000
 
