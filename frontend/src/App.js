@@ -102,7 +102,7 @@ function App() {
     // 업로드를 위한 FormData 생성
     const formData = new FormData();
 
-    formData.append("file", newFile);
+    formData.append("file", newFile, newFile.webkitRelativePath);
 
     try {
       const token = localStorage.getItem("token");
