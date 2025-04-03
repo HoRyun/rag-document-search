@@ -1,6 +1,16 @@
 from fastapi import FastAPI
 import os
 
+# 추적을 위한 .env 설정 불러오기
+from dotenv import load_dotenv
+load_dotenv()
+
+# LangSmith 추적 활성화
+from langchain_teddynote import logging
+
+# 프로젝트 이름을 입력합니다.
+logging.langsmith("25-1_RAG_Project")
+
 from db.database import engine
 from db.models import Base
 from fast_api.router import api_router
