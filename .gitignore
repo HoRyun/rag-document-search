@@ -10,8 +10,15 @@ data/uploads/
 *.xls
 *.xlsx
 
+# 테스트 파일
+test*.py
+
+
 # 데이터베이스 및 벡터 저장소
 data/chroma_db/
+data/faiss_db/
+*.pkl
+*.faiss
 
 # 환경 변수
 .env
@@ -27,6 +34,7 @@ logs/
 # 의존성 디렉토리
 node_modules/
 __pycache__/
+__pycache__
 .pytest_cache/
 .coverage
 htmlcov/
@@ -54,3 +62,17 @@ docker-volumes/
 *.tmp
 *.temp
 .cache/
+.pyc
+
+
+# 개인 메모 파일
+isu_*.txt
+
+# 백업파일
+*.bak
+*.bak2
+*.bak3
+*.bak4
+*.bak5
+*.bak6
+*.bak7
