@@ -2,8 +2,9 @@ import React, { useState, useRef } from 'react';
 import FileItem from '../FileItem/FileItem';
 import './FileDisplay.css';
 
-const FileDisplay = ({ files, currentPath, onAddFile }) => {
+const FileDisplay = ({ files, currentPath, onAddFile, onRefresh }) => {
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
   
   // Handle drag events
@@ -33,15 +34,33 @@ const FileDisplay = ({ files, currentPath, onAddFile }) => {
   };
   
   // Process the files
-  const handleFiles = (fileList) => {
-    for (let i = 0; i < fileList.length; i++) {
-      onAddFile(fileList[i]);
+  const handleFiles = async (fileList) => {
+    setIsUploading(true);
+    try {
+      for (let i = 0; i < fileList.length; i++) {
+        await onAddFile(fileList[i]);
+      }
+      // Clear file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      console.error("Error handling files:", error);
+    } finally {
+      setIsUploading(false);
     }
   };
   
   // Trigger file input click
   const handleUploadClick = () => {
     fileInputRef.current.click();
+  };
+  
+  // Refresh file list
+  const handleRefresh = () => {
+    if (onRefresh) {
+      onRefresh();
+    }
   };
 
   return (
@@ -53,15 +72,25 @@ const FileDisplay = ({ files, currentPath, onAddFile }) => {
     >
       <div className="file-display-header">
         <h2>{currentPath === '/' ? 'Home' : currentPath.substring(1)}</h2>
-        <button className="upload-btn" onClick={handleUploadClick}>
-          Upload File
-        </button>
+        <div className="file-actions">
+          <button className="refresh-btn" onClick={handleRefresh}>
+            Refresh
+          </button>
+          <button 
+            className="upload-btn" 
+            onClick={handleUploadClick}
+            disabled={isUploading}
+          >
+            {isUploading ? "Uploading..." : "Upload File"}
+          </button>
+        </div>
         <input 
           type="file" 
           ref={fileInputRef}
           style={{ display: 'none' }}
           onChange={handleFileInputChange}
           multiple
+          accept=".pdf,.docx,.doc,.hwp,.hwpx,.xlsx,.xls,.txt"
         />
       </div>
       
