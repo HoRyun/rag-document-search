@@ -9,11 +9,9 @@ services:
       - ./backend:/app
       - ./data:/data
     environment:
-      - OLLAMA_HOST=ollama
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/ragdb
     depends_on:
       - db
-      - ollama
 
   frontend:
     build: ./frontend
@@ -22,8 +20,13 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    stdin_open: true
+    tty: true
     depends_on:
-     - backend
+      - backend
 
   db:
     image: ankane/pgvector:latest
@@ -38,13 +41,6 @@ services:
     ports:
       - "5432:5432"
 
-  ollama:
-    build: ./ollama
-    volumes:
-      - ollama-data:/root/.ollama
-    ports:
-      - "11434:11434"
 
 volumes:
   postgres-data:
-  ollama-data:
