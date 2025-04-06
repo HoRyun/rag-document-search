@@ -1,0 +1,108 @@
+.file-display {
+  flex: 1;
+  padding: 20px;
+  background-color: #fff;
+  position: relative;
+  overflow-y: auto;
+  min-height: 400px;
+}
+
+.file-display.dragging {
+  background-color: #f5f9ff;
+}
+
+.file-display-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.file-display-header h2 {
+  font-size: 24px;
+  color: #333;
+  text-transform: capitalize;
+}
+
+.file-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.upload-btn, .refresh-btn {
+  padding: 10px 16px;
+  background-color: #4285f4;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.upload-btn:hover, .refresh-btn:hover {
+  background-color: #3367d6;
+}
+
+.upload-btn:disabled {
+  background-color: #a0c4ff;
+  cursor: not-allowed;
+}
+
+.refresh-btn {
+  background-color: #34a853;
+}
+
+.refresh-btn:hover {
+  background-color: #2e8b57;
+}
+
+.file-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 20px;
+  padding: 10px 0;
+}
+
+.empty-message {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px 0;
+  color: #666;
+}
+
+.drop-message {
+  margin-top: 15px;
+  font-size: 14px;
+  color: #999;
+}
+
+.drop-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(66, 133, 244, 0.1);
+  border: 2px dashed #4285f4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  border-radius: 8px;
+}
+
+.drop-overlay .drop-message {
+  background-color: white;
+  padding: 20px 40px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.drop-overlay .drop-message p {
+  font-size: 18px;
+  color: #4285f4;
+  font-weight: bold;
+}
