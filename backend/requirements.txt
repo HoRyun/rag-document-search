@@ -17,3 +17,4 @@ python-dotenv==1.1.0
 python_jose==3.3.0
 sentence_transformers==4.0.1
 SQLAlchemy==2.0.40
+python-multipart==0.0.6
