@@ -160,7 +160,7 @@ async def process_document(
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error processing document: {str(e)}")
 
-def query_documents(query: str) -> str:
+def process_query(query: str) -> str:
     """문서 질의응답"""
     try:
         # 벡터 스토어 가져오기
