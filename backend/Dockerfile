@@ -16,6 +16,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 패키지 목록 복사
 COPY requirements.txt .
 
+# 로그 디렉토리 생성
+RUN mkdir -p /var/log/app
+ENV LOG_PATH=/var/log/app/app.log
+
+# 로그 볼륨 마운트 (docker-compose.yml)
+VOLUME /var/log/app
+
 # pip 업그레이드 및 패키지 설치
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
@@ -50,4 +57,4 @@ COPY . .
 EXPOSE 8000
 
 # 컨테이너 실행 시 uvicorn 서버 실행 (개발용 reload 포함)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--log-config", "logging.conf", "--reload"]
