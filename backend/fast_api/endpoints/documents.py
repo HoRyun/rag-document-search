@@ -50,7 +50,7 @@ def list_documents(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error listing documents: {str(e)}")
 
-@router.post("/documents/upload")
+@router.post("/upload")
 async def upload_document(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user)  # 현재 사용자 정보 가져오기
