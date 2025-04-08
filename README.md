@@ -17,8 +17,8 @@ Retrieval-Augmented Generation(RAG) 기술을 활용한 문서 검색 및 질의
 
 - **FastAPI**: 고성능 API 프레임워크
 - **LangChain**: LLM 애플리케이션 개발 프레임워크
-- **PostgreSQL**: 벡터 및 사용자 데이터 저장
-
+- **PostgreSQL**: 사용자 데이터 저장
+- **faiss**: 벡터 데이터 저장
 ## **프론트엔드**
 
 - **React**: 사용자 인터페이스 구현
@@ -26,7 +26,12 @@ Retrieval-Augmented Generation(RAG) 기술을 활용한 문서 검색 및 질의
 ## **인프라**
 
 - **Docker**: 애플리케이션 컨테이너화
-- **Ollama**: 로컬 LLM 실행 (llama2 모델)
+
+## **클라우드**
+
+- FastAPI -> Lambda
+- PostgreSQL -> RDS
+- faiss -> faiss + s3
 
 ## **설치 방법**
 
