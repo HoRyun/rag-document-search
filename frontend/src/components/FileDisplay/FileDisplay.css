@@ -11,30 +11,60 @@
   background-color: #f5f9ff;
 }
 
+.file-display.loading {
+  cursor: wait;
+}
+
 .file-display-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
   margin-bottom: 20px;
   padding-bottom: 10px;
   border-bottom: 1px solid #eee;
 }
 
-.file-display-header h2 {
-  font-size: 24px;
+.path-navigator {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.breadcrumb-item {
+  color: #555;
+  cursor: pointer;
+}
+
+.breadcrumb-item:hover {
+  color: #4285f4;
+  text-decoration: underline;
+}
+
+.breadcrumb-item.active {
   color: #333;
-  text-transform: capitalize;
+  font-weight: 500;
+  cursor: default;
+}
+
+.breadcrumb-item.active:hover {
+  color: #333;
+  text-decoration: none;
+}
+
+.breadcrumb-separator {
+  margin: 0 4px;
+  color: #999;
 }
 
 .file-actions {
   display: flex;
   gap: 10px;
+  align-self: flex-end;
 }
 
-.upload-btn, .refresh-btn {
-  padding: 10px 16px;
-  background-color: #4285f4;
-  color: white;
+.upload-btn, .refresh-btn, .new-folder-btn {
+  padding: 8px 16px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -42,7 +72,12 @@
   transition: background-color 0.2s;
 }
 
-.upload-btn:hover, .refresh-btn:hover {
+.upload-btn {
+  background-color: #4285f4;
+  color: white;
+}
+
+.upload-btn:hover {
   background-color: #3367d6;
 }
 
@@ -53,10 +88,30 @@
 
 .refresh-btn {
   background-color: #34a853;
+  color: white;
 }
 
 .refresh-btn:hover {
   background-color: #2e8b57;
+}
+
+.refresh-btn:disabled {
+  background-color: #a0d4b5;
+  cursor: not-allowed;
+}
+
+.new-folder-btn {
+  background-color: #fbbc05;
+  color: white;
+}
+
+.new-folder-btn:hover {
+  background-color: #f9a825;
+}
+
+.new-folder-btn:disabled {
+  background-color: #fde298;
+  cursor: not-allowed;
 }
 
 .file-grid {
@@ -105,4 +160,88 @@
   font-size: 18px;
   color: #4285f4;
   font-weight: bold;
+}
+
+.new-folder-input-container {
+  margin: 0 0 20px 0;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+
+.new-folder-input-container form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.new-folder-input {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  width: 100%;
+}
+
+.new-folder-input:focus {
+  outline: none;
+  border-color: #4285f4;
+}
+
+.new-folder-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.create-btn, .cancel-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.create-btn {
+  background-color: #4285f4;
+  color: white;
+}
+
+.create-btn:hover {
+  background-color: #3367d6;
+}
+
+.cancel-btn {
+  background-color: #f1f3f4;
+  color: #5f6368;
+}
+
+.cancel-btn:hover {
+  background-color: #e8eaed;
+}
+
+.loading-indicator {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+  color: #666;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 15px;
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top: 4px solid #4285f4;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }

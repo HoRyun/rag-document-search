@@ -37,11 +37,12 @@ WORKDIR /app
 
 # 패키지 목록 복사 및 필요한 패키지 직접 설치
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir "pydantic[email]" && \
-    pip install --no-cache-dir uvicorn && \
-    which uvicorn && \
-    ls -la /usr/local/bin/
+RUN pip install --upgrade pip setuptools wheel \
+ && pip install --no-cache-dir -r requirements.txt \
+ && pip install --no-cache-dir "pydantic[email]" \
+ && pip install --no-cache-dir uvicorn \
+ && which uvicorn \
+ && ls -la /usr/local/bin/
 
 # 애플리케이션 소스 코드 복사
 COPY . .
