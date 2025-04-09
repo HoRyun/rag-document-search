@@ -76,3 +76,6 @@ isu_*.txt
 *.bak5
 *.bak6
 *.bak7
+
+# 커서 파일
+.cursor/*
