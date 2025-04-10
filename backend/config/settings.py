@@ -25,7 +25,7 @@ else:
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # 데이터베이스 설정
-DATABASE_URL = "postgresql+psycopg2://postgres:postgres@db:5432/ragdb"
+DATABASE_URL = "postgresql+psycopg://postgres:postgres@db:5432/ragdb"
 
 # 토큰 설정
 # 기본값은 30분이다.

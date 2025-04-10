@@ -5,22 +5,24 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 import json
 from typing import Tuple, List, Dict, Any
+import traceback
 
 from langchain_core.documents import Document as LangchainDocument
 from langchain.chains.retrieval_qa.base import RetrievalQA
 
-import faiss
-from langchain_community.vectorstores import FAISS
-from langchain_community.docstore.in_memory import InMemoryDocstore
-
-
+# FAISS 관련 임포트 (주석 처리)
+# import faiss
+# from langchain_community.vectorstores import FAISS
+# from langchain_community.docstore.in_memory import InMemoryDocstore
 
 # 함수 불러오기
 from db.models import Document, DocumentChunk
 
 from rag.retriever import get_reretriever
 from rag.embeddings import get_embeddings
-from rag.vectorstore import create_vector_store, get_vector_store, save_to_vector_store
+# FAISS 관련 함수 임포트 (주석 처리)
+# from rag.vectorstore import create_vector_store, get_vector_store
+from rag.vectorstore import save_to_vector_store, get_pg_vector_store
 from rag.llm import get_llms_answer
 from rag.file_load import (
     load_pdf, 
@@ -30,44 +32,33 @@ from rag.file_load import (
 from rag.chunking import chunk_documents
 
 
-
 def get_all_documents(db: Session):
     """모든 문서 조회"""
     return db.query(Document).all()
 
-# def safe_json_serializable(data):
-#     """JSON으로 직렬화할 수 있는 데이터만 반환.
-#     보조 기능 함수.
-#     """
-#     try:
-#         # JSON 직렬화 시도
-#         json.dumps(data)
-#         return data
-#     except (TypeError, OverflowError):
-#         # 직렬화할 수 없는 경우 문자열로 변환
-#         if isinstance(data, dict):
-#             return {k: safe_json_serializable(v) for k, v in data.items()}
-#         elif isinstance(data, list):
-#             return [safe_json_serializable(item) for item in data]
-#         else:
-#             return str(data)
+
+# # TODO: 나중에 삭제될 함수로 현재 사용하지 않음.
+# def prepare_chunks(documents, filename, timestamp):
+#     """텍스트를 청크로 분할하고 메타데이터 추가"""
+#     # 여기에서 청크 준비 로직을 구현합니다
+#     # ...
+#     return documents
+
 
 async def process_document(
     file: UploadFile, 
     user_id: int, 
     db: Session
 ) -> int:
-    """문서 업로드 및 처리
-    주 기능 함수.
-    """
-    # 파일 확장자 확인
+    """문서 업로드 및 처리"""
+    # 파일 확장자 추출
     file_extension = file.filename.split('.')[-1].lower()
-    supported_extensions = ['pdf', 'hwp', 'hwpx', 'docx']
     
-    if file_extension not in supported_extensions:
+    # 지원되는 파일 형식 확인
+    if file_extension not in ['pdf', 'docx', 'hwp', 'hwpx']:
         raise HTTPException(
             status_code=400, 
-            detail=f"Only {', '.join(supported_extensions)} files are supported"
+            detail="지원되지 않는 파일 형식입니다. PDF, DOCX, HWP 또는 HWPX 파일만 업로드 가능합니다."
         )
     
     # # 파일 저장 
@@ -75,9 +66,9 @@ async def process_document(
     # file_path= save_uploaded_file(file, file.filename)
     
     try:
-        # DB의 documents 테이블에 문서 정보 저장.
+        # DB의 documents 테이블에 문서 정보 저장. # 이 코드는 이 위치에 있어야 함.
         db_document = Document(
-            filename=file.filename, 
+            filename=os.path.basename(file.filename), 
             upload_time=datetime.now(), 
             user_id=user_id
         )
@@ -99,72 +90,37 @@ async def process_document(
         chunked_documents = chunk_documents(documents, file.filename)
 
         # 벡터 스토어에 저장
-        save_to_vector_store(chunked_documents)
-        
-        print(f"Document {os.path.basename(file.filename)} uploaded and processed successfully")
+        try:
+            save_to_vector_store(chunked_documents)
+            print(f"Document {os.path.basename(file.filename)} uploaded and processed successfully")
+        except Exception as ve:
+            print(f"벡터 저장 중 오류 발생, 하지만 청킹된 문서는 처리되었습니다: {str(ve)}")
+            print(traceback.format_exc())
+            # 벡터 저장 실패해도 문서 자체는 업로드 성공으로 처리
 
-
-        # # 청크 준비
-        # chunks = prepare_chunks(documents, file.filename, timestamp)
-        
-        # # 벡터 스토어에 문서 추가 시도
-        # try:
-        #     vector_store = get_vector_store()
-        #     vector_store.add_documents(chunks)
-        # except Exception as e:
-        #     print(f"벡터 스토어 추가 오류: {str(e)}")
-        #     # 대체 방법으로 한 번에 하나씩 청크 추가 시도
-        #     try:
-        #         vector_store = get_vector_store()
-        #         for i, chunk in enumerate(chunks):
-        #             try:
-        #                 # 청크 내용에서 문제가 되는 문자 제거
-        #                 chunk.page_content = clean_text(chunk.page_content)
-        #                 # 메타데이터 정리
-        #                 chunk.metadata = safe_json_serializable(chunk.metadata)
-        #                 vector_store.add_documents([chunk])
-        #                 print(f"청크 {i+1}/{len(chunks)} 추가 성공")
-        #             except Exception as chunk_error:
-        #                 print(f"청크 {i+1}/{len(chunks)} 추가 실패: {str(chunk_error)}")
-        #                 continue
-        #     except Exception as fallback_error:
-        #         print(f"대체 방법 실패: {str(fallback_error)}")
-        #         # 벡터 스토어 추가가 실패해도 계속 진행
-        
-        # # DB에 청크 정보 저장
-        # for chunk in chunks:
-        #     try:
-        #         # 청크 내용 정리
-        #         content = clean_text(chunk.page_content)
-        #         # 메타데이터 정리
-        #         metadata = safe_json_serializable(chunk.metadata)
-                
-        #         db_chunk = DocumentChunk(
-        #             document_id=db_document.id,
-        #             content=content,
-        #             meta=metadata
-        #         )
-        #         db.add(db_chunk)
-        #     except Exception as chunk_db_error:
-        #         print(f"청크 DB 저장 오류: {str(chunk_db_error)}")
-        #         continue
-        
-        # db.commit()
-        
         return 200
         
     except Exception as e:
-        # db.rollback()
-        import traceback
+        # 오류 발생 시 처리
+        db.rollback()  # 트랜잭션 롤백
         print(f"Error processing document: {str(e)}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error processing document: {str(e)}")
 
+
 def process_query(query: str) -> str:
     """문서 질의응답"""
     try:
-        # 벡터 스토어 가져오기
-        vector_store = get_vector_store()
+        # PostgreSQL 벡터 스토어만 사용
+        vector_store = get_pg_vector_store()
+        
+        # 기존 FAISS 벡터 스토어 코드 (주석 처리)
+        # if use_pg_vector:
+        #     # PostgreSQL 벡터 스토어 사용
+        #     vector_store = get_pg_vector_store()
+        # else:
+        #     # FAISS 벡터 스토어 사용 (기본값)
+        #     vector_store = get_vector_store()
         
         # reretriever 생성
         reretriever = get_reretriever(vector_store)
@@ -174,7 +130,7 @@ def process_query(query: str) -> str:
         
         return result
     except Exception as e:
-        import traceback
         print(f"Error querying documents: {str(e)}")
         print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error querying documents: {str(e)}") 
+        # 오류 발생 시 사용자 친화적인 메시지 반환
+        return f"검색 중 오류가 발생했습니다. 관리자에게 문의하세요. 오류 정보: {str(e)[:100]}..." 

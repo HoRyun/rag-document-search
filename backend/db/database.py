@@ -15,16 +15,12 @@ elif os.environ.get('DATABASE_URL'):
     DATABASE_URL = os.environ.get('DATABASE_URL')
 elif os.name == 'nt':  # Windows 환경
     # 로컬 Windows 환경에서 사용할 URL
-    DATABASE_URL = "postgresql+psycopg2://postgres:postgres@localhost:5432/ragdb"
+    DATABASE_URL = "postgresql+psycopg://postgres:postgres@localhost:5432/ragdb"
 else:
     # Docker 환경에서 사용할 URL
-    DATABASE_URL = "postgresql+psycopg2://postgres:postgres@db:5432/ragdb"
-
-
-
-
-
-
+    DATABASE_URL = "postgresql+psycopg://postgres:postgres@db:5432/ragdb"
+    # Docker 환경 변수 설정
+    os.environ['DOCKER_ENV'] = 'true'
 
 print(f"Using database URL: {DATABASE_URL}")
 

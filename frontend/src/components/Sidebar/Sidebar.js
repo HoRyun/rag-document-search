@@ -1,24 +1,30 @@
 import React from 'react';
 import './Sidebar.css';
 
-const Sidebar = ({ currentPath, setCurrentPath }) => {
-  // Sample directory structure
-  const directories = [
-    { id: 1, name: 'Home', path: '/' },
-    { id: 2, name: 'Documents', path: '/documents' },
-    { id: 3, name: 'Pictures', path: '/pictures' },
-    { id: 4, name: 'Videos', path: '/videos' },
-    { id: 5, name: 'Downloads', path: '/downloads' },
-  ];
-
+const Sidebar = ({ directories, currentPath, setCurrentPath, onRefresh }) => {
   const handleDirectoryClick = (path) => {
     setCurrentPath(path);
+  };
+
+  const handleRefresh = () => {
+    if (onRefresh) {
+      onRefresh();
+    }
+  };
+
+  // 파일 경로의 깊이에 따라 들여쓰기 추가
+  const getIndentLevel = (path) => {
+    if (path === '/') return 0;
+    return path.split('/').filter(Boolean).length;
   };
 
   return (
     <div className="sidebar">
       <div className="sidebar-header">
-        <h3>Directories</h3>
+        <h3>디렉토리</h3>
+        <button className="refresh-sidebar-btn" onClick={handleRefresh}>
+          새로고침
+        </button>
       </div>
       <div className="directory-list">
         {directories.map((dir) => (
@@ -26,6 +32,7 @@ const Sidebar = ({ currentPath, setCurrentPath }) => {
             key={dir.id} 
             className={`directory-item ${currentPath === dir.path ? 'active' : ''}`}
             onClick={() => handleDirectoryClick(dir.path)}
+            style={{ paddingLeft: `${15 + getIndentLevel(dir.path) * 10}px` }}
           >
             <div className="directory-icon">
               <i className="folder-icon"></i>
