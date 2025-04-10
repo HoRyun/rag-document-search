@@ -5,7 +5,7 @@ import "./FileDisplay.css";
 const FileDisplay = ({ files, currentPath, onAddFile, onCreateFolder, onFolderOpen, onRefresh, isLoading }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [showNewFolderInput, setShowNewFolderInput] = useState(false);
+  const [showNewFolderModal, setShowNewFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const fileInputRef = useRef(null);
   const newFolderInputRef = useRef(null);
@@ -66,14 +66,15 @@ const FileDisplay = ({ files, currentPath, onAddFile, onCreateFolder, onFolderOp
     }
   };
 
-  // Show new folder input
+  // Show new folder modal
   const handleNewFolderClick = () => {
-    setShowNewFolderInput(true);
+    setShowNewFolderModal(true);
+    setNewFolderName("");
     setTimeout(() => {
       if (newFolderInputRef.current) {
         newFolderInputRef.current.focus();
       }
-    }, 0);
+    }, 100);
   };
 
   // Create new folder
@@ -82,14 +83,21 @@ const FileDisplay = ({ files, currentPath, onAddFile, onCreateFolder, onFolderOp
     if (newFolderName.trim() && onCreateFolder) {
       onCreateFolder(newFolderName);
       setNewFolderName("");
-      setShowNewFolderInput(false);
+      setShowNewFolderModal(false);
     }
   };
 
   // Cancel new folder creation
   const handleCancelNewFolder = () => {
     setNewFolderName("");
-    setShowNewFolderInput(false);
+    setShowNewFolderModal(false);
+  };
+
+  // Handle folder modal click outside
+  const handleModalOutsideClick = (e) => {
+    if (e.target.className === "folder-modal-overlay") {
+      handleCancelNewFolder();
+    }
   };
 
   // Handle file or folder click
@@ -153,7 +161,7 @@ const FileDisplay = ({ files, currentPath, onAddFile, onCreateFolder, onFolderOp
           <button 
             className="new-folder-btn" 
             onClick={handleNewFolderClick}
-            disabled={showNewFolderInput || isLoading}
+            disabled={isLoading}
           >
             새 폴더
           </button>
@@ -181,31 +189,6 @@ const FileDisplay = ({ files, currentPath, onAddFile, onCreateFolder, onFolderOp
           accept=".pdf,.docx,.doc,.hwp,.hwpx,.xlsx,.xls,.txt,.jpg,.jpeg,.png,.gif"
         />
       </div>
-
-      {showNewFolderInput && (
-        <div className="new-folder-input-container">
-          <form onSubmit={handleCreateFolder}>
-            <input
-              type="text"
-              ref={newFolderInputRef}
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              placeholder="새 폴더 이름"
-              className="new-folder-input"
-            />
-            <div className="new-folder-actions">
-              <button type="submit" className="create-btn">생성</button>
-              <button 
-                type="button" 
-                className="cancel-btn"
-                onClick={handleCancelNewFolder}
-              >
-                취소
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
 
       <div className="file-grid">
         {isLoading ? (
@@ -236,6 +219,47 @@ const FileDisplay = ({ files, currentPath, onAddFile, onCreateFolder, onFolderOp
         <div className="drop-overlay">
           <div className="drop-message">
             <p>파일을 여기에 놓아 업로드</p>
+          </div>
+        </div>
+      )}
+      
+      {/* 새 폴더 생성 모달 */}
+      {showNewFolderModal && (
+        <div className="folder-modal-overlay" onClick={handleModalOutsideClick}>
+          <div className="folder-modal">
+            <div className="folder-modal-header">
+              <h3>새 폴더 만들기</h3>
+            </div>
+            <form onSubmit={handleCreateFolder}>
+              <div className="folder-modal-content">
+                <label htmlFor="folderName">폴더 이름:</label>
+                <input
+                  type="text"
+                  id="folderName"
+                  ref={newFolderInputRef}
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  placeholder="새 폴더 이름을 입력하세요"
+                  className="folder-name-input"
+                />
+              </div>
+              <div className="folder-modal-actions">
+                <button 
+                  type="button" 
+                  className="cancel-btn"
+                  onClick={handleCancelNewFolder}
+                >
+                  취소
+                </button>
+                <button 
+                  type="submit" 
+                  className="create-btn"
+                  disabled={!newFolderName.trim()}
+                >
+                  생성
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

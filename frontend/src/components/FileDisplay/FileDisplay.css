@@ -162,63 +162,119 @@
   font-weight: bold;
 }
 
-.new-folder-input-container {
-  margin: 0 0 20px 0;
-  padding: 15px;
-  background-color: #f8f9fa;
-  border-radius: 8px;
-  border: 1px solid #eee;
-}
-
-.new-folder-input-container form {
+/* 새 폴더 모달 스타일 */
+.folder-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
 }
 
-.new-folder-input {
-  padding: 10px;
+.folder-modal {
+  width: 400px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  animation: modal-appear 0.3s ease;
+}
+
+@keyframes modal-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.folder-modal-header {
+  padding: 16px 20px;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #eee;
+}
+
+.folder-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+  font-weight: 500;
+}
+
+.folder-modal-content {
+  padding: 20px;
+}
+
+.folder-modal-content label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #555;
+}
+
+.folder-name-input {
+  width: 100%;
+  padding: 10px 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
-  width: 100%;
+  transition: border-color 0.2s;
 }
 
-.new-folder-input:focus {
+.folder-name-input:focus {
   outline: none;
   border-color: #4285f4;
+  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
 }
 
-.new-folder-actions {
+.folder-modal-actions {
   display: flex;
-  gap: 10px;
   justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  background-color: #f9f9f9;
+  border-top: 1px solid #eee;
 }
 
-.create-btn, .cancel-btn {
+.folder-modal-actions .cancel-btn,
+.folder-modal-actions .create-btn {
   padding: 8px 16px;
   border: none;
   border-radius: 4px;
-  cursor: pointer;
   font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
 }
 
-.create-btn {
-  background-color: #4285f4;
-  color: white;
-}
-
-.create-btn:hover {
-  background-color: #3367d6;
-}
-
-.cancel-btn {
+.folder-modal-actions .cancel-btn {
   background-color: #f1f3f4;
   color: #5f6368;
 }
 
-.cancel-btn:hover {
+.folder-modal-actions .cancel-btn:hover {
   background-color: #e8eaed;
+}
+
+.folder-modal-actions .create-btn {
+  background-color: #4285f4;
+  color: white;
+}
+
+.folder-modal-actions .create-btn:hover {
+  background-color: #3367d6;
+}
+
+.folder-modal-actions .create-btn:disabled {
+  background-color: #a0c4ff;
+  cursor: not-allowed;
 }
 
 .loading-indicator {
