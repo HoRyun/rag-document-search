@@ -5,7 +5,7 @@ from typing import List
 from db.database import get_db
 from db.models import User
 from fast_api.security import get_current_user
-from rag.document_service import get_all_documents, process_document, query_documents
+from rag.document_service import get_all_documents, process_document, process_query
 
 router = APIRouter()
 
@@ -37,7 +37,6 @@ async def upload_document(
         code = await process_document(single_file, current_user.id, db)
 
 
-
     # # 여기에 반복문으로 여러 파일 처리하는 코드 작성해야 함.
     # code = process_document(file, current_user.id, db)
     
@@ -49,5 +48,5 @@ async def upload_document(
 @router.post("/query")
 async def query_document(query: str = Form(...)):
     """문서 질의응답 엔드포인트"""
-    answer = query_documents(query)
+    answer = process_query(query)
     return {"answer": answer} 
