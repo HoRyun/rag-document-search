@@ -1,7 +1,7 @@
-from langchain_huggingface import HuggingFaceEmbeddings
+# from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_openai import OpenAIEmbeddings
 
-from langchain_postgres import PGVector
+# from langchain_postgres import PGVector
 import re
 import time
 from sqlalchemy import create_engine, text
