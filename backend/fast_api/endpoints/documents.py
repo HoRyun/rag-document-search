@@ -17,6 +17,8 @@ from db.models import Document
 from datetime import datetime
 import logging
 
+from dotenv import load_dotenv
+load_dotenv()
 
 
 # 로거 설정
