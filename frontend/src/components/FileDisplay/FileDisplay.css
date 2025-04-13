@@ -1,0 +1,303 @@
+.file-display {
+  flex: 1;
+  padding: 20px;
+  background-color: #fff;
+  position: relative;
+  overflow-y: auto;
+  min-height: 400px;
+}
+
+.file-display.dragging {
+  background-color: #f5f9ff;
+}
+
+.file-display.loading {
+  cursor: wait;
+}
+
+.file-display-header {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.path-navigator {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.breadcrumb-item {
+  color: #555;
+  cursor: pointer;
+}
+
+.breadcrumb-item:hover {
+  color: #4285f4;
+  text-decoration: underline;
+}
+
+.breadcrumb-item.active {
+  color: #333;
+  font-weight: 500;
+  cursor: default;
+}
+
+.breadcrumb-item.active:hover {
+  color: #333;
+  text-decoration: none;
+}
+
+.breadcrumb-separator {
+  margin: 0 4px;
+  color: #999;
+}
+
+.file-actions {
+  display: flex;
+  gap: 10px;
+  align-self: flex-end;
+}
+
+.upload-btn, .refresh-btn, .new-folder-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.upload-btn {
+  background-color: #4285f4;
+  color: white;
+}
+
+.upload-btn:hover {
+  background-color: #3367d6;
+}
+
+.upload-btn:disabled {
+  background-color: #a0c4ff;
+  cursor: not-allowed;
+}
+
+.refresh-btn {
+  background-color: #34a853;
+  color: white;
+}
+
+.refresh-btn:hover {
+  background-color: #2e8b57;
+}
+
+.refresh-btn:disabled {
+  background-color: #a0d4b5;
+  cursor: not-allowed;
+}
+
+.new-folder-btn {
+  background-color: #fbbc05;
+  color: white;
+}
+
+.new-folder-btn:hover {
+  background-color: #f9a825;
+}
+
+.new-folder-btn:disabled {
+  background-color: #fde298;
+  cursor: not-allowed;
+}
+
+.file-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 20px;
+  padding: 10px 0;
+}
+
+.empty-message {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px 0;
+  color: #666;
+}
+
+.drop-message {
+  margin-top: 15px;
+  font-size: 14px;
+  color: #999;
+}
+
+.drop-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(66, 133, 244, 0.1);
+  border: 2px dashed #4285f4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  border-radius: 8px;
+}
+
+.drop-overlay .drop-message {
+  background-color: white;
+  padding: 20px 40px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.drop-overlay .drop-message p {
+  font-size: 18px;
+  color: #4285f4;
+  font-weight: bold;
+}
+
+/* 새 폴더 모달 스타일 */
+.folder-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.folder-modal {
+  width: 400px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  animation: modal-appear 0.3s ease;
+}
+
+@keyframes modal-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.folder-modal-header {
+  padding: 16px 20px;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #eee;
+}
+
+.folder-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+  font-weight: 500;
+}
+
+.folder-modal-content {
+  padding: 20px;
+}
+
+.folder-modal-content label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #555;
+}
+
+.folder-name-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.folder-name-input:focus {
+  outline: none;
+  border-color: #4285f4;
+  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+}
+
+.folder-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  background-color: #f9f9f9;
+  border-top: 1px solid #eee;
+}
+
+.folder-modal-actions .cancel-btn,
+.folder-modal-actions .create-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.folder-modal-actions .cancel-btn {
+  background-color: #f1f3f4;
+  color: #5f6368;
+}
+
+.folder-modal-actions .cancel-btn:hover {
+  background-color: #e8eaed;
+}
+
+.folder-modal-actions .create-btn {
+  background-color: #4285f4;
+  color: white;
+}
+
+.folder-modal-actions .create-btn:hover {
+  background-color: #3367d6;
+}
+
+.folder-modal-actions .create-btn:disabled {
+  background-color: #a0c4ff;
+  cursor: not-allowed;
+}
+
+.loading-indicator {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+  color: #666;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 15px;
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top: 4px solid #4285f4;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

@@ -13,9 +13,6 @@ TEST_MODE = os.environ.get('TEST_MODE', 'False').lower() == 'true'
 OLLAMA_HOST = os.environ.get('OLLAMA_HOST', 'localhost')
 OLLAMA_PORT = os.environ.get('OLLAMA_PORT', '11434')
 
-
-
-
 # 업로드 디렉토리 설정
 # 테스트 모드일 경우 업로드 되는 파일은 임시 디렉토리에 저장됨.
 # 임시 디렉토리에 저장될 경우 테스트 종료 후 임시 디렉토리 삭제됨.
@@ -25,12 +22,10 @@ if TEST_MODE:
 else:
     UPLOAD_DIR = os.environ.get('UPLOAD_DIR', '/data/uploads')
 
-
-
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # 데이터베이스 설정
-DATABASE_URL = "postgresql+psycopg2://postgres:postgres@db:5432/ragdb"
+DATABASE_URL = "postgresql+psycopg://postgres:postgres@db:5432/ragdb"
 
 # 토큰 설정
 # 기본값은 30분이다.
@@ -40,3 +35,8 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 # ACCESS_TOKEN_EXPIRE_MINUTES = 1
 SECRET_KEY = os.environ.get("SECRET_KEY", "your-secret-key-for-jwt")
 ALGORITHM = "HS256" 
+
+AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
+AWS_DEFAULT_REGION = os.environ.get("AWS_DEFAULT_REGION")
+S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")

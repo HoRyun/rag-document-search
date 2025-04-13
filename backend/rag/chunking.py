@@ -8,15 +8,15 @@ def chunk_documents(documents, filepath):
     print("Splitting text into chunks...")
 
     # CharacterTextSplitter를 사용하여 텍스트를 청크(chunk)로 분할하는 코드
-    text_splitter = CharacterTextSplitter(
-        # 텍스트를 분할할 때 사용할 구분자를 지정합니다. 기본값은 "\n\n"입니다.
-        separator="\n",
+    text_splitter = RecursiveCharacterTextSplitter(
         # 분할된 텍스트 청크의 최대 크기를 지정합니다 (문자 수).
-        chunk_size=400,
+        chunk_size=600,
         # 분할된 텍스트 청크 간의 중복되는 문자 수를 지정합니다.
-        chunk_overlap=100,
+        chunk_overlap=250,
         # 텍스트의 길이를 계산하는 함수를 지정합니다.
         length_function=len,
+        # 구분자를 정규 표현식으로 처리할지 여부를 지정합니다.
+        is_separator_regex=False,
     )
     
     metadatas = [

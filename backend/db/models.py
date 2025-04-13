@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from pgvector.sqlalchemy import Vector
 
 from db.database import Base
 
@@ -36,5 +37,6 @@ class DocumentChunk(Base):
     document_id = Column(Integer, ForeignKey("documents.id"))
     content = Column(String)
     meta = Column(JSON)
+    embedding = Column(Vector(1536))
     
     document = relationship("Document", back_populates="chunks") 

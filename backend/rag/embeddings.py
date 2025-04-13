@@ -1,10 +1,10 @@
-from langchain_huggingface import HuggingFaceEmbeddings
+# from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_openai import OpenAIEmbeddings
-
 from langchain_postgres import PGVector
 import re
 import time
 from sqlalchemy import create_engine, text
+import os
 
 from config.settings import DATABASE_URL
 
@@ -15,6 +15,9 @@ from config.settings import DATABASE_URL
 def get_embeddings():
     """임베딩 모델 함수."""
     embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+
+    
+
     return embeddings
 
 
@@ -23,17 +26,25 @@ def get_embeddings():
 #     return 
 
 def manually_create_vector_extension():
-    """pgvector 확장을 수동으로 생성합니다"""
+    """pgvector 익스텐션을 수동으로 생성합니다"""
     try:
         # 클라이언트 인코딩 옵션 추가
         modified_url = DATABASE_URL
-        if 'postgresql' in DATABASE_URL and not DATABASE_URL.startswith('postgresql+psycopg2://'):
-            modified_url = DATABASE_URL.replace('postgresql://', 'postgresql+psycopg2://')
+        
+        # Docker 컨테이너 환경에서는 'db'를 사용, 로컬 개발 환경에서는 'localhost'를 사용
+        # getaddrinfo 오류 방지를 위한 조치
+        if 'db:5432' in modified_url and not os.environ.get('DOCKER_ENV'):
+            modified_url = modified_url.replace('db:5432', 'localhost:5432')
+        
+        if 'postgresql' in modified_url and not modified_url.startswith('postgresql+psycopg://'):
+            modified_url = modified_url.replace('postgresql://', 'postgresql+psycopg://')
             
         if '?' in modified_url:
             modified_url = f"{modified_url}&client_encoding=utf8"
         else:
             modified_url = f"{modified_url}?client_encoding=utf8"
+        
+        print(f"Vector extension 연결 URL: {modified_url}")
                 
         engine = create_engine(modified_url)
         with engine.connect() as connection:

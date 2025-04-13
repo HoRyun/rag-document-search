@@ -20,13 +20,17 @@ def create_document(db: Session, filename: str, user_id: int):
     db.refresh(db_document)
     return db_document
 
-def add_document_chunk(db: Session, document_id: int, content: str, embedding: list):
+def add_document_chunk(db: Session, document_id: int, content: str, meta: dict, embedding=None):
     db_chunk = models.DocumentChunk(
         document_id=document_id,
         content=content,
+        meta=meta,
         embedding=embedding
     )
     db.add(db_chunk)
     db.commit()
     db.refresh(db_chunk)
     return db_chunk
+
+def get_document_chunks_by_document_id(db: Session, document_id: int):
+    return db.query(models.DocumentChunk).filter(models.DocumentChunk.document_id == document_id).all()
