@@ -5,7 +5,6 @@
 from langchain_postgres import PGVector
 from langchain_core.documents import Document
 import os
-import numpy as np
 from sqlalchemy import text
 
 from rag.embeddings import get_embeddings
@@ -68,12 +67,12 @@ def get_pg_vector_connection_string():
         connection_string = connection_string.replace('db:5432', 'localhost:5432')
     
     # PGVector는 psycopg 접두사를 인식하지 못할 수 있으므로 표준 postgresql 접두사 사용
-    if 'postgresql+psycopg://' in connection_string:
-        connection_string = connection_string.replace('postgresql+psycopg://', 'postgresql://')
+    # if 'postgresql+psycopg://' in connection_string:
+    #     connection_string = connection_string.replace('postgresql+psycopg://', 'postgresql://')
     
     return connection_string
 
-def get_pg_vector_store():
+def get_pg_vector_store(): 
     """PostgreSQL 벡터 스토어를 가져옵니다."""
     connection_string = get_pg_vector_connection_string()
     collection_name = "document_chunks"
@@ -83,10 +82,16 @@ def get_pg_vector_store():
     # PGVector 스토어 생성
     try:
         vector_store = PGVector(
+            embeddings=embeddings,
             collection_name=collection_name,
-            connection_string=connection_string,
-            embedding_function=embeddings,
-            use_jsonb=True
+            connection=connection_string,
+            use_jsonb=True,
+            # --- 컬럼 매핑 추가 ---
+            # id_field="id",          # Langchain 내부 ID -> DB 'id' 컬럼
+            # content_field="content",  # Langchain 내부 content -> DB 'content' 컬럼
+            # embedding_field="embedding",# Langchain 내부 embedding -> DB 'embedding' 컬럼
+            # metadata_field="meta"      # Langchain 내부 metadata -> DB 'meta' 컬럼            
+
         )
         
         print(f"PGVector 스토어가 성공적으로 생성되었습니다: {collection_name}")
@@ -155,8 +160,8 @@ def save_to_pg_vector(documents):
                     embedding=embedding_vector
                 )
         
-        # embedding 컬럼의 데이터를 embedding_vector 컬럼으로 복사
-        update_embedding_vector_column()
+        # embedding 컬럼의 데이터를 embedding_vector 컬럼으로 복사 - 현재 문제를 발생시키는 코드이며, 필요하지 않은 코드이므로 주석처리.
+        # update_embedding_vector_column()
                 
         print(f"총 {len(documents)}개의 청크가 PostgreSQL에 저장되었습니다.")
     except Exception as e:

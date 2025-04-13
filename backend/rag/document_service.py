@@ -3,26 +3,16 @@ import os
 from fastapi import UploadFile, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
-import json
-from typing import Tuple, List, Dict, Any
+
 import traceback
 
-from langchain_core.documents import Document as LangchainDocument
-from langchain.chains.retrieval_qa.base import RetrievalQA
-
-# FAISS 관련 임포트 (주석 처리)
-# import faiss
-# from langchain_community.vectorstores import FAISS
-# from langchain_community.docstore.in_memory import InMemoryDocstore
 
 # 함수 불러오기
-from db.models import Document, DocumentChunk
+from db.models import Document
 
-from rag.retriever import get_reretriever
-from rag.embeddings import get_embeddings
-# FAISS 관련 함수 임포트 (주석 처리)
-# from rag.vectorstore import create_vector_store, get_vector_store
-from rag.vectorstore import save_to_vector_store, get_pg_vector_store
+
+
+from rag.vectorstore import save_to_vector_store
 from rag.llm import get_llms_answer
 from rag.file_load import (
     load_pdf, 
@@ -37,23 +27,17 @@ def get_all_documents(db: Session):
     return db.query(Document).all()
 
 
-# # TODO: 나중에 삭제될 함수로 현재 사용하지 않음.
-# def prepare_chunks(documents, filename, timestamp):
-#     """텍스트를 청크로 분할하고 메타데이터 추가"""
-#     # 여기에서 청크 준비 로직을 구현합니다
-#     # ...
-#     return documents
 
 
 async def process_document(
-    file: UploadFile, 
+    file: UploadFile,
     user_id: int, 
     db: Session
 ) -> int:
     """문서 업로드 및 처리"""
     # 파일 확장자 추출
     file_extension = file.filename.split('.')[-1].lower()
-    
+     
     # 지원되는 파일 형식 확인
     if file_extension not in ['pdf', 'docx', 'hwp', 'hwpx']:
         raise HTTPException(
@@ -61,11 +45,9 @@ async def process_document(
             detail="지원되지 않는 파일 형식입니다. PDF, DOCX, HWP 또는 HWPX 파일만 업로드 가능합니다."
         )
     
-    # # 파일 저장 
-    # 현재 필요하지 않은 기능이므로 우선 주석처리.
-    # file_path= save_uploaded_file(file, file.filename)
-    
     try:
+
+        
         # DB의 documents 테이블에 문서 정보 저장. # 이 코드는 이 위치에 있어야 함.
         db_document = Document(
             filename=os.path.basename(file.filename), 
@@ -75,7 +57,6 @@ async def process_document(
         db.add(db_document)
         db.commit()
         db.refresh(db_document)
-
 
 
         # 파일 형식에 따라 문서 로드
@@ -111,22 +92,7 @@ async def process_document(
 def process_query(query: str) -> str:
     """문서 질의응답"""
     try:
-        # PostgreSQL 벡터 스토어만 사용
-        vector_store = get_pg_vector_store()
-        
-        # 기존 FAISS 벡터 스토어 코드 (주석 처리)
-        # if use_pg_vector:
-        #     # PostgreSQL 벡터 스토어 사용
-        #     vector_store = get_pg_vector_store()
-        # else:
-        #     # FAISS 벡터 스토어 사용 (기본값)
-        #     vector_store = get_vector_store()
-        
-        # reretriever 생성
-        reretriever = get_reretriever(vector_store)
-
-        # 질의 실행, 2번째 파라미터로 retriever(검색기) 전달
-        result = get_llms_answer(query, reretriever)
+        result = get_llms_answer(query)
         
         return result
     except Exception as e:

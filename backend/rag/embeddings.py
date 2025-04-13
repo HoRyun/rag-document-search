@@ -15,6 +15,9 @@ from config.settings import DATABASE_URL
 def get_embeddings():
     """임베딩 모델 함수."""
     embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+
+    
+
     return embeddings
 
 

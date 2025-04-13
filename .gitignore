@@ -12,7 +12,7 @@ data/uploads/
 
 # 테스트 파일
 test*.py
-
+*.ipynb
 
 # 데이터베이스 및 벡터 저장소
 data/chroma_db/

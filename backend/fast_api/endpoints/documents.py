@@ -18,6 +18,7 @@ from datetime import datetime
 import logging
 
 
+
 # 로거 설정
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -74,25 +75,36 @@ def list_documents(db: Session = Depends(get_db)):
 @router.post("/upload")
 async def upload_document(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user)  # 현재 사용자 정보 가져오기
+    current_user: User = Depends(get_current_user),  # 현재 사용자 정보 가져오기
+    db: Session = Depends(get_db)
 ):
+
     try:
+
         # 1. 필수 필드 검증
         if not file.filename:
             raise ValueError("파일 이름이 없습니다.")
         if not current_user.username:
             raise ValueError("사용자 이름이 없습니다.")
 
-        # 2. S3 키 생성 (사용자 이름 기반)
+        # 2. 문서 처리
+        code = await process_document(file, current_user.id, db)
+
+
+        # 3. S3 키 생성 (사용자 이름 기반)
         s3_key = f"uploads/{current_user.username}/{file.filename}"
 
-        # 3. 파일 업로드
+        # 4. s3에 파일 업로드
         s3_client.upload_fileobj(
             Fileobj=file.file,
             Bucket=S3_BUCKET_NAME,
             Key=s3_key,
             ExtraArgs={'ContentType': file.content_type}
         )
+
+
+
+
 
         return JSONResponse(
             content={
