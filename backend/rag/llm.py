@@ -179,11 +179,11 @@ LIMIT :top_n
                             for selected_doc in selected_docs:
                                 # 코사인 유사도 계산 - 0으로 나누기 예외 처리
                                 try:
-                                    # 디버깅: 임베딩 타입 확인
-                                    print(f"doc embedding type: {type(doc['embedding'])}")
-                                    print(f"doc embedding sample: {str(doc['embedding'])[:100]}")
-                                    print(f"selected_doc embedding type: {type(selected_doc['embedding'])}")
-                                    print(f"selected_doc embedding sample: {str(selected_doc['embedding'])[:100]}")
+                                    # 디버깅: 임베딩 타입 확인 -  디버깅 시에만 주석 해제하기.
+                                    # print(f"doc embedding type: {type(doc['embedding'])}")
+                                    # print(f"doc embedding sample: {str(doc['embedding'])[:100]}")
+                                    # print(f"selected_doc embedding type: {type(selected_doc['embedding'])}")
+                                    # print(f"selected_doc embedding sample: {str(selected_doc['embedding'])[:100]}")
                                     
                                     # 임베딩이 문자열인 경우 배열로 변환 시도
                                     if isinstance(doc["embedding"], str):
