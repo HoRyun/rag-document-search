@@ -6,7 +6,6 @@ from langchain_core.documents import Document
 import numpy as np
 from sqlalchemy import text
 from .embeddings import get_embeddings
-from db.database import SessionLocal
 import os
 import traceback
 
@@ -42,15 +41,19 @@ def get_llms_answer(query: str) -> str:
     max_tokens=2048,
     model_name="gpt-4o-mini",)
 
-    # 데이터베이스에서 MMR 알고리즘을 사용하여 관련 문서 검색
+
+        # <사용자의 쿼리 임베딩>
+
     # 1. 임베딩 모델 가져오기
     embeddings_model = get_embeddings()
     
     # 2. 사용자 쿼리를 임베딩 벡터로 변환
     query_embedding = embeddings_model.embed_query(query)
-    query_embedding_array = np.array(query_embedding)
-    
-    # 3. 직접 SQL 쿼리로 문서 가져오기 (ORM 대신)
+
+        # </사용자의 쿼리 임베딩>
+
+# <SQL 쿼리를 날려 사용자 쿼리와 유사한 임베딩 청크 가져오기>
+
     # 문서 목록을 저장할 변수
     docs = []
     
@@ -158,8 +161,10 @@ LIMIT :top_n
                     except Exception as e:
                         print(f"임베딩 변환 오류: {str(e)} - 문서 ID: {row['id']}")
                         continue
-                
-                # 7. MMR 알고리즘 구현
+# <SQL 쿼리를 날려 사용자 쿼리와 유사한 임베딩 청크 가져오기>
+
+
+# <가져온 청크에 대해 파이썬 코드에서 mmr 알고리즘 수행.>
                 lambda_val = 0.5  # MMR 가중치 - 관련성과 다양성 균형
                 max_documents = 5  # 최종 반환 문서 수
                 
@@ -238,6 +243,9 @@ LIMIT :top_n
                     else:
                         break
                 
+# </가져온 청크에 대해 파이썬 코드에서 mmr 알고리즘 수행.>
+
+# <mmr알고리즘 수행 결과를 문자열로 변환하여 llm의 context로 제공.>
                 # 7. 결과를 Document 객체 리스트로 변환
                 docs = []
                 for doc in selected_docs:
@@ -276,6 +284,8 @@ LIMIT :top_n
         print(f"문서 포맷팅 오류: {str(e)}")
         formatted_docs = "문서 처리 중 오류가 발생했습니다."
 
+
+# </mmr알고리즘 수행 결과를 문자열로 변환하여 llm의 context로 제공.>
     # 단계 8: 체인(Chain) 생성
     chain = (
         {"question": RunnablePassthrough(), "context": lambda _: formatted_docs}

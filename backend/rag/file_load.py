@@ -51,26 +51,41 @@ async def load_pdf(file):
     print(f"Extracted {len(documents)} pages from PDF")
     return documents
 
-def load_docx(file_path):
+
+
+async def load_docx(file):
     """Word 문서 처리"""
     print("Loading DOCX file...")
-    text = docx2txt.process(file_path)
     
-    # 텍스트 정리
-    text = clean_text(text)
+    # 파일 객체를 메모리에 로드
+    docx_content = await file.read()
     
-    # TextLoader를 사용하기 위해 임시 텍스트 파일 생성
-    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as temp:
-        temp.write(text)
+    # 임시 파일 생성
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp:
+        temp.write(docx_content)
         temp_path = temp.name
     
     try:
-        loader = TextLoader(temp_path)
-        documents = loader.load()
-        print(f"Created {len(documents)} document(s) from DOCX")
+        # docx2txt 패키지를 사용하여 문서 로드
+        text = docx2txt.process(temp_path)
+        
+        # 결과를 PDF와 같은 형식으로 변환
+        documents = []
+        text = clean_text(text)
+        documents.append(text)
+        
+        print(f"추출된 Word 문서 내용: {len(documents)} 페이지")
         return documents
+    except Exception as e:
+        print(f"DOCX 파일 처리 중 오류 발생: {str(e)}")
+        raise
     finally:
-        os.unlink(temp_path)  # 임시 파일 삭제
+        # 임시 파일 삭제
+        os.unlink(temp_path)
+
+
+
+
 
 def load_hwp(file_path, file_extension):
     """HWP/HWPX 문서 처리"""
