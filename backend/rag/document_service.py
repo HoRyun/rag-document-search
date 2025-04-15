@@ -63,7 +63,7 @@ async def process_document(
         if file_extension == 'pdf':
             documents = await load_pdf(file)
         elif file_extension == 'docx':
-            documents = load_docx(file)
+            documents = await load_docx(file)
         elif file_extension in ['hwp', 'hwpx']:
             documents = load_hwp(file, file_extension)
         
