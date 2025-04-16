@@ -5,16 +5,14 @@ from typing import List
 from pydantic import BaseModel
 
 import boto3
-from botocore.exceptions import ClientError
 
 from db.database import get_db
 from db.models import User
 from fast_api.security import get_current_user
 from rag.document_service import get_all_documents, process_document, process_query
+from rag.llm import get_llms_answer
 from config.settings import AWS_SECRET_ACCESS_KEY,S3_BUCKET_NAME,AWS_ACCESS_KEY_ID,AWS_DEFAULT_REGION  # 설정 임포트
 import os
-from db.models import Document
-from datetime import datetime
 import logging
 
 from dotenv import load_dotenv
@@ -84,29 +82,32 @@ async def upload_document(
     try:
 
         # 1. 필수 필드 검증
+        # 업로드 된 파일과 현재 로그인 된 사용자가 실제 존재하는 지 검증
         if not file.filename:
             raise ValueError("파일 이름이 없습니다.")
         if not current_user.username:
             raise ValueError("사용자 이름이 없습니다.")
 
+
+
+
         # 2. 문서 처리
+        # db에 문서 정보를 저장하고 문서를 인덱싱하여 vector store에 저장한다.
         code = await process_document(file, current_user.id, db)
 
 
-        # 3. S3 키 생성 (사용자 이름 기반)
-        s3_key = f"uploads/{current_user.username}/{file.filename}"
 
-        # 4. s3에 파일 업로드
+        # 3. s3에 파일 업로드
+        # 문서 처리 후에 파일 원본을 s3에 업로드한다.
+            # S3 키 생성 (사용자 이름 기반)
+        s3_key = f"uploads/{current_user.username}/{file.filename}"
+            # s3에 파일 업로드
         s3_client.upload_fileobj(
             Fileobj=file.file,
             Bucket=S3_BUCKET_NAME,
             Key=s3_key,
             ExtraArgs={'ContentType': file.content_type}
         )
-
-
-
-
 
         return JSONResponse(
             content={
@@ -204,5 +205,10 @@ async def create_directory(
 @router.post("/query")
 async def query_document(query: str = Form(...)):
     """문서 질의응답 엔드포인트"""
-    answer = process_query(query)
+    from db.database import engine  # 기존 엔진을 임포트
+
+    docs = process_query(query,engine)
+
+    answer = get_llms_answer(docs, query)
+
     return {"answer": answer} 
