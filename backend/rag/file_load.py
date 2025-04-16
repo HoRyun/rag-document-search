@@ -3,20 +3,14 @@
 
 import os
 import tempfile
-import shutil
 import subprocess
 import re
-from datetime import datetime
-from typing import List
 
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 import docx2txt
 
 from io import BytesIO
 from PyPDF2 import PdfReader
-
-from config.settings import UPLOAD_DIR
 
 def clean_text(text):
     """텍스트에서 NULL 문자 및 기타 문제가 될 수 있는 특수 문자 제거"""
@@ -119,29 +113,3 @@ def load_hwp(file_path, file_extension):
         raise
     finally:
         os.unlink(temp_path)  # 임시 파일 삭제
-
-# def prepare_chunks(documents, file_name, timestamp):
-#     """문서를 청크로 분할하고 메타데이터 추가"""
-#     print("Splitting text into chunks...")
-#     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-#     chunks = text_splitter.split_documents(documents)
-#     print(f"Created {len(chunks)} chunks from document")
-    
-#     # 메타데이터 추가 및 텍스트 정리
-#     for chunk in chunks:
-#         # NULL 문자 및 기타 문제가 될 수 있는 문자 제거
-#         chunk.page_content = clean_text(chunk.page_content)
-#         chunk.metadata["source"] = file_name
-#         chunk.metadata["upload_time"] = timestamp
-    
-#     return chunks
-
-# def save_uploaded_file(file, filename):
-#     """업로드된 파일 저장"""
-#     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-#     file_path = os.path.join(UPLOAD_DIR, f"{timestamp}_{filename}")
-    
-#     with open(file_path, "wb") as buffer:
-#         shutil.copyfileobj(file.file, buffer)
-    
-#     return file_path 

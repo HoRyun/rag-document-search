@@ -21,7 +21,7 @@ def format_docs(docs):
 
 def get_llms_answer(query: str) -> str:
     """LLM 모델 함수"""
-
+    from db.database import engine  # 기존 엔진을 임포트
     # 프롬프트를 생성합니다.
     prompt = PromptTemplate.from_template(
         """
@@ -58,26 +58,6 @@ def get_llms_answer(query: str) -> str:
     docs = []
     
     try:
-        # 직접 raw connection 사용
-        from sqlalchemy import create_engine
-        from config.settings import DATABASE_URL
-        
-        # 데이터베이스 URL 수정 (필요한 경우)
-        modified_url = DATABASE_URL
-        
-        # Docker 컨테이너 환경에서는 'db'를 사용, 로컬 개발 환경에서는 'localhost'를 사용
-        # getaddrinfo 오류 방지를 위한 조치
-        if 'db:5432' in modified_url and not os.environ.get('DOCKER_ENV'):
-            modified_url = modified_url.replace('db:5432', 'localhost:5432')
-        
-        if 'postgresql' in modified_url and not modified_url.startswith('postgresql+psycopg://'):
-            modified_url = modified_url.replace('postgresql://', 'postgresql+psycopg://')
-        
-        print(f"Database connection URL: {modified_url}")
-        
-        # autocommit=True로 엔진 생성
-        engine = create_engine(modified_url, pool_pre_ping=True)
-        
         # connection 직접 가져오기
         with engine.connect() as connection:
             # 데이터베이스에서 직접 유사도 계산 및 상위 문서 가져오기

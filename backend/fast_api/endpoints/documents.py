@@ -5,7 +5,6 @@ from typing import List
 from pydantic import BaseModel
 
 import boto3
-from botocore.exceptions import ClientError
 
 from db.database import get_db
 from db.models import User
@@ -13,8 +12,6 @@ from fast_api.security import get_current_user
 from rag.document_service import get_all_documents, process_document, process_query
 from config.settings import AWS_SECRET_ACCESS_KEY,S3_BUCKET_NAME,AWS_ACCESS_KEY_ID,AWS_DEFAULT_REGION  # 설정 임포트
 import os
-from db.models import Document
-from datetime import datetime
 import logging
 
 from dotenv import load_dotenv
