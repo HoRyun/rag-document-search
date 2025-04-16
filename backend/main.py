@@ -16,10 +16,8 @@ from db.database import init_db
 from fast_api.router import api_router
 from fast_api.middlewares import setup_middlewares
 from config.settings import UPLOAD_DIR
-from rag.embeddings import manually_create_vector_extension
+from rag.vectorstore import manually_create_vector_extension
 
-# 테이블 생성
-# Base.metadata.create_all(bind=engine)
 
 # 애플리케이션 시작 시 DB 초기화
 @asynccontextmanager

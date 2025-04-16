@@ -1,16 +1,9 @@
-# from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_openai import OpenAIEmbeddings
-from sqlalchemy import text
-import os
-
-from config.settings import DATABASE_URL
-
 
 
 def get_embeddings():
     """임베딩 모델 함수."""
+    from langchain_openai import OpenAIEmbeddings
     embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-
     return embeddings
 
 
@@ -19,6 +12,9 @@ def manually_create_vector_extension(engine):
     """pgvector 익스텐션을 수동으로 생성합니다"""
     """pgvector 익스텐션은 db에 한 번 생성되면 데이터베이스가 삭제될 때까지 유지되며
     해당 함수의 로직은 안전하게 애플리케이션을 초기화하기 위한 일반적인 패턴입니다."""
+    from sqlalchemy import text
+    from config.settings import DATABASE_URL
+    import os
     try:
         # 클라이언트 인코딩 옵션 추가
         modified_url = DATABASE_URL
@@ -46,3 +42,10 @@ def manually_create_vector_extension(engine):
     except Exception as e:
         print(f"수동 벡터 확장 생성 오류: {str(e)}")
         return False
+
+
+def embed_query(query: str):
+    """사용자 쿼리를 임베딩 벡터로 변환"""
+    embeddings_model = get_embeddings()
+    embeded_query = embeddings_model.embed_query(query)
+    return embeded_query

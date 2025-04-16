@@ -1,15 +1,8 @@
 from rag.embeddings import get_embeddings
 
-def save_to_vector_store(chunked_documents):
-
-    # PG Vector 저장소에만 저장
-    try:
-        save_to_pg_vector(chunked_documents)
-    except Exception as e:
-        print(f"PG Vector 저장 오류: {str(e)}")
 
 
-def save_to_pg_vector(documents):
+def save_to_vector_store(documents):
     """문서를 PostgreSQL 벡터 스토어에 저장합니다."""
     from db.database import SessionLocal
     from db import crud, models
@@ -49,4 +42,35 @@ def save_to_pg_vector(documents):
     finally:
         db.close()
 
-   
+
+def manually_create_vector_extension(engine):
+    """pgvector 익스텐션을 수동으로 생성합니다"""
+    from sqlalchemy import text
+    from config.settings import DATABASE_URL
+    import os
+    try:
+        # 클라이언트 인코딩 옵션 추가
+        modified_url = DATABASE_URL
+        
+        # Docker 컨테이너 환경에서는 'db'를 사용, 로컬 개발 환경에서는 'localhost'를 사용
+        # getaddrinfo 오류 방지를 위한 조치
+        if 'db:5432' in modified_url and not os.environ.get('DOCKER_ENV'):
+            modified_url = modified_url.replace('db:5432', 'localhost:5432')
+        
+        if 'postgresql' in modified_url and not modified_url.startswith('postgresql+psycopg://'):
+            modified_url = modified_url.replace('postgresql://', 'postgresql+psycopg://')
+            
+        if '?' in modified_url:
+            modified_url = f"{modified_url}&client_encoding=utf8"
+        else:
+            modified_url = f"{modified_url}?client_encoding=utf8"
+        
+        print(f"Vector extension 연결 URL: {modified_url}")
+                
+        with engine.connect() as connection:
+            connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+            connection.commit()
+        return True
+    except Exception as e:
+        print(f"수동 벡터 확장 생성 오류: {str(e)}")
+        return False
