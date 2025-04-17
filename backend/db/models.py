@@ -23,6 +23,7 @@ class Document(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String)
+    s3_key = Column(String(1024), nullable=False, unique=True)
     upload_time = Column(DateTime, default=datetime.now)
     user_id = Column(Integer, ForeignKey("users.id"))
     

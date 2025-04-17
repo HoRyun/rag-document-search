@@ -14,7 +14,7 @@ load_dotenv()
 from langchain_teddynote import logging
 
 # 프로젝트 이름을 입력합니다.
-logging.langsmith("25-1_RAG_Project")
+#logging.langsmith("25-1_RAG_Project")
 
 from db.database import init_db
 from fast_api.router import api_router

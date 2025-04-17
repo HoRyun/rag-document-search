@@ -13,8 +13,8 @@ def get_user_by_id(db: Session, user_id: int):
     return db.query(models.User).filter(models.User.id == user_id).first()
 
 # 문서 관련 CRUD
-def create_document(db: Session, filename: str, user_id: int):
-    db_document = models.Document(filename=filename, user_id=user_id)
+def create_document(db: Session, filename: str, s3_key: str, user_id: int):
+    db_document = models.Document(filename=filename, s3_key=s3_key, user_id=user_id)
     db.add(db_document)
     db.commit()
     db.refresh(db_document)

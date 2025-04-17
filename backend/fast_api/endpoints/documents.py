@@ -16,7 +16,7 @@ import os
 from db.models import Document
 from datetime import datetime
 import logging
-
+from io import BytesIO
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -68,6 +68,7 @@ def list_documents(db: Session = Depends(get_db)):
             {
                 "id": doc.id,
                 "filename": doc.filename,
+                "s3_url": f"https://{S3_BUCKET_NAME}.s3.{AWS_DEFAULT_REGION}.amazonaws.com/{doc.s3_key}",  # URL 동적 생성
                 "uploaded_at": doc.upload_time.isoformat()
             } for doc in documents
         ]}
@@ -77,36 +78,33 @@ def list_documents(db: Session = Depends(get_db)):
 @router.post("/upload")
 async def upload_document(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),  # 현재 사용자 정보 가져오기
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-
     try:
-
         # 1. 필수 필드 검증
         if not file.filename:
             raise ValueError("파일 이름이 없습니다.")
         if not current_user.username:
             raise ValueError("사용자 이름이 없습니다.")
+        
 
-        # 2. 문서 처리
-        code = await process_document(file, current_user.id, db)
-
-
-        # 3. S3 키 생성 (사용자 이름 기반)
+        # 2. S3 업로드 (BytesIO 없이 UploadFile.file 직접 사용)
         s3_key = f"uploads/{current_user.username}/{file.filename}"
-
-        # 4. s3에 파일 업로드
         s3_client.upload_fileobj(
             Fileobj=file.file,
             Bucket=S3_BUCKET_NAME,
             Key=s3_key,
             ExtraArgs={'ContentType': file.content_type}
         )
-
-
-
-
+        
+        # 3. DB 저장 및 문서 처리
+        code = await process_document(
+            file=file,
+            user_id=current_user.id,
+            db=db,
+            s3_key=s3_key
+        )
 
         return JSONResponse(
             content={
@@ -118,7 +116,7 @@ async def upload_document(
                 }]
             }
         )
-        
+
     except Exception as e:
         logger.error(f"파일 업로드 실패: {str(e)}")
         return JSONResponse(
@@ -129,10 +127,7 @@ async def upload_document(
                 "error": str(e)
             }
         )
-    # 파일 업로드 및 처리가 완료되면 성공 메시지를 반환
-    return {
-        "code": code
-    }
+
 
 @router.get("/directories")
 async def get_directories(
