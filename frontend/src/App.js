@@ -124,7 +124,7 @@ function App() {
       fetchDocuments();
     }
   }, [isAuthenticated, currentPath, fetchDocuments]);
-
+  
   // 파일 업로드 처리
   const handleAddFile = async (fileList, targetPath = currentPath, dirStructure = null) => {
     if (!fileList || fileList.length === 0) return;
@@ -133,29 +133,81 @@ function App() {
       setIsLoading(true);
       const token = localStorage.getItem("token");
       
+      // 디버깅: 업로드되는 파일과 경로 정보 출력
+      console.log('===== 업로드 디버깅 정보 =====');
+      console.log('업로드 경로:', targetPath);
+      console.log('파일 리스트:', fileList);
+      console.log('전달받은 디렉토리 구조:', dirStructure);
+      
+      // dirStructure가 null이면 기본 구조 생성
+      if (!dirStructure) {
+        dirStructure = createDirectoryStructureForPath(targetPath);
+        console.log('생성된 기본 디렉토리 구조:', dirStructure);
+      }
+      
       // FormData 생성
       const formData = new FormData();
       
-      // 파일 추가
+      // 파일 추가 및 경로 정보 수집
+      const filePaths = [];
       for (let i = 0; i < fileList.length; i++) {
+        // 디버깅: 각 파일 정보 출력
+        console.log(`파일 ${i+1}:`, {
+          name: fileList[i].name,
+          size: fileList[i].size,
+          type: fileList[i].type,
+          relativePath: fileList[i].relativePath || fileList[i].webkitRelativePath || '없음'
+        });
+        
+        // 파일 경로 정보가 있는 경우 처리
+        if (fileList[i].relativePath || fileList[i].webkitRelativePath) {
+          const fullPath = fileList[i].relativePath || fileList[i].webkitRelativePath;
+          filePaths.push(fullPath);
+          // 파일 경로 정보를 추가 필드로 전송
+          formData.append('file_paths', fullPath);
+        }
+        
         formData.append('files', fileList[i]);
       }
       
       // 경로 정보 추가
       formData.append('path', targetPath);
       
-      // 디렉토리 구조가 있는 경우 추가
-      if (dirStructure) {
-        formData.append('directory_structure', JSON.stringify(dirStructure));
+      // 디렉토리 구조 추가 (항상 전송)
+      formData.append('directory_structure', JSON.stringify(dirStructure));
+      
+      // 디버깅: 디렉토리 구조 상세 출력
+      console.log('전송할 디렉토리 구조 상세:', JSON.stringify(dirStructure, null, 2));
+      
+      // FormData 내용 확인
+      console.log('FormData 항목:');
+      for (let pair of formData.entries()) {
+        // 파일 객체는 너무 큰 정보이므로 파일명만 출력
+        if (pair[1] instanceof File) {
+          console.log(pair[0], '(파일):', pair[1].name);
+        } else {
+          console.log(pair[0], ':', pair[1]);
+        }
       }
       
+      // 디버깅: API 요청 정보
+      console.log('API 요청 URL:', `${API_BASE_URL}/documents/manage`);
+      console.log('헤더 정보:', {
+        Authorization: 'Bearer ' + token.substring(0, 10) + '...',
+        'Content-Type': 'multipart/form-data'
+      });
+      
       // API 호출
-      await axios.post(`${API_BASE_URL}/documents/manage`, formData, {
+      const response = await axios.post(`${API_BASE_URL}/documents/manage`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
         },
       });
+      
+      // 디버깅: API 응답 확인
+      console.log('API 응답:', response.data);
+      console.log('===== 업로드 디버깅 정보 종료 =====');
 
       // 업로드 성공 후 문서 목록 새로고침
       fetchDocuments();
@@ -163,10 +215,58 @@ function App() {
       fetchDirectories();
     } catch (error) {
       console.error("Error uploading files:", error);
+      
+      // 디버깅: 오류 상세 정보
+      console.log('===== 업로드 오류 정보 =====');
+      if (error.response) {
+        // 서버가 응답을 반환한 경우
+        console.log('서버 응답 상태:', error.response.status);
+        console.log('서버 응답 데이터:', error.response.data);
+        console.log('서버 응답 헤더:', error.response.headers);
+      } else if (error.request) {
+        // 요청이 전송되었으나 응답이 없는 경우
+        console.log('요청 정보 (응답 없음):', error.request);
+      } else {
+        // 요청 설정 중에 오류가 발생한 경우
+        console.log('오류 메시지:', error.message);
+      }
+      console.log('오류 설정:', error.config);
+      console.log('===== 업로드 오류 정보 종료 =====');
+      
       alert("파일 업로드 중 오류가 발생했습니다.");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // 경로에 따른 디렉토리 구조 생성 함수
+  const createDirectoryStructureForPath = (path) => {
+    // 루트 경로인 경우 빈 객체 반환
+    if (path === '/') {
+      return {};
+    }
+    
+    // 경로를 폴더 이름으로 분리
+    const pathParts = path.split('/').filter(Boolean);
+    
+    // 폴더 구조 객체 생성
+    let structure = {};
+    let currentLevel = structure;
+    
+    // 경로의 각 부분을 중첩된 객체로 변환
+    for (let i = 0; i < pathParts.length; i++) {
+      const folder = pathParts[i];
+      if (i === pathParts.length - 1) {
+        // 마지막 폴더는 파일이 추가될 위치
+        currentLevel[folder] = {};
+      } else {
+        // 중간 폴더는 다음 레벨의 부모
+        currentLevel[folder] = {};
+        currentLevel = currentLevel[folder];
+      }
+    }
+    
+    return structure;
   };
 
   // 새 폴더 생성 처리
