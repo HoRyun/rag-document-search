@@ -327,7 +327,7 @@ const FileDisplay = ({ files, currentPath, onAddFile, onCreateFolder, onFolderOp
   };
 
   // 메뉴 외부 클릭 처리
-  const handleDocumentClick = (e) => {
+  const handleDocumentClick = React.useCallback((e) => {
     if (
       showUploadTypeMenu && 
       uploadButtonRef.current && 
@@ -335,15 +335,15 @@ const FileDisplay = ({ files, currentPath, onAddFile, onCreateFolder, onFolderOp
     ) {
       setShowUploadTypeMenu(false);
     }
-  };
+  }, [showUploadTypeMenu]);
 
-  // document 클릭 이벤트 리스너 추가
+  // useEffect에 의존성 배열 추가
   React.useEffect(() => {
     document.addEventListener('click', handleDocumentClick);
     return () => {
       document.removeEventListener('click', handleDocumentClick);
     };
-  }, [showUploadTypeMenu]);
+  }, [handleDocumentClick]); // handleDocumentClick 의존성 추가
 
   // Refresh file list
   const handleRefresh = () => {
