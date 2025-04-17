@@ -1,27 +1,16 @@
 import os
-
 from fastapi import UploadFile, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
-import json
-from typing import Tuple, List, Dict, Any
-
-from langchain_core.documents import Document as LangchainDocument
-from langchain.chains.retrieval_qa.base import RetrievalQA
-
-import faiss
-from langchain_community.vectorstores import FAISS
-from langchain_community.docstore.in_memory import InMemoryDocstore
-
+import traceback
 
 
 # 함수 불러오기
-from db.models import Document, DocumentChunk
+from db.models import Document
+from rag.embeddings import embed_query
+from rag.vectorstore import save_to_vector_store
 
-from rag.retriever import get_reretriever
-from rag.embeddings import get_embeddings
-from rag.vectorstore import create_vector_store, get_vector_store, save_to_vector_store
-from rag.llm import get_llms_answer
+from rag.retriever import search_similarity, do_mmr
 from rag.file_load import (
     load_pdf, 
     load_docx, 
@@ -30,151 +19,105 @@ from rag.file_load import (
 from rag.chunking import chunk_documents
 
 
-
 def get_all_documents(db: Session):
     """모든 문서 조회"""
     return db.query(Document).all()
 
-# def safe_json_serializable(data):
-#     """JSON으로 직렬화할 수 있는 데이터만 반환.
-#     보조 기능 함수.
-#     """
-#     try:
-#         # JSON 직렬화 시도
-#         json.dumps(data)
-#         return data
-#     except (TypeError, OverflowError):
-#         # 직렬화할 수 없는 경우 문자열로 변환
-#         if isinstance(data, dict):
-#             return {k: safe_json_serializable(v) for k, v in data.items()}
-#         elif isinstance(data, list):
-#             return [safe_json_serializable(item) for item in data]
-#         else:
-#             return str(data)
+
 
 async def process_document(
-    file: UploadFile, 
+    file: UploadFile,
     user_id: int, 
     db: Session
 ) -> int:
-    """문서 업로드 및 처리
-    주 기능 함수.
-    """
-    # 파일 확장자 확인
+    """문서 업로드 및 처리"""
+
+    # 1. 업로드 된 파일의 형식을 확인한다.
+    # 파일 확장자 추출
     file_extension = file.filename.split('.')[-1].lower()
-    supported_extensions = ['pdf', 'hwp', 'hwpx', 'docx']
-    
-    if file_extension not in supported_extensions:
+     
+    # 지원되는 파일 형식 확인
+    if file_extension not in ['pdf', 'docx', 'hwp', 'hwpx']:
         raise HTTPException(
             status_code=400, 
-            detail=f"Only {', '.join(supported_extensions)} files are supported"
+            detail="지원되지 않는 파일 형식입니다. PDF, DOCX, HWP 또는 HWPX 파일만 업로드 가능합니다."
         )
-    
-    # # 파일 저장 
-    # 현재 필요하지 않은 기능이므로 우선 주석처리.
-    # file_path= save_uploaded_file(file, file.filename)
-    
+    # 1. 업로드 된 파일의 형식을 확인한다.
+
+
+
     try:
-        # DB의 documents 테이블에 문서 정보 저장.
+
+        # 2. 업로드 된 파일의 정보를 db에 저장한다.
+        # 업로드 된 파일의 이름, 업로드 시간, 사용자 아이디를 DB의 documents 테이블에 저장.
+        # DB의 documents 테이블에 문서 정보 저장. # 이 코드는 이 위치에 있어야 함.
         db_document = Document(
-            filename=file.filename, 
+            filename=os.path.basename(file.filename), 
             upload_time=datetime.now(), 
             user_id=user_id
         )
         db.add(db_document)
         db.commit()
         db.refresh(db_document)
+        # 2. 업로드 된 파일의 정보를 db에 저장한다.
 
 
 
-        # 파일 형식에 따라 문서 로드
+
+        # 3. 파일 형식에 따라 문서 로드
+        # 파일을 읽어 문자열 리스트로 반환하는 작업을 한다.
         if file_extension == 'pdf':
             documents = await load_pdf(file)
         elif file_extension == 'docx':
-            documents = load_docx(file)
+            documents = await load_docx(file)
         elif file_extension in ['hwp', 'hwpx']:
             documents = load_hwp(file, file_extension)
-        
-        # 문서 청킹
+        # 3. 파일 형식에 따라 문서 로드
+
+
+
+
+        # 4. 문서 청킹
+        # 문자열 리스트화 된 문서를 조각으로 나눈다.
         chunked_documents = chunk_documents(documents, file.filename)
+        # 4. 문서 청킹
 
-        # 벡터 스토어에 저장
-        save_to_vector_store(chunked_documents)
-        
-        print(f"Document {os.path.basename(file.filename)} uploaded and processed successfully")
+        # 5. 벡터 스토어에 청크들을 저장
+        # 청크들을 임베딩하여 벡터 스토어에 저장한다.
+        try:
+            save_to_vector_store(chunked_documents)
+            print(f"Document {os.path.basename(file.filename)} uploaded and processed successfully")
+        except Exception as ve:
+            print(f"벡터 저장 중 오류 발생 {str(ve)}")
+            print(traceback.format_exc())
 
+        # 5. 벡터 스토어에 저장
 
-        # # 청크 준비
-        # chunks = prepare_chunks(documents, file.filename, timestamp)
-        
-        # # 벡터 스토어에 문서 추가 시도
-        # try:
-        #     vector_store = get_vector_store()
-        #     vector_store.add_documents(chunks)
-        # except Exception as e:
-        #     print(f"벡터 스토어 추가 오류: {str(e)}")
-        #     # 대체 방법으로 한 번에 하나씩 청크 추가 시도
-        #     try:
-        #         vector_store = get_vector_store()
-        #         for i, chunk in enumerate(chunks):
-        #             try:
-        #                 # 청크 내용에서 문제가 되는 문자 제거
-        #                 chunk.page_content = clean_text(chunk.page_content)
-        #                 # 메타데이터 정리
-        #                 chunk.metadata = safe_json_serializable(chunk.metadata)
-        #                 vector_store.add_documents([chunk])
-        #                 print(f"청크 {i+1}/{len(chunks)} 추가 성공")
-        #             except Exception as chunk_error:
-        #                 print(f"청크 {i+1}/{len(chunks)} 추가 실패: {str(chunk_error)}")
-        #                 continue
-        #     except Exception as fallback_error:
-        #         print(f"대체 방법 실패: {str(fallback_error)}")
-        #         # 벡터 스토어 추가가 실패해도 계속 진행
-        
-        # # DB에 청크 정보 저장
-        # for chunk in chunks:
-        #     try:
-        #         # 청크 내용 정리
-        #         content = clean_text(chunk.page_content)
-        #         # 메타데이터 정리
-        #         metadata = safe_json_serializable(chunk.metadata)
-                
-        #         db_chunk = DocumentChunk(
-        #             document_id=db_document.id,
-        #             content=content,
-        #             meta=metadata
-        #         )
-        #         db.add(db_chunk)
-        #     except Exception as chunk_db_error:
-        #         print(f"청크 DB 저장 오류: {str(chunk_db_error)}")
-        #         continue
-        
-        # db.commit()
-        
         return 200
         
     except Exception as e:
-        # db.rollback()
-        import traceback
+        # 오류 발생 시 처리
+        db.rollback()  # 트랜잭션 롤백
         print(f"Error processing document: {str(e)}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error processing document: {str(e)}")
 
-def process_query(query: str) -> str:
-    """문서 질의응답"""
-    try:
-        # 벡터 스토어 가져오기
-        vector_store = get_vector_store()
-        
-        # reretriever 생성
-        reretriever = get_reretriever(vector_store)
 
-        # 질의 실행, 2번째 파라미터로 retriever(검색기) 전달
-        result = get_llms_answer(query, reretriever)
-        
-        return result
+def process_query(query: str, engine) -> str:
+    """사용자의 쿼리를 처리"""
+    try:
+        # 쿼리 임베딩
+        embed_query_data = embed_query(query)
+
+        # 검색 결과 가져오기
+        search_similarity_result = search_similarity(embed_query_data, engine)
+
+        # MMR 알고리즘 수행
+        docs = do_mmr(search_similarity_result)
+
+        return docs
     except Exception as e:
-        import traceback
-        print(f"Error querying documents: {str(e)}")
+        print(f"Error processing query: {str(e)}")
         print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error querying documents: {str(e)}") 
+        # 오류 발생 시 사용자 친화적인 메시지 반환
+        return f"처리 중 오류가 발생했습니다. 관리자에게 문의하세요. 오류 정보: {str(e)[:100]}..." 

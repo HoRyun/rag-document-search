@@ -1,12 +1,41 @@
-from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException
+from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import List
 from pydantic import BaseModel
+
+import boto3
 
 from db.database import get_db
 from db.models import User
 from fast_api.security import get_current_user
 from rag.document_service import get_all_documents, process_document, process_query
+from rag.llm import get_llms_answer
+from config.settings import AWS_SECRET_ACCESS_KEY,S3_BUCKET_NAME,AWS_ACCESS_KEY_ID,AWS_DEFAULT_REGION  # 설정 임포트
+import os
+import logging
+
+from dotenv import load_dotenv
+load_dotenv()
+
+
+# 로거 설정
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+logger.addHandler(handler)
+
+# S3 클라이언트 초기화 (설정 사용)
+s3_client = boto3.client(
+    's3',
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+    region_name=AWS_DEFAULT_REGION
+)
+S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
+if not S3_BUCKET_NAME:
+    raise ValueError("S3_BUCKET_NAME 환경 변수가 설정되지 않았습니다.")
 
 router = APIRouter()
 
@@ -45,20 +74,62 @@ def list_documents(db: Session = Depends(get_db)):
 
 @router.post("/upload")
 async def upload_document(
-    file: List[UploadFile] = File(...), 
-    current_user: User = Depends(get_current_user),
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),  # 현재 사용자 정보 가져오기
     db: Session = Depends(get_db)
 ):
-    """문서 업로드 엔드포인트"""
-    # 성공시 code=200, 실패시 code=500
 
-    for single_file in file:
-        code = await process_document(single_file, current_user.id, db)
+    try:
+
+        # 1. 필수 필드 검증
+        # 업로드 된 파일과 현재 로그인 된 사용자가 실제 존재하는 지 검증
+        if not file.filename:
+            raise ValueError("파일 이름이 없습니다.")
+        if not current_user.username:
+            raise ValueError("사용자 이름이 없습니다.")
 
 
-    # # 여기에 반복문으로 여러 파일 처리하는 코드 작성해야 함.
-    # code = process_document(file, current_user.id, db)
-    
+
+
+        # 2. 문서 처리
+        # db에 문서 정보를 저장하고 문서를 인덱싱하여 vector store에 저장한다.
+        code = await process_document(file, current_user.id, db)
+
+
+
+        # 3. s3에 파일 업로드
+        # 문서 처리 후에 파일 원본을 s3에 업로드한다.
+            # S3 키 생성 (사용자 이름 기반)
+        s3_key = f"uploads/{current_user.username}/{file.filename}"
+            # s3에 파일 업로드
+        s3_client.upload_fileobj(
+            Fileobj=file.file,
+            Bucket=S3_BUCKET_NAME,
+            Key=s3_key,
+            ExtraArgs={'ContentType': file.content_type}
+        )
+
+        return JSONResponse(
+            content={
+                "code": 200,
+                "message": "파일 업로드 성공",
+                "results": [{
+                    "filename": file.filename,
+                    "s3_url": f"https://{S3_BUCKET_NAME}.s3.{os.getenv('AWS_DEFAULT_REGION')}.amazonaws.com/{s3_key}"
+                }]
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"파일 업로드 실패: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "code": 500,
+                "message": "파일 업로드 실패",
+                "error": str(e)
+            }
+        )
     # 파일 업로드 및 처리가 완료되면 성공 메시지를 반환
     return {
         "code": code
@@ -134,5 +205,10 @@ async def create_directory(
 @router.post("/query")
 async def query_document(query: str = Form(...)):
     """문서 질의응답 엔드포인트"""
-    answer = process_query(query)
+    from db.database import engine  # 기존 엔진을 임포트
+
+    docs = process_query(query,engine)
+
+    answer = get_llms_answer(docs, query)
+
     return {"answer": answer} 

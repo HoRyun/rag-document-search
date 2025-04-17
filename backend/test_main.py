@@ -10,6 +10,9 @@ from fastapi import HTTPException, status
 # 테스트 모드 설정(github actions 테스트 환경에서 사용)
 os.environ['TEST_MODE'] = 'True'
 
+# 테스트 환경에서 사용할 환경 변수 설정
+os.environ['S3_BUCKET_NAME'] = 'rag-document-management'
+
 # 모의 사용자 객체 생성 (Pydantic 호환)
 class MockUser:
     def __init__(self):

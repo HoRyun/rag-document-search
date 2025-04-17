@@ -1,49 +1,76 @@
-import faiss
-from langchain_community.vectorstores import FAISS
-from langchain_community.docstore.in_memory import InMemoryDocstore
-
 from rag.embeddings import get_embeddings
 
-def create_vector_store(documents, embeddings):
-    vector_store = FAISS(
-            embedding_function=embeddings,
-            # 임베딩 차원 수를 얻어 FAISS 인덱스 초기화
-            index=faiss.IndexFlatL2(len(embeddings.embed_query("hello world"))),
-            docstore=InMemoryDocstore(),
-            index_to_docstore_id={},
-        )
-
-    # DB 생성
-    vector_store = FAISS.from_documents(documents=documents, embedding=embeddings)
-    return vector_store
 
 
-def get_vector_store():
-    # 임베딩 모델 생성
-    embeddings=get_embeddings()
-
-
-    # 로컬에 저장된 vectorstore를 로드
-    vector_store = FAISS.load_local(
-        folder_path="db/faiss_db/",
-        index_name="faiss_index",
-        embeddings=embeddings,
-        allow_dangerous_deserialization=True,
-    )
-
-    print(vector_store)
-    print("--------------------------------")
-    print(vector_store.similarity_search("어떤 문서가 저장되어 있습니까?"))
-    print("--------------------------------")
-    print(len(vector_store.docstore._dict))
-    print("--------------------------------")
-    return vector_store
-
-def save_to_vector_store(chunked_documents):
-    # FAISS 벡터 저장소 생성
-    vector_store=create_vector_store(chunked_documents, get_embeddings())
+def save_to_vector_store(documents):
+    """문서를 PostgreSQL 벡터 스토어에 저장합니다."""
+    from db.database import SessionLocal
+    from db import crud, models
     
-    # 로컬 disk에 저장. index_name: vectorstore의 이름.
-    vector_store.save_local(folder_path="db/faiss_db", index_name="faiss_index")  
+    db = SessionLocal()
+    try:
+        # 임베딩 모델
+        embeddings = get_embeddings()
+        
+        # 각 청크에 대해
+        for chunk in documents:
+            # 해당 문서 찾기
+            content = chunk.page_content
+            metadata = chunk.metadata
+            document_name = metadata.get("document_name", "")
+            
+            # 문서 ID 찾기
+            document = db.query(models.Document).filter(models.Document.filename == document_name).first()
+            
+            if document:
+                # 임베딩 생성
+                embedding_vector = embeddings.embed_query(content)
+                
+                # DB에 저장
+                crud.add_document_chunk(
+                    db=db,
+                    document_id=document.id,
+                    content=content,
+                    meta=metadata,
+                    embedding=embedding_vector
+                )
+                
+        print(f"총 {len(documents)}개의 청크가 PostgreSQL에 저장되었습니다.")
+    except Exception as e:
+        print(f"PostgreSQL 저장 오류: {str(e)}")
+        raise e
+    finally:
+        db.close()
 
-   
+
+def manually_create_vector_extension(engine):
+    """pgvector 익스텐션을 수동으로 생성합니다"""
+    from sqlalchemy import text
+    from config.settings import DATABASE_URL
+    import os
+    try:
+        # 클라이언트 인코딩 옵션 추가
+        modified_url = DATABASE_URL
+        
+        # Docker 컨테이너 환경에서는 'db'를 사용, 로컬 개발 환경에서는 'localhost'를 사용
+        # getaddrinfo 오류 방지를 위한 조치
+        if 'db:5432' in modified_url and not os.environ.get('DOCKER_ENV'):
+            modified_url = modified_url.replace('db:5432', 'localhost:5432')
+        
+        if 'postgresql' in modified_url and not modified_url.startswith('postgresql+psycopg://'):
+            modified_url = modified_url.replace('postgresql://', 'postgresql+psycopg://')
+            
+        if '?' in modified_url:
+            modified_url = f"{modified_url}&client_encoding=utf8"
+        else:
+            modified_url = f"{modified_url}?client_encoding=utf8"
+        
+        print(f"Vector extension 연결 URL: {modified_url}")
+                
+        with engine.connect() as connection:
+            connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+            connection.commit()
+        return True
+    except Exception as e:
+        print(f"수동 벡터 확장 생성 오류: {str(e)}")
+        return False

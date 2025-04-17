@@ -9,7 +9,7 @@ services:
       - ./backend:/app
       - ./data:/data
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/ragdb
+      - DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/ragdb
     depends_on:
       - db
 

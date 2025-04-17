@@ -19,7 +19,7 @@ data/uploads/
 
 # 테스트 파일
 test*.py
-
+*.ipynb
 
 # 데이터베이스 및 벡터 저장소
 data/chroma_db/
@@ -83,3 +83,6 @@ isu_*.txt
 *.bak5
 *.bak6
 *.bak7
+
+#커서 룰 파일
+.cursor/*

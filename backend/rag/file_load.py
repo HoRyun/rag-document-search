@@ -3,20 +3,14 @@
 
 import os
 import tempfile
-import shutil
 import subprocess
 import re
-from datetime import datetime
-from typing import List
 
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 import docx2txt
 
 from io import BytesIO
 from PyPDF2 import PdfReader
-
-from config.settings import UPLOAD_DIR
 
 def clean_text(text):
     """텍스트에서 NULL 문자 및 기타 문제가 될 수 있는 특수 문자 제거"""
@@ -51,26 +45,41 @@ async def load_pdf(file):
     print(f"Extracted {len(documents)} pages from PDF")
     return documents
 
-def load_docx(file_path):
+
+
+async def load_docx(file):
     """Word 문서 처리"""
     print("Loading DOCX file...")
-    text = docx2txt.process(file_path)
     
-    # 텍스트 정리
-    text = clean_text(text)
+    # 파일 객체를 메모리에 로드
+    docx_content = await file.read()
     
-    # TextLoader를 사용하기 위해 임시 텍스트 파일 생성
-    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as temp:
-        temp.write(text)
+    # 임시 파일 생성
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp:
+        temp.write(docx_content)
         temp_path = temp.name
     
     try:
-        loader = TextLoader(temp_path)
-        documents = loader.load()
-        print(f"Created {len(documents)} document(s) from DOCX")
+        # docx2txt 패키지를 사용하여 문서 로드
+        text = docx2txt.process(temp_path)
+        
+        # 결과를 PDF와 같은 형식으로 변환
+        documents = []
+        text = clean_text(text)
+        documents.append(text)
+        
+        print(f"추출된 Word 문서 내용: {len(documents)} 페이지")
         return documents
+    except Exception as e:
+        print(f"DOCX 파일 처리 중 오류 발생: {str(e)}")
+        raise
     finally:
-        os.unlink(temp_path)  # 임시 파일 삭제
+        # 임시 파일 삭제
+        os.unlink(temp_path)
+
+
+
+
 
 def load_hwp(file_path, file_extension):
     """HWP/HWPX 문서 처리"""
@@ -104,29 +113,3 @@ def load_hwp(file_path, file_extension):
         raise
     finally:
         os.unlink(temp_path)  # 임시 파일 삭제
-
-# def prepare_chunks(documents, file_name, timestamp):
-#     """문서를 청크로 분할하고 메타데이터 추가"""
-#     print("Splitting text into chunks...")
-#     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-#     chunks = text_splitter.split_documents(documents)
-#     print(f"Created {len(chunks)} chunks from document")
-    
-#     # 메타데이터 추가 및 텍스트 정리
-#     for chunk in chunks:
-#         # NULL 문자 및 기타 문제가 될 수 있는 문자 제거
-#         chunk.page_content = clean_text(chunk.page_content)
-#         chunk.metadata["source"] = file_name
-#         chunk.metadata["upload_time"] = timestamp
-    
-#     return chunks
-
-# def save_uploaded_file(file, filename):
-#     """업로드된 파일 저장"""
-#     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-#     file_path = os.path.join(UPLOAD_DIR, f"{timestamp}_{filename}")
-    
-#     with open(file_path, "wb") as buffer:
-#         shutil.copyfileobj(file.file, buffer)
-    
-#     return file_path 
