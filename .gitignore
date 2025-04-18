@@ -1,3 +1,10 @@
+uploads/
+
+# 사용하지 않는 ollama 무시
+ollama/*
+ollama/
+
+
 #cursor 파일
 .cursor/*
 

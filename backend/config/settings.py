@@ -59,7 +59,7 @@ print(f"Using database URL: {DATABASE_URL}")
 
 # 토큰 설정
 # 기본값은 30분이다.
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 180
 
 # 테스트를 위해 토큰 제한 시간을 1분으로 설정한다.
 # ACCESS_TOKEN_EXPIRE_MINUTES = 1
