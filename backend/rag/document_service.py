@@ -32,6 +32,8 @@ async def process_document(
 ) -> int:
     """문서 업로드 및 처리"""
 
+    from db import crud
+
     # 1. 업로드 된 파일의 형식을 확인한다.
     # 파일 확장자 추출
     file_extension = file.filename.split('.')[-1].lower()
@@ -45,7 +47,6 @@ async def process_document(
     # 1. 업로드 된 파일의 형식을 확인한다.
 
 
-
     try:
 
         # 2. 업로드 된 파일의 정보를 db에 저장한다.
@@ -54,11 +55,15 @@ async def process_document(
         db_document = Document(
             filename=os.path.basename(file.filename), 
             upload_time=datetime.now(), 
-            user_id=user_id
+            user_id=user_id,
+            # document_size=file.size
         )
         db.add(db_document)
         db.commit()
         db.refresh(db_document)
+
+        # 이 코드에서 에러를 발생시키므로 주석 처리
+        # crud.add_directory_size(db, db_document.id, file.size)
         # 2. 업로드 된 파일의 정보를 db에 저장한다.
 
 
@@ -85,15 +90,15 @@ async def process_document(
         # 5. 벡터 스토어에 청크들을 저장
         # 청크들을 임베딩하여 벡터 스토어에 저장한다.
         try:
-            save_to_vector_store(chunked_documents)
+            document_id = save_to_vector_store(chunked_documents)
             print(f"Document {os.path.basename(file.filename)} uploaded and processed successfully")
         except Exception as ve:
             print(f"벡터 저장 중 오류 발생 {str(ve)}")
             print(traceback.format_exc())
 
-        # 5. 벡터 스토어에 저장
+        
 
-        return 200
+        return document_id
         
     except Exception as e:
         # 오류 발생 시 처리

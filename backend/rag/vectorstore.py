@@ -36,6 +36,7 @@ def save_to_vector_store(documents):
                 )
                 
         print(f"총 {len(documents)}개의 청크가 PostgreSQL에 저장되었습니다.")
+        return document.id
     except Exception as e:
         print(f"PostgreSQL 저장 오류: {str(e)}")
         raise e
