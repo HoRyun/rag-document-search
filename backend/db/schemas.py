@@ -61,3 +61,10 @@ class QueryRequest(BaseModel):
 
 class QueryResponse(BaseModel):
     answer: str 
+
+# 디렉토리 스키마
+class DirectoryBase(BaseModel):
+    id: str
+    name: str
+    path: str
+    is_directory: bool

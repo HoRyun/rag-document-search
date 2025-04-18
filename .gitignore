@@ -1,3 +1,17 @@
+uploads/
+
+# 사용하지 않는 ollama 무시
+ollama/*
+ollama/
+
+
+#cursor 파일
+.cursor/*
+
+#테스트 용 주피터 노트북
+*test.ipynb
+test*.ipynb
+
 # 업로드된 문서 파일
 data/uploads/
 *.pdf
@@ -12,7 +26,7 @@ data/uploads/
 
 # 테스트 파일
 test*.py
-
+*.ipynb
 
 # 데이터베이스 및 벡터 저장소
 data/chroma_db/
@@ -76,3 +90,6 @@ isu_*.txt
 *.bak5
 *.bak6
 *.bak7
+
+#커서 룰 파일
+.cursor/*
