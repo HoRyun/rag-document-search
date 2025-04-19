@@ -35,14 +35,21 @@ async def process_document(
     # 1. 업로드 된 파일의 형식을 확인한다.
     # 파일 확장자 추출
     file_extension = file.filename.split('.')[-1].lower()
-     
+
     # 지원되는 파일 형식 확인
     if file_extension not in ['pdf', 'docx', 'hwp', 'hwpx']:
         raise HTTPException(
             status_code=400, 
             detail="지원되지 않는 파일 형식입니다. PDF, DOCX, HWP 또는 HWPX 파일만 업로드 가능합니다."
         )
-    # 1. 업로드 된 파일의 형식을 확인한다.
+    
+    # 파일의 경로 추출
+    file_path = file.filename
+
+    # 파일의 이름 추출
+    file_name = os.path.basename(file_path)
+
+
 
 
     try:
@@ -51,7 +58,7 @@ async def process_document(
         # 업로드 된 파일의 이름, 업로드 시간, 사용자 아이디를 DB의 documents 테이블에 저장.
         # DB의 documents 테이블에 문서 정보 저장. # 이 코드는 이 위치에 있어야 함.
         db_document = Document(
-            filename=file.filename,
+            filename=file_name,
             s3_key=s3_key,
             upload_time=datetime.now(),
             user_id=user_id
@@ -80,14 +87,14 @@ async def process_document(
 
         # 4. 문서 청킹
         # 문자열 리스트화 된 문서를 조각으로 나눈다.
-        chunked_documents = chunk_documents(documents, file.filename)
+        chunked_documents = chunk_documents(documents, file_path, file_name)
         # 4. 문서 청킹
 
         # 5. 벡터 스토어에 청크들을 저장
         # 청크들을 임베딩하여 벡터 스토어에 저장한다.
         try:
             document_id = save_to_vector_store(chunked_documents)
-            print(f"Document {os.path.basename(file.filename)} uploaded and processed successfully")
+            print(f"Document {file_name} uploaded and processed successfully")
         except Exception as ve:
             print(f"벡터 저장 중 오류 발생 {str(ve)}")
             print(traceback.format_exc())

@@ -3,7 +3,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_text_splitters import CharacterTextSplitter
 
 
-def chunk_documents(documents, filepath):
+def chunk_documents(documents, filepath, file_name):
     """문서 청킹"""
     print("Splitting text into chunks...")
 
@@ -21,7 +21,7 @@ def chunk_documents(documents, filepath):
     
     metadatas = [
         {
-            "document_name": os.path.basename(filepath),
+            "document_name": file_name,
             "document_path": filepath,
         }
     ]  # 문서에 대한 메타데이터 리스트를 정의합니다.

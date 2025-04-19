@@ -516,7 +516,7 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                 current_rel = current_path[len(root_path):].strip("/")  #*
                 if dir_part == current_rel:
                     # file_id = str(uuid.uuid4())
-                    file_path= f"{current_path.rstrip('/')}/{file_name}" 
+                    file_path= result # f"{current_path.rstrip('/')}/{file_name}" <- result로 대체.
                     # file_path = os.path.join(current_path, file_name)  #* 변경된 부분
                     # DB 저장: 파일
                     
@@ -559,6 +559,24 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                         )
                         # </s3업로드, 파일 처리 및 return 예외 처리>
                     
+                        # <디렉토리 정보 처리>
+                        #이 파일의 parent_id 얻어오는 쿼리문.
+                        parent_id = crud.get_parent_id(db, str(document_id))
+
+                        # 디렉토리 업로드 시에는 해당 문서의 id를 사용.
+                        id = document_id
+
+                        crud.create_directory(
+                            db=db,
+                            id=id,
+                            name=file_name,
+                            path=file_path,
+                            is_directory=False,
+                            parent_id=parent_id,
+                            created_at=datetime.now().isoformat()
+                        )
+                        # </디렉토리 정보 처리> 
+
                         # result에 결과 추가
                         results.append({
                             "type": "file",
