@@ -1,5 +1,4 @@
 docx2txt==0.8
-faiss_cpu==1.10.0
 fastapi==0.115.12
 langchain==0.3.23
 langchain_community==0.3.21

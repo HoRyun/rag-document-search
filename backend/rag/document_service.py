@@ -23,16 +23,13 @@ def get_all_documents(db: Session):
     """모든 문서 조회"""
     return db.query(Document).all()
 
-
-
 async def process_document(
     file: UploadFile,
     user_id: int, 
-    db: Session
+    db: Session,
+    s3_key: str
 ) -> int:
     """문서 업로드 및 처리"""
-
-    from db import crud
 
     # 1. 업로드 된 파일의 형식을 확인한다.
     # 파일 확장자 추출
@@ -48,26 +45,24 @@ async def process_document(
 
 
     try:
-
+        
         # 2. 업로드 된 파일의 정보를 db에 저장한다.
         # 업로드 된 파일의 이름, 업로드 시간, 사용자 아이디를 DB의 documents 테이블에 저장.
         # DB의 documents 테이블에 문서 정보 저장. # 이 코드는 이 위치에 있어야 함.
         db_document = Document(
-            filename=os.path.basename(file.filename), 
-            upload_time=datetime.now(), 
-            user_id=user_id,
-            # document_size=file.size
+            filename=os.path.basename(file.filename),
+            s3_key=s3_key,
+            upload_time=datetime.now(),
+            user_id=user_id
         )
         db.add(db_document)
         db.commit()
         db.refresh(db_document)
+        # 2. 업로드 된 파일의 정보를 db에 저장한다.
 
         # 이 코드에서 에러를 발생시키므로 주석 처리
         # crud.add_directory_size(db, db_document.id, file.size)
         # 2. 업로드 된 파일의 정보를 db에 저장한다.
-
-
-
 
         # 3. 파일 형식에 따라 문서 로드
         # 파일을 읽어 문자열 리스트로 반환하는 작업을 한다.
@@ -96,7 +91,6 @@ async def process_document(
             print(f"벡터 저장 중 오류 발생 {str(ve)}")
             print(traceback.format_exc())
 
-        
 
         return document_id
         
