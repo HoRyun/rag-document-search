@@ -22,37 +22,33 @@ def clean_text(text):
     
     return text
 
-async def load_pdf(file):
+async def load_pdf(file_content):
     """PDF 파일 사전 처리"""
     print("Loading PDF file...")
 
-    # 파일 객체를 메모리에 로드
-    pdf_content = await file.read()
+    try:
+
+        # PyPDFLoader 대신 PyPDFReader 사용
+        reader = PdfReader(BytesIO(file_content)) # 이부분의 <pdf_file>는 BytesIO(<load_pdf의 매개변수>)로 대체.
+        documents = []
+        for page in reader.pages:
+            text = page.extract_text()
+            text = clean_text(text)
+            documents.append(text)
+
+        print(f"Extracted {len(documents)} pages from PDF")
+
+        return documents
     
-    # BytesIO를 사용하여 메모리 내 파일 객체 생성(process_pdf 함수 종료 시 해당 파일 분에 한해 메모리 해제됨)
-    pdf_file = BytesIO(pdf_content)
-    
-    # PyPDFLoader 대신 PyPDFReader 사용
-    reader = PdfReader(pdf_file)
-    documents = []
-    for page in reader.pages:
-        text = page.extract_text()
-        text = clean_text(text)
-        documents.append(text)
- 
-
-        
-    print(f"Extracted {len(documents)} pages from PDF")
-    return documents
+    except Exception as e:
+        print(f"Error loading PDF file: {str(e)}")
+        raise
 
 
 
-async def load_docx(file):
+async def load_docx(docx_content):
     """Word 문서 처리"""
     print("Loading DOCX file...")
-    
-    # 파일 객체를 메모리에 로드
-    docx_content = await file.read()
     
     # 임시 파일 생성
     with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp:

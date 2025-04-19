@@ -352,7 +352,17 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
             # <if len(files) == 1: 의 예외 처리 구역>
             # <s3업로드, 파일 처리 및 return 예외 처리>
             try:
-                # S3 업로드 (BytesIO 없이 UploadFile.file 직접 사용)
+
+
+                # <파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
+                file_content = await files[0].read()
+                # </파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
+
+
+
+
+                # S3 업로드.
+                # 이 부분에서 파일은 한 번 읽힘.
                 s3_key = f"uploads/{current_user.username}/{files[0].filename}"
                 s3_client.upload_fileobj(
                     Fileobj=files[0].file,
@@ -361,9 +371,10 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                     ExtraArgs={'ContentType': files[0].content_type}
                 )
 
-                # 3. DB 저장 및 문서 처리
+                # 3. DB에 파일 정보 저장 및 문서 처리
                 document_id = await process_document(
-                    file=files[0],
+                    file=files[0],# 파일의 정보를 사용하기 위해 그대로 전달.
+                    file_content=file_content, # 메모리에 읽은 파일의 실제 데이터를 전달.
                     user_id=current_user.id,
                     db=db,
                     s3_key=s3_key
@@ -514,6 +525,10 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                     try:
                         # <s3업로드 예외 처리 try except>
                         try:
+                            # <파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
+                            file_content = await upload_file.read()
+                            # </파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
+
                             # S3 업로드 (BytesIO 없이 UploadFile.file 직접 사용)
                             s3_key = f"uploads/{current_user.username}/{upload_file.filename}"
                             s3_client.upload_fileobj(
@@ -537,6 +552,7 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                         # 3. DB 저장 및 문서 처리
                         document_id = await process_document(
                             file=upload_file,
+                            file_content=file_content,
                             user_id=current_user.id,
                             db=db,
                             s3_key=s3_key

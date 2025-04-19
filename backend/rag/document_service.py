@@ -24,7 +24,8 @@ def get_all_documents(db: Session):
     return db.query(Document).all()
 
 async def process_document(
-    file: UploadFile,
+    file: UploadFile, 
+    file_content: bytes,
     user_id: int, 
     db: Session,
     s3_key: str
@@ -50,7 +51,7 @@ async def process_document(
         # 업로드 된 파일의 이름, 업로드 시간, 사용자 아이디를 DB의 documents 테이블에 저장.
         # DB의 documents 테이블에 문서 정보 저장. # 이 코드는 이 위치에 있어야 함.
         db_document = Document(
-            filename=os.path.basename(file.filename),
+            filename=file.filename,
             s3_key=s3_key,
             upload_time=datetime.now(),
             user_id=user_id
@@ -67,9 +68,9 @@ async def process_document(
         # 3. 파일 형식에 따라 문서 로드
         # 파일을 읽어 문자열 리스트로 반환하는 작업을 한다.
         if file_extension == 'pdf':
-            documents = await load_pdf(file)
+            documents = await load_pdf(file_content) # file 대신 file_content를 매개변수로 전달
         elif file_extension == 'docx':
-            documents = await load_docx(file)
+            documents = await load_docx(file_content) # file 대신 file_content를 매개변수로 전달
         elif file_extension in ['hwp', 'hwpx']:
             documents = load_hwp(file, file_extension)
         # 3. 파일 형식에 따라 문서 로드
