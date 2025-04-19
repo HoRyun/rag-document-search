@@ -29,6 +29,7 @@ class TokenData(BaseModel):
 # 문서 스키마
 class DocumentBase(BaseModel):
     filename: str
+    s3_key: str
 
 class DocumentCreate(DocumentBase):
     pass

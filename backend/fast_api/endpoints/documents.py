@@ -76,6 +76,19 @@ def list_items(
     ):
     """지정된 경로의 파일 및 폴더 목록을 반환"""
     # 현재 이 함수는 에러가 발생하는데, 프로그램 실행에 영향을 주지는 않으니 일단 두기.
+    ## develop-clud ver: 
+    # try:
+    #     documents = get_all_documents(db)
+    #     return {"documents": [
+    #         {
+    #             "id": doc.id,
+    #             "filename": doc.filename,
+    #             "s3_url": f"https://{S3_BUCKET_NAME}.s3.{AWS_DEFAULT_REGION}.amazonaws.com/{doc.s3_key}",  # URL 동적 생성
+    #             "uploaded_at": doc.upload_time.isoformat()
+    #         } for doc in documents
+    #     ]}
+    # except Exception as e:
+    #     raise HTTPException(status_code=500, detail=f"Error listing documents: {str(e)}")
     from db import crud
     try:
         filtered_items = []
@@ -126,6 +139,7 @@ async def upload_document(
             "message": "작업이 완료되었습니다.",
             "items": []
         }
+
         # 1 & 2. 파일 업로드 처리 (디렉토리 구조 포함 또는 단일 파일)
         if files:
             file_results = await process_file_uploads(files, path, directory_structure, current_user, db)
@@ -334,14 +348,55 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
     # 단일 파일 거르기
     if len(files) == 1:
         document_id = None
-        # 문서 처리.
         try:
-            document_id = await process_document(files[0], current_user.id, db)
+            # <if len(files) == 1: 의 예외 처리 구역>
+            # <s3업로드, 파일 처리 및 return 예외 처리>
+            try:
 
+
+                # <파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
+                file_content = await files[0].read()
+                # </파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
+
+
+
+
+                # S3 업로드.
+                # 이 부분에서 파일은 한 번 읽힘.
+                s3_key = f"uploads/{current_user.username}/{files[0].filename}"
+                s3_client.upload_fileobj(
+                    Fileobj=files[0].file,
+                    Bucket=S3_BUCKET_NAME,
+                    Key=s3_key,
+                    ExtraArgs={'ContentType': files[0].content_type}
+                )
+
+                # 3. DB에 파일 정보 저장 및 문서 처리
+                document_id = await process_document(
+                    file=files[0],# 파일의 정보를 사용하기 위해 그대로 전달.
+                    file_content=file_content, # 메모리에 읽은 파일의 실제 데이터를 전달.
+                    user_id=current_user.id,
+                    db=db,
+                    s3_key=s3_key
+                )
+                # </s3업로드, 파일 처리 및 return 예외 처리>
+            except Exception as e:
+                print(f"s3 업로드 중 오류 발생: {str(e)}")
+                results.append({
+                    "type": "file",
+                    "id": document_id,
+                    "name": files[0].filename,
+                    "path": path,
+                    "status": "error",
+                    "error": str(e)
+                }) 
+            # <디렉토리 정보 처리>
             #이 파일의 parent_id 얻어오는 쿼리문.
             parent_id = crud.get_parent_id(db, str(document_id))
 
+            # 단일 파일 업로드 시에는 고유한 아이디 값으로 저장함.
             id = str(uuid.uuid4())
+
             crud.create_directory(
                 db=db,
                 id=id,
@@ -350,7 +405,9 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                 is_directory=False,
                 parent_id=parent_id,
                 created_at=datetime.now().isoformat()
-            )               
+            )
+            # </디렉토리 정보 처리>            
+            # </if len(files) == 1: 의 예외 처리 구역>
         except Exception as e:
             results.append({
                 "type": "file",
@@ -360,28 +417,7 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                 "status": "error",
                 "error": str(e)
             })
-        # s3에 파일 업로드.
-        try:
-            # 문서 처리 후에 파일 원본을 s3에 업로드한다.
-                # S3 키 생성 (사용자 이름 기반)
-            s3_key = f"uploads/{current_user.username}/{files[0].filename}"
-                # s3에 파일 업로드
-            s3_client.upload_fileobj(
-                Fileobj=files[0].file,
-                Bucket=S3_BUCKET_NAME,
-                Key=s3_key,
-                ExtraArgs={'ContentType': files[0].content_type}
-            )
-        except Exception as e:
-            print(f"s3 업로드 중 오류 발생: {str(e)}")
-            results.append({
-                "type": "file",
-                "id": document_id,
-                "name": files[0].filename,
-                "path": path,
-                "status": "error",
-                "error": str(e)
-            })          
+             
     else: # 아니면 디렉토리 구조 포함된 데이터.
         # 1. 문자열로 받은 디렉토리 구조를 파이썬 dict로 변환
         tree: Dict[str, Any] = json.loads(directory_structure)
@@ -430,6 +466,7 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
             current_name = name
             #* 변경: OS 종속적 os.path.join 대신 '/' 문자열 조합 사용
             current_path = f"{parent_path.rstrip('/')}/{name}" 
+            
             # DB 저장: 디렉토리
             # <예외 처리 구역>
             try:
@@ -468,6 +505,8 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
             # 3-2. 해당 디렉토리에 포함된 파일 처리
             prefix = "/"
             for upload_file in files:
+                # 파일 객체는 upload_file에 저장됨.
+
                 _, _, result = upload_file.filename.partition('/')
                 full_path = result = '/'+ result
                 if not full_path.startswith(prefix):
@@ -477,49 +516,68 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                 current_rel = current_path[len(root_path):].strip("/")  #*
                 if dir_part == current_rel:
                     # file_id = str(uuid.uuid4())
-                    file_path= f"{current_path.rstrip('/')}/{file_name}" 
+                    file_path= result # f"{current_path.rstrip('/')}/{file_name}" <- result로 대체.
                     # file_path = os.path.join(current_path, file_name)  #* 변경된 부분
                     # DB 저장: 파일
-                    # <예외 처리 구역>
+                    
                     document_id = None
+                    # <복붙>
                     try:
-
-                        # 문서 처리 - 문서 목록 추가 & 벡터 데이터 추가
-                        document_id = await process_document(upload_file, current_user.id, db)
-
-                        # db_save(id=file_id, name=file_name, path=file_path, is_directory=False, parent_id=current_id)
-                        crud.create_directory(
-                            db=db,
-                            id=str(document_id),
-                            name=file_name,
-                            path=file_path,
-                            is_directory=False,
-                            parent_id=current_id,
-                            created_at=datetime.now().isoformat()
-                        )                    
-                        # s3에 파일 업로드
+                        # <s3업로드 예외 처리 try except>
                         try:
-                            # 문서 처리 후에 파일 원본을 s3에 업로드한다.
-                                # S3 키 생성 (사용자 이름 기반)
-                            s3_key = f"uploads/{current_user.username}/{file_name}"
-                                # s3에 파일 업로드
+                            # <파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
+                            file_content = await upload_file.read()
+                            # </파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
+
+                            # S3 업로드 (BytesIO 없이 UploadFile.file 직접 사용)
+                            s3_key = f"uploads/{current_user.username}/{upload_file.filename}"
                             s3_client.upload_fileobj(
                                 Fileobj=upload_file.file,
                                 Bucket=S3_BUCKET_NAME,
                                 Key=s3_key,
                                 ExtraArgs={'ContentType': upload_file.content_type}
-                            )
+                            )                                
                         except Exception as e:
                             print(f"s3 업로드 중 오류 발생: {str(e)}")
                             results.append({
                                 "type": "file",
                                 "id": document_id,
-                                "name": file_name,
-                                "path": file_path,
+                                "name": upload_file.filename,
+                                "path": path,
                                 "status": "error",
                                 "error": str(e)
-                            })                        
+                            })
+                        # </<s3업로드 예외 처리 try except>>
 
+                        # 3. DB 저장 및 문서 처리
+                        document_id = await process_document(
+                            file=upload_file,
+                            file_content=file_content,
+                            user_id=current_user.id,
+                            db=db,
+                            s3_key=s3_key
+                        )
+                        # </s3업로드, 파일 처리 및 return 예외 처리>
+                    
+                        # <디렉토리 정보 처리>
+                        #이 파일의 parent_id 얻어오는 쿼리문.
+                        parent_id = crud.get_parent_id(db, str(document_id))
+
+                        # 디렉토리 업로드 시에는 해당 문서의 id를 사용.
+                        id = document_id
+
+                        crud.create_directory(
+                            db=db,
+                            id=id,
+                            name=file_name,
+                            path=file_path,
+                            is_directory=False,
+                            parent_id=parent_id,
+                            created_at=datetime.now().isoformat()
+                        )
+                        # </디렉토리 정보 처리> 
+
+                        # result에 결과 추가
                         results.append({
                             "type": "file",
                             "id": document_id,
@@ -531,12 +589,13 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                         results.append({
                             "type": "file",
                             "id": document_id,
-                            "name": file_name,
-                            "path": file_path,
+                            "name": upload_file.filename,
+                            "path": path,
                             "status": "error",
                             "error": str(e)
-                        })
-                    # </예외 처리 구역>
+                        })                    
+                    # </복붙>
+                    
 
         # 4. 실제 트리 순회 시작
         # root 자체가 아닌, 루트의 자식들부터 순회하도록 변경  #* 변경된 부분
