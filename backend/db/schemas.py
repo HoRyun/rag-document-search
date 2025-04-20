@@ -29,6 +29,7 @@ class TokenData(BaseModel):
 # 문서 스키마
 class DocumentBase(BaseModel):
     filename: str
+    s3_key: str
 
 class DocumentCreate(DocumentBase):
     pass
@@ -61,3 +62,10 @@ class QueryRequest(BaseModel):
 
 class QueryResponse(BaseModel):
     answer: str 
+
+# 디렉토리 스키마
+class DirectoryBase(BaseModel):
+    id: str
+    name: str
+    path: str
+    is_directory: bool
