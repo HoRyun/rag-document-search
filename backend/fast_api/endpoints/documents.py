@@ -8,7 +8,7 @@ import uuid
 import json
 import boto3
 
-from db.database import get_db
+from db.database import get_db, engine
 from db.models import User
 from fast_api.security import get_current_user
 from rag.document_service import get_all_documents, process_document, process_query
@@ -41,32 +41,6 @@ if not S3_BUCKET_NAME:
 
 router = APIRouter()
 
-# # 디렉토리 항목을 위한 Pydantic 모델
-# class DirectoryItem(BaseModel):
-#     id: str
-#     name: str
-#     path: str
-#     is_directory: bool
-
-# # 디렉토리 작업을 위한 모델
-# class DirectoryOperation(BaseModel):
-#     operation_type: str  # 'create', 'move', 'delete', 'rename'
-#     item_id: Optional[str] = None
-#     name: Optional[str] = None
-#     path: Optional[str] = None
-#     new_path: Optional[str] = None
-
-# 임시 스토리지 (실제 구현에서는 DB를 사용)
-# filesystem = {
-#     "home": {
-#         "id": "home",
-#         "name": "Home",
-#         "path": "/",
-#         "is_directory": True,
-#         "parent_id": None,
-#         "created_at": datetime.now().isoformat()
-#     }
-# }
 
 @router.get("/")
 def list_items(
@@ -75,50 +49,45 @@ def list_items(
     db: Session = Depends(get_db)
     ):
     """지정된 경로의 파일 및 폴더 목록을 반환"""
-    # 현재 이 함수는 에러가 발생하는데, 프로그램 실행에 영향을 주지는 않으니 일단 두기.
-    ## develop-clud ver: 
-    # try:
-    #     documents = get_all_documents(db)
-    #     return {"documents": [
-    #         {
-    #             "id": doc.id,
-    #             "filename": doc.filename,
-    #             "s3_url": f"https://{S3_BUCKET_NAME}.s3.{AWS_DEFAULT_REGION}.amazonaws.com/{doc.s3_key}",  # URL 동적 생성
-    #             "uploaded_at": doc.upload_time.isoformat()
-    #         } for doc in documents
-    #     ]}
-    # except Exception as e:
-    #     raise HTTPException(status_code=500, detail=f"Error listing documents: {str(e)}")
+
     from db import crud
+    from sqlalchemy import text
     try:
+        
         filtered_items = []
-        
-        #로직.
-        # 디렉토리 구조 가져오기
-        directories = crud.get_specific_directory(db, path, is_directory=True)
-        # 
-        # 파일 구조 가져오기
-        files = crud.get_specific_directory(db, path, is_directory=False)
 
-        # directories에서 필요한 키만 뽑아 추가
-        for d in directories:
-            filtered_items.append({
-                "id":   d["id"],
-                "name": d["name"],
-                "path": d["path"],
-                "type": d["type"],
-            })
-        
-        # files에서 필요한 키만 뽑아 추가
-        for f in files:
-            filtered_items.append({
-                "id":   f["id"],
-                "name": f["name"],
-                "path": f["path"],
-                "size": f["size"],
-                "type": f["type"],
-            })
+        # 프론트 엔드에서 선택한 경로
+        selected_path = path
+        # <db에서 디렉토리 정보와 파일 정보 가져오기>
 
+        # 커넥션 풀에서 직접 연결 가져오기
+        with db.connection() as connection:
+            # 파일 목록 쿼리
+            file_query = text("""
+                SELECT id, name, 'file' as type, path 
+                FROM directories 
+                WHERE path LIKE :selected_path || '/%' 
+                AND path NOT LIKE :selected_path || '/%/%' 
+                AND is_directory = FALSE
+            """)
+            file_result = connection.execute(file_query, {"selected_path": selected_path}).mappings().fetchall()
+            
+            # 디렉토리 목록 쿼리
+            dir_query = text("""
+                SELECT id, name, 'folder' as type, path 
+                FROM directories 
+                WHERE path LIKE :selected_path || '/%' 
+                AND path NOT LIKE :selected_path || '/%/%' 
+                AND is_directory = TRUE
+            """)
+            dir_result = connection.execute(dir_query, {"selected_path": selected_path}).mappings().fetchall()
+        # </db에서 디렉토리 정보와 파일 정보 가져오기>
+
+        # <가져온 정보를 filtered_items에 추가>
+        filtered_items.extend([dict(item) for item in file_result])
+        filtered_items.extend([dict(item) for item in dir_result])
+        # </가져온 정보를 filtered_items에 추가>
+        
         return {"items": filtered_items}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error listing items: {str(e)}")
@@ -379,6 +348,7 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                     db=db,
                     s3_key=s3_key
                 )
+
                 # </s3업로드, 파일 처리 및 return 예외 처리>
             except Exception as e:
                 print(f"s3 업로드 중 오류 발생: {str(e)}")
