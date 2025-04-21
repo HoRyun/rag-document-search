@@ -101,7 +101,7 @@ async def upload_document(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-
+    from typing import Dict, Any
     try:
         results = {
             "success": True,
@@ -118,7 +118,7 @@ async def upload_document(
         # 3 & 4. 디렉토리 작업 처리 (생성, 이동, 삭제 등)
         if operations:
             try:
-                ops_data = json.loads(operations)
+                ops_data: Dict[str, Any] = json.loads(operations)
                 op_results = process_directory_operations(ops_data, current_user.id, db)
                 results["items"].extend(op_results)
             except json.JSONDecodeError:
@@ -128,60 +128,6 @@ async def upload_document(
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error managing documents: {str(e)}")
-    #     # 1. 필수 필드 검증
-    #     # 업로드 된 파일과 현재 로그인 된 사용자가 실제 존재하는 지 검증
-    #     # if not file.filename:
-    #     #     raise ValueError("파일 이름이 없습니다.")
-    #     # if not current_user.username:
-    #     #     raise ValueError("사용자 이름이 없습니다.")
-
-
-    #     for single_file in files:
-    #         code = await process_document(single_file, current_user.id, db)
-
-    #     # # 2. 문서 처리
-    #     # # db에 문서 정보를 저장하고 문서를 인덱싱하여 vector store에 저장한다.
-    #     # code = await process_document(file, current_user.id, db)
-
-
-
-            # # 3. s3에 파일 업로드
-            # # 문서 처리 후에 파일 원본을 s3에 업로드한다.
-            #     # S3 키 생성 (사용자 이름 기반)
-            # s3_key = f"uploads/{current_user.username}/{single_file.filename}"
-            #     # s3에 파일 업로드
-            # s3_client.upload_fileobj(
-            #     Fileobj=single_file.file,
-            #     Bucket=S3_BUCKET_NAME,
-            #     Key=s3_key,
-            #     ExtraArgs={'ContentType': single_file.content_type}
-            # )
-
-    #     return JSONResponse(
-    #         content={
-    #             "code": 200,
-    #             "message": "파일 업로드 성공",
-    #             "results": [{
-    #                 "filename": single_file.filename,
-    #                 "s3_url": f"https://{S3_BUCKET_NAME}.s3.{os.getenv('AWS_DEFAULT_REGION')}.amazonaws.com/{s3_key}"
-    #             }]
-    #         }
-    #     )
-        
-    # except Exception as e:
-    #     logger.error(f"파일 업로드 실패: {str(e)}")
-    #     return JSONResponse(
-    #         status_code=500,
-    #         content={
-    #             "code": 500,
-    #             "message": "파일 업로드 실패",
-    #             "error": str(e)
-    #         }
-    #     )
-    # # 파일 업로드 및 처리가 완료되면 성공 메시지를 반환
-    # return {
-    #     "code": code
-    # }
 
 @router.get("/structure")
 async def get_filesystem_structure(
@@ -225,72 +171,6 @@ async def get_filesystem_structure(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching filesystem structure: {str(e)}")
 
-# @router.get("/directories")
-# async def get_directories(
-#     current_user: User = Depends(get_current_user)
-# ):
-#     """디렉토리 구조 가져오기 엔드포인트"""
-#     try:
-#         # 실제 구현에서는 DB에서 디렉토리 구조 가져오기
-#         directories = list(directory_storage.values())
-#         return {"directories": directories}
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Error fetching directories: {str(e)}")
-
-# @router.post("/sync-directories")
-# async def sync_directories(
-#     directory_list: DirectoryList,
-#     current_user: User = Depends(get_current_user)
-# ):
-#     """디렉토리 구조를 서버와 동기화하는 엔드포인트"""
-#     try:
-#         # 실제 구현에서는 DB에 디렉토리 구조 저장
-#         for directory in directory_list.directories:
-#             directory_storage[directory.id] = {
-#                 "id": directory.id,
-#                 "name": directory.name,
-#                 "path": directory.path
-#             }
-        
-#         return {"message": "Directories synchronized successfully"}
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Error syncing directories: {str(e)}")
-
-# @router.post("/create-directory")
-# async def create_directory(
-#     name: str = Form(...),
-#     path: str = Form("/"),
-#     current_user: User = Depends(get_current_user),
-#     db: Session = Depends(get_db)
-# ):
-#     """새 폴더 생성 엔드포인트"""
-#     try:
-#         # 폴더 이름으로 고유 ID 생성
-#         import uuid
-#         dir_id = str(uuid.uuid4())
-        
-#         # 새 경로 생성
-#         new_path = path
-#         if not new_path.endswith("/"):
-#             new_path += "/"
-#         new_path += name
-        
-#         # 실제 구현에서는 DB에 폴더 정보 저장
-#         # 여기서는 임시 디렉토리 저장소에 저장
-#         directory_storage[dir_id] = {
-#             "id": dir_id,
-#             "name": name,
-#             "path": new_path
-#         }
-        
-#         return {
-#             "id": dir_id,
-#             "name": name,
-#             "path": new_path,
-#             "message": "Directory created successfully"
-#         }
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Error creating directory: {str(e)}")
 
 @router.post("/query")
 async def query_document(query: str = Form(...)):
@@ -362,7 +242,7 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                 }) 
             # <디렉토리 정보 처리>
             #이 파일의 parent_id 얻어오는 쿼리문.
-            parent_id = crud.get_parent_id(db, str(document_id))
+            parent_id = crud.get_parent_id_by_id(db, str(document_id))
 
             # 단일 파일 업로드 시에는 고유한 아이디 값으로 저장함.
             id = str(uuid.uuid4())
@@ -531,7 +411,7 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                     
                         # <디렉토리 정보 처리>
                         #이 파일의 parent_id 얻어오는 쿼리문.
-                        parent_id = crud.get_parent_id(db, str(document_id))
+                        parent_id = crud.get_parent_id_by_id(db, str(document_id))
 
                         # 디렉토리 업로드 시에는 해당 문서의 id를 사용.
                         id = document_id
@@ -574,172 +454,178 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
 
     return results
 
-# 이 함수는 버그 잡고 연결 하기.
-def process_directory_operations(operations, user_id, db):
-    pass
 
-    # """디렉토리 작업 처리 (생성, 이동, 삭제 등)"""
-    # results = []
+def process_directory_operations(operations, user_id, db):
+    """디렉토리 작업 처리 (생성, 이동, 삭제 등)"""
+    from db import crud
+    results = []
     
-    # for op in operations:
-    #     op_type = op.get("operation_type")
+    for op in operations:
+        op_type = op.get("operation_type")
         
-    #     try:
-    #         # 새 폴더 생성
-    #         if op_type == "create":
-    #             dir_id = str(uuid.uuid4())
-    #             path = op.get("path", "/")
-    #             name = op.get("name")
+        reserved_path = op.get("path", "/")
+
+        try:
+            # 새 폴더 생성
+            if op_type == "create":
+                dir_id = str(uuid.uuid4())
+                path = op.get("path", "/")
+                name = op.get("name")
                 
-    #             # 경로 정규화
-    #             if not path.endswith("/"):
-    #                 path += "/"
+                # 경로 정규화
+                if not path.endswith("/"):
+                    path += "/"
                     
-    #             new_path = path + name
+                new_path = path + name
                 
-    #             # 디렉토리 정보 저장
-    #             filesystem[dir_id] = {
-    #                 "id": dir_id,
-    #                 "name": name,
-    #                 "path": new_path,
-    #                 "is_directory": True,
-    #                 "parent_id": None,  # 실제 구현에서는 부모 디렉토리 ID 설정
-    #                 "created_at": datetime.now().isoformat()
-    #             }
+                # 부모 디렉토리 id 가져오는 코드.
+                parent_id = crud.get_parent_id_by_path(db,reserved_path)
                 
-    #             results.append({
-    #                 "operation": "create",
-    #                 "type": "directory",
-    #                 "id": dir_id,
-    #                 "name": name,
-    #                 "path": new_path,
-    #                 "status": "success"
-    #             })
+                # 디렉토리 정보 저장
+                crud.create_directory(
+                    db=db,
+                    id=dir_id,
+                    name=name,
+                    path=new_path,
+                    is_directory=True,
+                    parent_id=parent_id,
+                    created_at=datetime.now().isoformat()
+                )
+             
+                
+                results.append({
+                    "operation": "create",
+                    "type": "directory",
+                    "id": dir_id,
+                    "name": name,
+                    "path": new_path,
+                    "status": "success"
+                })
             
-    #         # 항목 이동
-    #         elif op_type == "move":
-    #             item_id = op.get("item_id")
-    #             new_path = op.get("new_path")
+            # 항목 이동
+            # elif op_type == "move":
+            #     item_id = op.get("item_id")
+            #     new_path = op.get("new_path")
                 
-    #             if item_id in filesystem:
-    #                 # 디렉토리인 경우
-    #                 item = filesystem[item_id]
-    #                 old_path = item["path"]
+            #     if item_id in filesystem:
+            #         # 디렉토리인 경우
+            #         item = filesystem[item_id]
+            #         old_path = item["path"]
                     
-    #                 # 경로 업데이트
-    #                 item["path"] = new_path
-    #                 filesystem[item_id] = item
+            #         # 경로 업데이트
+            #         item["path"] = new_path
+            #         filesystem[item_id] = item
                     
-    #                 # TODO: 실제 구현에서는 DB에서 경로 업데이트
+            #         # TODO: 실제 구현에서는 DB에서 경로 업데이트
                     
-    #                 results.append({
-    #                     "operation": "move",
-    #                     "type": "directory" if item["is_directory"] else "file",
-    #                     "id": item_id,
-    #                     "name": item["name"],
-    #                     "old_path": old_path,
-    #                     "new_path": new_path,
-    #                     "status": "success"
-    #                 })
-    #             else:
-    #                 # TODO: 파일인 경우 DB에서 경로 업데이트
+            #         results.append({
+            #             "operation": "move",
+            #             "type": "directory" if item["is_directory"] else "file",
+            #             "id": item_id,
+            #             "name": item["name"],
+            #             "old_path": old_path,
+            #             "new_path": new_path,
+            #             "status": "success"
+            #         })
+            #     else:
+            #         # TODO: 파일인 경우 DB에서 경로 업데이트
                     
-    #                 results.append({
-    #                     "operation": "move",
-    #                     "id": item_id,
-    #                     "new_path": new_path,
-    #                     "status": "not_found",
-    #                     "error": "Item not found"
-    #                 })
+            #         results.append({
+            #             "operation": "move",
+            #             "id": item_id,
+            #             "new_path": new_path,
+            #             "status": "not_found",
+            #             "error": "Item not found"
+            #         })
             
-    #         # 항목 삭제
-    #         elif op_type == "delete":
-    #             item_id = op.get("item_id")
+            # 항목 삭제
+            # elif op_type == "delete":
+            #     item_id = op.get("item_id")
                 
-    #             if item_id in filesystem:
-    #                 # 디렉토리인 경우
-    #                 item = filesystem[item_id]
-    #                 del filesystem[item_id]
+            #     if item_id in filesystem:
+            #         # 디렉토리인 경우
+            #         item = filesystem[item_id]
+            #         del filesystem[item_id]
                     
-    #                 # TODO: 실제 구현에서는 DB에서 항목 삭제
+            #         # TODO: 실제 구현에서는 DB에서 항목 삭제
                     
-    #                 results.append({
-    #                     "operation": "delete",
-    #                     "type": "directory" if item["is_directory"] else "file",
-    #                     "id": item_id,
-    #                     "name": item["name"],
-    #                     "path": item["path"],
-    #                     "status": "success"
-    #                 })
-    #             else:
-    #                 # TODO: 파일인 경우 DB에서 삭제
+            #         results.append({
+            #             "operation": "delete",
+            #             "type": "directory" if item["is_directory"] else "file",
+            #             "id": item_id,
+            #             "name": item["name"],
+            #             "path": item["path"],
+            #             "status": "success"
+            #         })
+            #     else:
+            #         # TODO: 파일인 경우 DB에서 삭제
                     
-    #                 results.append({
-    #                     "operation": "delete",
-    #                     "id": item_id,
-    #                     "status": "not_found",
-    #                     "error": "Item not found"
-    #                 })
+            #         results.append({
+            #             "operation": "delete",
+            #             "id": item_id,
+            #             "status": "not_found",
+            #             "error": "Item not found"
+            #         })
             
-    #         # 항목 이름 변경
-    #         elif op_type == "rename":
-    #             item_id = op.get("item_id")
-    #             new_name = op.get("name")
+            # 항목 이름 변경
+            # elif op_type == "rename":
+            #     item_id = op.get("item_id")
+            #     new_name = op.get("name")
                 
-    #             if item_id in filesystem:
-    #                 # 디렉토리인 경우
-    #                 item = filesystem[item_id]
-    #                 old_name = item["name"]
+            #     if item_id in filesystem:
+            #         # 디렉토리인 경우
+            #         item = filesystem[item_id]
+            #         old_name = item["name"]
                     
-    #                 # 이름 업데이트
-    #                 item["name"] = new_name
+            #         # 이름 업데이트
+            #         item["name"] = new_name
                     
-    #                 # 경로도 업데이트
-    #                 path_parts = item["path"].rsplit("/", 1)
-    #                 if len(path_parts) > 1:
-    #                     item["path"] = path_parts[0] + "/" + new_name
-    #                 else:
-    #                     item["path"] = "/" + new_name
+            #         # 경로도 업데이트
+            #         path_parts = item["path"].rsplit("/", 1)
+            #         if len(path_parts) > 1:
+            #             item["path"] = path_parts[0] + "/" + new_name
+            #         else:
+            #             item["path"] = "/" + new_name
                     
-    #                 filesystem[item_id] = item
+            #         # filesystem[item_id] = item
                     
-    #                 # TODO: 실제 구현에서는 DB에서 이름 업데이트
+            #         # TODO: 실제 구현에서는 DB에서 이름 업데이트
                     
-    #                 results.append({
-    #                     "operation": "rename",
-    #                     "type": "directory" if item["is_directory"] else "file",
-    #                     "id": item_id,
-    #                     "old_name": old_name,
-    #                     "new_name": new_name,
-    #                     "path": item["path"],
-    #                     "status": "success"
-    #                 })
-    #             else:
-    #                 # TODO: 파일인 경우 DB에서 이름 업데이트
+            #         results.append({
+            #             "operation": "rename",
+            #             "type": "directory" if item["is_directory"] else "file",
+            #             "id": item_id,
+            #             "old_name": old_name,
+            #             "new_name": new_name,
+            #             "path": item["path"],
+            #             "status": "success"
+            #         })
+            #     else:
+            #         # TODO: 파일인 경우 DB에서 이름 업데이트
                     
-    #                 results.append({
-    #                     "operation": "rename",
-    #                     "id": item_id,
-    #                     "new_name": new_name,
-    #                     "status": "not_found",
-    #                     "error": "Item not found"
-    #                 })
+            #         results.append({
+            #             "operation": "rename",
+            #             "id": item_id,
+            #             "new_name": new_name,
+            #             "status": "not_found",
+            #             "error": "Item not found"
+            #         })
             
-    #         else:
-    #             results.append({
-    #                 "operation": op_type,
-    #                 "status": "error",
-    #                 "error": f"Unknown operation type: {op_type}"
-    #             })
+            else:
+                results.append({
+                    "operation": op_type,
+                    "status": "error",
+                    "error": f"Unknown operation type: {op_type}"
+                })
         
-    #     except Exception as e:
-    #         results.append({
-    #             "operation": op_type,
-    #             "status": "error",
-    #             "error": str(e)
-    #         })
+        except Exception as e:
+            results.append({
+                "operation": op_type,
+                "status": "error",
+                "error": str(e)
+            })
     
-    # return results
+    return results
 
 
 def get_file_type(filename):
