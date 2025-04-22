@@ -101,6 +101,7 @@ async def upload_document(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    """통합 문서 / 디렉토리 관리"""
     from typing import Dict, Any
     try:
         results = {
@@ -491,7 +492,6 @@ def process_directory_operations(operations, user_id, db):
                     parent_id=parent_id,
                     created_at=datetime.now().isoformat()
                 )
-             
                 
                 results.append({
                     "operation": "create",
