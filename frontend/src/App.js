@@ -53,32 +53,13 @@ function App() {
     }
   };
 
-  // 디렉토리 구조 백엔드로 전송 (document API로 통합)
-  const syncDirectoryStructure = async (dirStructure) => {
-    try {
-      const token = localStorage.getItem("token");
-      await axios.post(
-        `${API_BASE_URL}/documents/sync-directories`,
-        { directories: dirStructure },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      console.log("Directory structure synced with backend");
-    } catch (error) {
-      console.error("Error syncing directory structure:", error);
-    }
-  };
-
-  // 디렉토리 구조 가져오기 (document API로 통합)
+  // 디렉토리 구조 가져오기
   const fetchDirectories = useCallback(async () => {
     try {
       setIsLoading(true);
       const token = localStorage.getItem("token");
       // 백엔드에서 디렉토리 구조 가져오기
-      const response = await axios.get(`${API_BASE_URL}/documents/directories`, {
+      const response = await axios.get(`${API_BASE_URL}/documents/structure`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -115,17 +96,12 @@ function App() {
         },
       });
 
-      // 백엔드에서 받은 문서를 files 상태로 변환
-      const fetchedFiles = (response.data.documents || []).map((doc) => ({
-        id: doc.id || Math.random().toString(36).substr(2, 9),
-        name: doc.filename,
-        type: getFileType(doc.filename),
-        path: currentPath,
-        isDirectory: doc.is_directory || false,
-        uploaded_at: doc.uploaded_at,
-      }));
-
-      setFiles(fetchedFiles);
+      // 백엔드에서 받은 항목을 files 상태로 변환
+      if (response.data && response.data.items) {
+        setFiles(response.data.items);
+      } else {
+        setFiles([]);
+      }
     } catch (error) {
       console.error("Error fetching documents:", error);
       // 빈 파일 목록으로 설정
@@ -148,116 +124,291 @@ function App() {
       fetchDocuments();
     }
   }, [isAuthenticated, currentPath, fetchDocuments]);
-
-  // 파일 타입 유추
-  const getFileType = (filename) => {
-    if (!filename) return "blank";
-    
-    const ext = filename.split(".").pop().toLowerCase();
-    if (["pdf"].includes(ext)) return "document";
-    if (["docx", "doc"].includes(ext)) return "document";
-    if (["hwp", "hwpx"].includes(ext)) return "document";
-    if (["xlsx", "xls", "csv"].includes(ext)) return "spreadsheet";
-    if (["jpg", "jpeg", "png", "gif"].includes(ext)) return "image";
-    if (["txt"].includes(ext)) return "blank";
-    
-    // 확장자가 없으면 폴더로 간주할 수 있음
-    if (ext === filename) return "folder";
-    
-    return "blank";
-  };
-
+  
   // 파일 업로드 처리
-  const handleAddFile = async (newFile) => {
-    if (!newFile) return;
-
-    // 업로드를 위한 FormData 생성
-    const formData = new FormData();
-    formData.append("file", newFile);
-    formData.append("path", currentPath); // 현재 경로 정보 추가
+  const handleAddFile = async (fileList, targetPath = currentPath, dirStructure = null) => {
+    if (!fileList || fileList.length === 0) return;
 
     try {
       setIsLoading(true);
       const token = localStorage.getItem("token");
-      await axios.post(`${API_BASE_URL}/documents/upload`, formData, {
+      
+      // 디버깅: 업로드되는 파일과 경로 정보 출력
+      console.log('===== 업로드 디버깅 정보 =====');
+      console.log('업로드 경로:', targetPath);
+      console.log('파일 리스트:', fileList);
+      console.log('전달받은 디렉토리 구조:', dirStructure);
+      
+      // dirStructure가 null이면 기본 구조 생성
+      if (!dirStructure) {
+        dirStructure = createDirectoryStructureForPath(targetPath);
+        console.log('생성된 기본 디렉토리 구조:', dirStructure);
+      }
+      
+      // FormData 생성
+      const formData = new FormData();
+      
+      // 파일 추가 및 경로 정보 수집
+      const filePaths = [];
+      for (let i = 0; i < fileList.length; i++) {
+        // 디버깅: 각 파일 정보 출력
+        console.log(`파일 ${i+1}:`, {
+          name: fileList[i].name,
+          size: fileList[i].size,
+          type: fileList[i].type,
+          relativePath: fileList[i].relativePath || fileList[i].webkitRelativePath || '없음'
+        });
+        
+        // 파일 경로 정보가 있는 경우 처리
+        if (fileList[i].relativePath || fileList[i].webkitRelativePath) {
+          const fullPath = fileList[i].relativePath || fileList[i].webkitRelativePath;
+          filePaths.push(fullPath);
+          // 파일 경로 정보를 추가 필드로 전송
+          formData.append('file_paths', fullPath);
+        }
+        
+        formData.append('files', fileList[i]);
+      }
+      
+      // 경로 정보 추가
+      formData.append('path', targetPath);
+      
+      // 디렉토리 구조 추가 (항상 전송)
+      formData.append('directory_structure', JSON.stringify(dirStructure));
+      
+      // 디버깅: 디렉토리 구조 상세 출력
+      console.log('전송할 디렉토리 구조 상세:', JSON.stringify(dirStructure, null, 2));
+      
+      // FormData 내용 확인
+      console.log('FormData 항목:');
+      for (let pair of formData.entries()) {
+        // 파일 객체는 너무 큰 정보이므로 파일명만 출력
+        if (pair[1] instanceof File) {
+          console.log(pair[0], '(파일):', pair[1].name);
+        } else {
+          console.log(pair[0], ':', pair[1]);
+        }
+      }
+      
+      // 디버깅: API 요청 정보
+      console.log('API 요청 URL:', `${API_BASE_URL}/documents/manage`);
+      console.log('헤더 정보:', {
+        Authorization: 'Bearer ' + token.substring(0, 10) + '...',
+        'Content-Type': 'multipart/form-data'
+      });
+      
+      // API 호출
+      const response = await axios.post(`${API_BASE_URL}/documents/manage`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
         },
       });
+      
+      // 디버깅: API 응답 확인
+      console.log('API 응답:', response.data);
+      console.log('===== 업로드 디버깅 정보 종료 =====');
 
       // 업로드 성공 후 문서 목록 새로고침
       fetchDocuments();
+      // 디렉토리 구조도 새로고침
+      fetchDirectories();
     } catch (error) {
-      console.error("Error uploading document:", error);
-      alert("Error uploading document");
+      console.error("Error uploading files:", error);
+      
+      // 디버깅: 오류 상세 정보
+      console.log('===== 업로드 오류 정보 =====');
+      if (error.response) {
+        // 서버가 응답을 반환한 경우
+        console.log('서버 응답 상태:', error.response.status);
+        console.log('서버 응답 데이터:', error.response.data);
+        console.log('서버 응답 헤더:', error.response.headers);
+      } else if (error.request) {
+        // 요청이 전송되었으나 응답이 없는 경우
+        console.log('요청 정보 (응답 없음):', error.request);
+      } else {
+        // 요청 설정 중에 오류가 발생한 경우
+        console.log('오류 메시지:', error.message);
+      }
+      console.log('오류 설정:', error.config);
+      console.log('===== 업로드 오류 정보 종료 =====');
+      
+      alert("파일 업로드 중 오류가 발생했습니다.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 새 폴더 생성 처리 (document API로 통합)
+  // 경로에 따른 디렉토리 구조 생성 함수
+  const createDirectoryStructureForPath = (path) => {
+    // 루트 경로인 경우 빈 객체 반환
+    if (path === '/') {
+      return {};
+    }
+    
+    // 경로를 폴더 이름으로 분리
+    const pathParts = path.split('/').filter(Boolean);
+    
+    // 폴더 구조 객체 생성
+    let structure = {};
+    let currentLevel = structure;
+    
+    // 경로의 각 부분을 중첩된 객체로 변환
+    for (let i = 0; i < pathParts.length; i++) {
+      const folder = pathParts[i];
+      if (i === pathParts.length - 1) {
+        // 마지막 폴더는 파일이 추가될 위치
+        currentLevel[folder] = {};
+      } else {
+        // 중간 폴더는 다음 레벨의 부모
+        currentLevel[folder] = {};
+        currentLevel = currentLevel[folder];
+      }
+    }
+    
+    return structure;
+  };
+
+  // 새 폴더 생성 처리
   const handleCreateFolder = async (folderName) => {
     if (!folderName.trim()) return;
 
     try {
       setIsLoading(true);
+      const token = localStorage.getItem("token");
       
-      // 현재 경로에 따른 새 폴더 경로 생성
-      const newFolderPath = currentPath === "/" 
-        ? `/${folderName}` 
-        : `${currentPath}/${folderName}`;
-      
-      // 새 디렉토리 객체 생성
-      const newDir = {
-        id: Math.random().toString(36).substr(2, 9),
+      // 폴더 생성 작업 정의
+      const operations = [{
+        operation_type: "create",
         name: folderName,
-        path: newFolderPath,
-      };
+        path: currentPath
+      }];
       
-      // 디렉토리 목록 업데이트
-      const updatedDirs = [...directories, newDir];
-      setDirectories(updatedDirs);
+      // FormData 생성
+      const formData = new FormData();
+      formData.append('operations', JSON.stringify(operations));
       
-      // 새 폴더 객체 생성 (파일 리스트용)
-      const newFolder = {
-        id: newDir.id,
-        name: folderName,
-        type: "folder",
-        path: currentPath,
-        isDirectory: true,
-        uploaded_at: new Date().toISOString(),
-      };
-      
-      // 파일 목록 업데이트
-      setFiles(prev => [...prev, newFolder]);
-      
-      // 백엔드와 디렉토리 구조 동기화
-      await syncDirectoryStructure(updatedDirs);
-      
-      // 서버 API를 통한 폴더 생성 시도 (document API로 통합)
-      try {
-        const token = localStorage.getItem("token");
-        await axios.post(
-          `${API_BASE_URL}/documents/create-directory`,
-          {
-            name: folderName,
-            path: currentPath,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-        // 성공 시 문서 목록 새로고침
-        fetchDocuments();
-      } catch (apiError) {
-        console.error("Server API error:", apiError);
-        // API 오류 시 UI는 이미 업데이트되어 있으므로 추가 작업 필요 없음
-      }
+      // API 호출
+      await axios.post(`${API_BASE_URL}/documents/manage`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      // 성공 시 문서 목록 새로고침
+      fetchDocuments();
+      // 디렉토리 구조도 새로고침
+      fetchDirectories();
     } catch (error) {
       console.error("Error creating folder:", error);
       alert("폴더 생성 중 오류가 발생했습니다.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 파일/폴더 이동 처리
+  const handleMoveItem = async (itemId, newPath) => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem("token");
+      
+      // 이동 작업 정의
+      const operations = [{
+        operation_type: "move",
+        item_id: itemId,
+        new_path: newPath
+      }];
+      
+      // FormData 생성
+      const formData = new FormData();
+      formData.append('operations', JSON.stringify(operations));
+      
+      // API 호출
+      await axios.post(`${API_BASE_URL}/documents/manage`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      // 성공 시 문서 목록 새로고침
+      fetchDocuments();
+      // 디렉토리 구조도 새로고침
+      fetchDirectories();
+    } catch (error) {
+      console.error("Error moving item:", error);
+      alert("항목 이동 중 오류가 발생했습니다.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 파일/폴더 삭제 처리
+  const handleDeleteItem = async (itemId) => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem("token");
+      
+      // 삭제 작업 정의
+      const operations = [{
+        operation_type: "delete",
+        item_id: itemId
+      }];
+      
+      // FormData 생성
+      const formData = new FormData();
+      formData.append('operations', JSON.stringify(operations));
+      
+      // API 호출
+      await axios.post(`${API_BASE_URL}/documents/manage`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      // 성공 시 문서 목록 새로고침
+      fetchDocuments();
+      // 디렉토리 구조도 새로고침
+      fetchDirectories();
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      alert("항목 삭제 중 오류가 발생했습니다.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 파일/폴더 이름 변경 처리
+  const handleRenameItem = async (itemId, newName) => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem("token");
+      
+      // 이름 변경 작업 정의
+      const operations = [{
+        operation_type: "rename",
+        item_id: itemId,
+        name: newName
+      }];
+      
+      // FormData 생성
+      const formData = new FormData();
+      formData.append('operations', JSON.stringify(operations));
+      
+      // API 호출
+      await axios.post(`${API_BASE_URL}/documents/manage`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      // 성공 시 문서 목록 새로고침
+      fetchDocuments();
+      // 디렉토리 구조도 새로고침
+      fetchDirectories();
+    } catch (error) {
+      console.error("Error renaming item:", error);
+      alert("이름 변경 중 오류가 발생했습니다.");
     } finally {
       setIsLoading(false);
     }
@@ -368,6 +519,9 @@ function App() {
           currentPath={currentPath}
           onAddFile={handleAddFile}
           onCreateFolder={handleCreateFolder}
+          onMoveItem={handleMoveItem}
+          onDeleteItem={handleDeleteItem}
+          onRenameItem={handleRenameItem}
           onFolderOpen={handleFolderOpen}
           onRefresh={fetchDocuments}
           isLoading={isLoading}

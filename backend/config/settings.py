@@ -23,6 +23,7 @@ S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
 # 아래 코드는 TEST_MODE를 false로 설정한다.
 TEST_MODE = os.environ.get('TEST_MODE', 'False').lower() == 'true'
 
+
 # 업로드 디렉토리 설정
 # 테스트 모드일 경우 업로드 되는 파일은 임시 디렉토리에 저장됨.
 # 임시 디렉토리에 저장될 경우 테스트 종료 후 임시 디렉토리 삭제됨.
@@ -32,6 +33,7 @@ if TEST_MODE:
     print(f"Using temporary directory for uploads: {UPLOAD_DIR}")
 else:
     UPLOAD_DIR = "uploads"
+
 
 # 데이터베이스 연결 주소 설정 (도커 컨테이너 환경의 경우 해당 값 적용)
 
@@ -44,12 +46,12 @@ if TEST_MODE:
 # 로컬 Windows 환경에서 사용할 URL
 elif os.name == 'nt':  # Windows 환경
     # Amazon RDS 환경에서 사용할 URL
-    DATABASE_URL = f"postgresql+psycopg2://{RDS_USER}:{RDS_PASSWORD}@{RDS_ENDPOINT}:5432/{RDS_DB_NAME}"
+    DATABASE_URL = f"postgresql+psycopg://{RDS_USER}:{RDS_PASSWORD}@{RDS_ENDPOINT}:5432/{RDS_DB_NAME}"
     # 프로그램 종료 시 까지 이 주소를 유지
     os.environ['DATABASE_URL'] = DATABASE_URL
 else:
     # Docker 환경에서 사용할 URL
-    DATABASE_URL = f"postgresql+psycopg2://{RDS_USER}:{RDS_PASSWORD}@{RDS_ENDPOINT}:5432/{RDS_DB_NAME}"
+    DATABASE_URL = f"postgresql+psycopg://{RDS_USER}:{RDS_PASSWORD}@{RDS_ENDPOINT}:5432/{RDS_DB_NAME}"
     # Docker 환경 변수 설정
     os.environ['DOCKER_ENV'] = 'true'
 
@@ -57,7 +59,7 @@ print(f"Using database URL: {DATABASE_URL}")
 
 # 토큰 설정
 # 기본값은 30분이다.
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 180
 
 # 테스트를 위해 토큰 제한 시간을 1분으로 설정한다.
 # ACCESS_TOKEN_EXPIRE_MINUTES = 1
