@@ -172,7 +172,6 @@ async def get_filesystem_structure(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching filesystem structure: {str(e)}")
 
-
 @router.post("/query")
 async def query_document(query: str = Form(...)):
     """문서 질의응답 엔드포인트"""
@@ -202,6 +201,9 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
             # <if len(files) == 1: 의 예외 처리 구역>
             # <s3업로드, 파일 처리 및 return 예외 처리>
             try:
+                # 파일 이름과 파일 경로를 미리 준비해서 전달하기.
+                file_name = files[0].filename
+                file_path = path+file_name
 
 
                 # <파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
@@ -213,7 +215,7 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
 
                 # S3 업로드.
                 # 이 부분에서 파일은 한 번 읽힘.
-                s3_key = f"uploads/{current_user.username}/{files[0].filename}"
+                s3_key = f"uploads/{current_user.username}/{file_name}"
                 s3_client.upload_fileobj(
                     Fileobj=files[0].file,
                     Bucket=S3_BUCKET_NAME,
@@ -221,9 +223,13 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                     ExtraArgs={'ContentType': files[0].content_type}
                 )
 
+
+
+
                 # 3. DB에 파일 정보 저장 및 문서 처리
                 document_id = await process_document(
-                    file=files[0],# 파일의 정보를 사용하기 위해 그대로 전달.
+                    file_name=file_name,# 파일의 정보를 사용하기 위해 그대로 전달. 파일의 정보 중에서 파일 이름만 필요하므로 미리 파일 이름을 뽑아서 전달하기.
+                    file_path=file_path,
                     file_content=file_content, # 메모리에 읽은 파일의 실제 데이터를 전달.
                     user_id=current_user.id,
                     db=db,
@@ -242,7 +248,7 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                     "error": str(e)
                 }) 
             # <디렉토리 정보 처리>
-            #이 파일의 parent_id 얻어오는 쿼리문.
+            #이 파일의 parent_id 얻어오는 쿼리문. # 이 코드에는 문제가 있다. 문서 id는 문서 자체의 id이다. 해당
             parent_id = crud.get_parent_id_by_id(db, str(document_id))
 
             # 단일 파일 업로드 시에는 고유한 아이디 값으로 저장함.
@@ -381,7 +387,7 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                             # </파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
 
                             # S3 업로드 (BytesIO 없이 UploadFile.file 직접 사용)
-                            s3_key = f"uploads/{current_user.username}/{upload_file.filename}"
+                            s3_key = f"uploads/{current_user.username}/{file_name}"
                             s3_client.upload_fileobj(
                                 Fileobj=upload_file.file,
                                 Bucket=S3_BUCKET_NAME,
@@ -393,8 +399,8 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                             results.append({
                                 "type": "file",
                                 "id": document_id,
-                                "name": upload_file.filename,
-                                "path": path,
+                                "name": file_name,
+                                "path": file_path,
                                 "status": "error",
                                 "error": str(e)
                             })
@@ -402,7 +408,8 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
 
                         # 3. DB 저장 및 문서 처리
                         document_id = await process_document(
-                            file=upload_file,
+                            file_name=file_name,
+                            file_path=file_path,
                             file_content=file_content,
                             user_id=current_user.id,
                             db=db,

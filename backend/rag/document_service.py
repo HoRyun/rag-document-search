@@ -24,7 +24,8 @@ def get_all_documents(db: Session):
     return db.query(Document).all()
 
 async def process_document(
-    file: UploadFile, 
+    file_name: str,
+    file_path: str,
     file_content: bytes,
     user_id: int, 
     db: Session,
@@ -34,7 +35,7 @@ async def process_document(
 
     # 1. 업로드 된 파일의 형식을 확인한다.
     # 파일 확장자 추출
-    file_extension = file.filename.split('.')[-1].lower()
+    file_extension = file_name.split('.')[-1].lower()
 
     # 지원되는 파일 형식 확인
     if file_extension not in ['pdf', 'docx', 'hwp', 'hwpx']:
@@ -43,11 +44,11 @@ async def process_document(
             detail="지원되지 않는 파일 형식입니다. PDF, DOCX, HWP 또는 HWPX 파일만 업로드 가능합니다."
         )
     
-    # 파일의 경로 추출
-    file_path = file.filename
+    # 파일의 경로 # 아래 코드는 삭제
+    # file_path = path+file.filename
 
     # 파일의 이름 추출
-    file_name = os.path.basename(file_path)
+    # file_name = os.path.basename(file_path)
 
 
 
