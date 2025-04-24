@@ -55,7 +55,7 @@ def list_items(
     try:
         
         filtered_items = []
-
+        
         # 프론트 엔드에서 선택한 경로
         selected_path = path
         # <db에서 디렉토리 정보와 파일 정보 가져오기>
@@ -87,6 +87,7 @@ def list_items(
         filtered_items.extend([dict(item) for item in file_result])
         filtered_items.extend([dict(item) for item in dir_result])
         # </가져온 정보를 filtered_items에 추가>
+
         
         return {"items": filtered_items}
     except Exception as e:

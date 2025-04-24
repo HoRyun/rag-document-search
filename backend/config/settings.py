@@ -4,6 +4,7 @@ import dotenv
 
 dotenv.load_dotenv()
 
+
 #AWS RDS Setting
 RDS_ENDPOINT = os.environ.get('RDS_ENDPOINT')
 RDS_USER = os.environ.get('RDS_USER')
@@ -23,7 +24,6 @@ S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
 # 아래 코드는 TEST_MODE를 false로 설정한다.
 TEST_MODE = os.environ.get('TEST_MODE', 'False').lower() == 'true'
 
-
 # 업로드 디렉토리 설정
 # 테스트 모드일 경우 업로드 되는 파일은 임시 디렉토리에 저장됨.
 # 임시 디렉토리에 저장될 경우 테스트 종료 후 임시 디렉토리 삭제됨.
@@ -33,7 +33,6 @@ if TEST_MODE:
     print(f"Using temporary directory for uploads: {UPLOAD_DIR}")
 else:
     UPLOAD_DIR = "uploads"
-
 
 # 데이터베이스 연결 주소 설정 (도커 컨테이너 환경의 경우 해당 값 적용)
 
@@ -57,9 +56,10 @@ else:
 
 print(f"Using database URL: {DATABASE_URL}")
 
+
 # 토큰 설정
 # 기본값은 30분이다.
-ACCESS_TOKEN_EXPIRE_MINUTES = 180
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # 테스트를 위해 토큰 제한 시간을 1분으로 설정한다.
 # ACCESS_TOKEN_EXPIRE_MINUTES = 1
