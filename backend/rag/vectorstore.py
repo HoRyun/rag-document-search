@@ -19,12 +19,19 @@ def save_to_vector_store(documents):
             metadata = chunk.metadata
             document_name = metadata.get("document_name", "")
             
-            # 문서 ID 찾기
+            # 문서 ID 찾기. 문서 이름이 db에 존재하면 해당 문서의 레코드 반환.
             document = db.query(models.Document).filter(models.Document.filename == document_name).first()
             
             if document:
-                # 임베딩 생성
-                embedding_vector = embeddings.embed_query(content)
+                # 메타데이터에서 필요한 정보 추출
+                metadata_text = f"<The name of this document>{metadata.get('document_name', '')}</The name of this document> <The path of this document>{metadata.get('document_path', '')}</The path of this document>"
+                
+                # 콘텐츠와 메타데이터 결합
+                combined_text = f"{content} {metadata_text}"
+                
+                # 결합된 텍스트 임베딩
+                embedding_vector = embeddings.embed_query(combined_text)
+            
                 
                 # DB에 저장
                 crud.add_document_chunk(
@@ -36,6 +43,7 @@ def save_to_vector_store(documents):
                 )
                 
         print(f"총 {len(documents)}개의 청크가 PostgreSQL에 저장되었습니다.")
+        return document.id
     except Exception as e:
         print(f"PostgreSQL 저장 오류: {str(e)}")
         raise e
