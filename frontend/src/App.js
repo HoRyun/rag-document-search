@@ -9,7 +9,7 @@ import RegisterForm from "./components/Login/RegisterForm";
 import "./App.css";
 
 // API 기본 URL 설정
-const API_BASE_URL = "http://localhost:8000/fast_api";
+const API_BASE_URL = "http://43.200.3.86:8000/fast_api";
 
 function App() {
   const [files, setFiles] = useState([]);
@@ -66,7 +66,31 @@ function App() {
       });
 
       if (response.data && response.data.directories) {
-        setDirectories(response.data.directories);
+        // 루트 디렉토리가 있는지 확인
+        const directories = response.data.directories;
+        const hasRootDir = directories.some(dir => dir.path === '/');
+        
+        // 이름 순으로 정렬 
+        directories.sort((a, b) => {
+          // 루트 디렉토리는 항상 첫 번째
+          if (a.path === '/') return -1;
+          if (b.path === '/') return 1;
+          
+          return a.name.localeCompare(b.name, 'ko');
+        });
+        
+        // 루트 디렉토리가 없으면 추가
+        if (!hasRootDir) {
+          const updatedDirectories = [
+            { id: "home", name: "Home", path: "/" },
+            ...directories
+          ];
+          setDirectories(updatedDirectories);
+        } else {
+          setDirectories(directories);
+        }
+        
+        console.log('디렉토리 구조 가져옴:', directories);
       } else {
         // 기본 홈 디렉토리 설정
         setDirectories([
@@ -84,13 +108,55 @@ function App() {
     }
   }, []);
 
+  
   // 문서 목록 가져오기
   const fetchDocuments = useCallback(async () => {
     try {
       setIsLoading(true);
       const token = localStorage.getItem("token");
+      
+      // 루트 경로를 처리하기 위한 분기
+      let pathParam = currentPath;
+      
+      // 루트 경로('/')일 경우, 백엔드 API가 빈 문자열을 예상할 수 있으므로 처리
+      if (currentPath === '/') {
+        pathParam = '';
+        console.log('루트 경로 문서 요청 (빈 문자열로 변환):', pathParam);
+        
+        // 루트 경로인 경우 API 요청 대신 직계 하위 폴더를, 디렉토리 정보에서 찾아 표시
+        // API가 루트 경로에서 제대로 작동하지 않을 때 사용하는 대안
+        if (directories && directories.length > 0) {
+          // 루트 경로의 직계 자식 폴더 찾기 (경로가 /로 시작하고 슬래시가 1개만 있는 경로)
+          const rootSubfolders = directories
+            .filter(dir => {
+              if (dir.path === '/') return false; // 루트 자체는 제외
+              const parts = dir.path.split('/').filter(Boolean);
+              return parts.length === 1; // 첫 번째 레벨의 폴더만 선택
+            })
+            .map(dir => ({
+              id: dir.id,
+              name: dir.name,
+              path: dir.path,
+              isDirectory: true,
+              type: 'folder',
+              // 추가적인 속성이 필요하면 여기에 추가
+            }));
+          
+          console.log(`루트 경로에서 ${rootSubfolders.length}개 폴더 찾음:`, rootSubfolders);
+          
+          // API 호출 없이 찾은 폴더들을 files 상태로 설정
+          if (rootSubfolders.length > 0) {
+            setFiles(rootSubfolders);
+            setIsLoading(false);
+            return; // API 호출 생략
+          }
+        }
+      }
+      
+      console.log(`문서 요청 경로: ${pathParam}`);
+      
       const response = await axios.get(`${API_BASE_URL}/documents`, {
-        params: { path: currentPath },
+        params: { path: pathParam },
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -98,18 +164,88 @@ function App() {
 
       // 백엔드에서 받은 항목을 files 상태로 변환
       if (response.data && response.data.items) {
-        setFiles(response.data.items);
+        console.log(`경로 '${currentPath}'에서 ${response.data.items.length}개 항목 받음:`, response.data.items);
+        
+        // 항목을 종류(폴더, 파일)와 이름 기준으로 정렬
+        const sortedFiles = [...response.data.items].sort((a, b) => {
+          // 폴더를 파일보다 위에 표시
+          if ((a.isDirectory || a.type === 'folder') && !(b.isDirectory || b.type === 'folder')) {
+            return -1;
+          }
+          if (!(a.isDirectory || a.type === 'folder') && (b.isDirectory || b.type === 'folder')) {
+            return 1;
+          }
+          // 같은 종류면 이름 기준으로 정렬
+          return a.name.localeCompare(b.name, 'ko');
+        });
+        
+        setFiles(sortedFiles);
       } else {
-        setFiles([]);
+        console.log(`경로 '${currentPath}'에서 항목 없음`);
+        
+        // API 응답이 없고 루트 경로일 때 대체 로직
+        if (currentPath === '/' && directories && directories.length > 0) {
+          // 위에서 작성한 로직과 동일: 디렉토리 구조에서 루트 하위 폴더 추출
+          const rootSubfolders = directories
+            .filter(dir => {
+              if (dir.path === '/') return false; // 루트 자체는 제외
+              const parts = dir.path.split('/').filter(Boolean);
+              return parts.length === 1; // 첫 번째 레벨의 폴더만 선택
+            })
+            .map(dir => ({
+              id: dir.id,
+              name: dir.name,
+              path: dir.path,
+              isDirectory: true,
+              type: 'folder',
+            }));
+          
+          console.log(`API 응답 없음, 폴더 구조에서 ${rootSubfolders.length}개 폴더 찾음:`, rootSubfolders);
+          
+          if (rootSubfolders.length > 0) {
+            setFiles(rootSubfolders);
+          } else {
+            setFiles([]);
+          }
+        } else {
+          setFiles([]);
+        }
       }
     } catch (error) {
       console.error("Error fetching documents:", error);
-      // 빈 파일 목록으로 설정
-      setFiles([]);
+      console.log('오류 발생:', error.message);
+      
+      // 오류 발생 시 루트 경로일 때 대체 로직
+      if (currentPath === '/' && directories && directories.length > 0) {
+        const rootSubfolders = directories
+          .filter(dir => {
+            if (dir.path === '/') return false;
+            const parts = dir.path.split('/').filter(Boolean);
+            return parts.length === 1;
+          })
+          .map(dir => ({
+            id: dir.id,
+            name: dir.name,
+            path: dir.path,
+            isDirectory: true,
+            type: 'folder',
+          }));
+        
+        console.log(`API 오류 발생, 폴더 구조에서 ${rootSubfolders.length}개 폴더 찾음`);
+        
+        if (rootSubfolders.length > 0) {
+          setFiles(rootSubfolders);
+        } else {
+          setFiles([]);
+        }
+      } else {
+        // 빈 파일 목록으로 설정
+        setFiles([]);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [currentPath]);
+  }, [currentPath, directories]);
 
   // 인증 시 디렉토리 및 문서 목록 가져오기
   useEffect(() => {
@@ -170,8 +306,9 @@ function App() {
         formData.append('files', fileList[i]);
       }
       
-      // 경로 정보 추가
-      formData.append('path', targetPath);
+      // 경로 정보 추가 (루트 경로인 경우 빈 문자열로 처리)
+      const apiPath = targetPath === '/' ? '' : targetPath;
+      formData.append('path', apiPath);
       
       // 디렉토리 구조 추가 (항상 전송)
       formData.append('directory_structure', JSON.stringify(dirStructure));
@@ -281,7 +418,7 @@ function App() {
       const operations = [{
         operation_type: "create",
         name: folderName,
-        path: currentPath
+        path: currentPath === '/' ? '' : currentPath
       }];
       
       // FormData 생성
@@ -317,7 +454,7 @@ function App() {
       const operations = [{
         operation_type: "move",
         item_id: itemId,
-        new_path: newPath
+        new_path: newPath === '/' ? '' : newPath
       }];
       
       // FormData 생성
@@ -416,6 +553,7 @@ function App() {
 
   // 폴더를 더블클릭하여 해당 폴더로 이동
   const handleFolderOpen = (folderPath) => {
+    console.log(`폴더 열기: ${folderPath}`);
     setCurrentPath(folderPath);
   };
 
