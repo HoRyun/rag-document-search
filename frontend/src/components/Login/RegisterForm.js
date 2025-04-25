@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import "./RegisterForm.css";
 
-const API_BASE_URL = "http://localhost:8000/fast_api";
+const API_BASE_URL = "http://43.200.3.86:8000/fast_api";
 
 const RegisterForm = ({ onRegisterSuccess, onShowLogin }) => {
   const [username, setUsername] = useState("");
