@@ -21,6 +21,7 @@ const Sidebar = ({ directories, currentPath, setCurrentPath, onRefresh }) => {
       
       setExpandedFolders(newExpanded);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 현재 경로가 변경될 때마다 해당 경로의 상위 폴더들을 자동으로 펼침
@@ -37,7 +38,7 @@ const Sidebar = ({ directories, currentPath, setCurrentPath, onRefresh }) => {
       
       setExpandedFolders(newExpanded);
     }
-  }, [currentPath]);
+  }, [currentPath, expandedFolders]);
 
   const handleDirectoryClick = (path) => {
     setCurrentPath(path);
@@ -60,7 +61,7 @@ const Sidebar = ({ directories, currentPath, setCurrentPath, onRefresh }) => {
     const newExpandedState = { ...expandedFolders };
     
     if (isCurrentlyExpanded) {
-      // 폴더를 접을 때, 하위 폴더의 상태를 저장
+      // 폴더를 접을 때, 모든 하위 폴더의 상태를 저장
       const subFolderStates = {};
       Object.keys(newExpandedState).forEach(folderPath => {
         if (folderPath !== path && folderPath.startsWith(path)) {
@@ -109,7 +110,6 @@ const Sidebar = ({ directories, currentPath, setCurrentPath, onRefresh }) => {
     });
     
     // 계층 구조 생성
-    const hierarchy = {};
     const dirMap = {};
     
     // 모든 디렉토리 맵 생성
