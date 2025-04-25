@@ -1,6 +1,8 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from pgvector.sqlalchemy import Vector
+from sqlalchemy.types import Boolean
 
 from db.database import Base
 
@@ -22,6 +24,7 @@ class Document(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String)
+    s3_key = Column(String(1024), nullable=False, unique=True)
     upload_time = Column(DateTime, default=datetime.now)
     user_id = Column(Integer, ForeignKey("users.id"))
     
@@ -36,5 +39,16 @@ class DocumentChunk(Base):
     document_id = Column(Integer, ForeignKey("documents.id"))
     content = Column(String)
     meta = Column(JSON)
-    
+    embedding = Column(Vector(1536))
     document = relationship("Document", back_populates="chunks") 
+
+class Directory(Base):
+    """디렉토리 모델"""
+    __tablename__ = "directories"
+
+    id = Column(String, primary_key=True, index=True)
+    name = Column(String)
+    path = Column(String)
+    is_directory = Column(Boolean)
+    parent_id = Column(String)
+    created_at = Column(DateTime, default=datetime.now)

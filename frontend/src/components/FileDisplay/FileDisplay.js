@@ -2,7 +2,7 @@ import React, { useState, useRef } from "react";
 import FileItem from "../FileItem/FileItem";
 import "./FileDisplay.css";
 
-const FileDisplay = ({ files, currentPath, onAddFile, onCreateFolder, onFolderOpen, onRefresh, isLoading }) => {
+const FileDisplay = ({ files, currentPath, onAddFile, onCreateFolder, onMoveItem, onDeleteItem, onRenameItem, onFolderOpen, onRefresh, isLoading }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
@@ -386,6 +386,20 @@ const FileDisplay = ({ files, currentPath, onAddFile, onCreateFolder, onFolderOp
     }
   };
 
+  // 파일/폴더 삭제 처리
+  const handleItemDelete = (itemId) => {
+    if (onDeleteItem) {
+      onDeleteItem(itemId);
+    }
+  };
+
+  // 파일/폴더 이름 변경 처리
+  const handleItemRename = (itemId, newName) => {
+    if (onRenameItem) {
+      onRenameItem(itemId, newName);
+    }
+  };
+
   // Handle file or folder click
   const handleItemClick = (file) => {
     if (file.isDirectory || file.type === 'folder') {
@@ -509,6 +523,8 @@ const FileDisplay = ({ files, currentPath, onAddFile, onCreateFolder, onFolderOp
               file={file} 
               onClick={() => handleItemClick(file)}
               onDoubleClick={() => handleItemClick(file)}
+              onDelete={() => handleItemDelete(file.id)}
+              onRename={(newName) => handleItemRename(file.id, newName)}
             />
           ))
         ) : (
