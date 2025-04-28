@@ -282,9 +282,9 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
 
         # 2. 최상위 디렉토리 처리
         root_name, root_children = next(iter(tree.items()))
-        root_id = "home"
+        root_id = str(uuid.uuid4())
         # root_path에 root_name 포함 
-        root_path = "/"  
+        root_path = "/" + root_name
         # DB 저장: 최상위 디렉토리
         # <예외 처리 구역>
         try:
@@ -320,10 +320,10 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
         # 3. 재귀로 하위 디렉토리 및 파일 처리
         async def traverse(name: str, subtree: Dict[str, Any], parent_id: str, parent_path: str):
             # 디렉토리 생성
-            current_id = str(uuid.uuid4())
-            current_name = name
+            current_dir_id = str(uuid.uuid4())
+            current_dir_name = name
             #* 변경: OS 종속적 os.path.join 대신 '/' 문자열 조합 사용
-            current_path = f"{parent_path.rstrip('/')}/{name}" 
+            current_dir_path = f"{parent_path.rstrip('/')}/{name}" 
             
             # DB 저장: 디렉토리
             # <예외 처리 구역>
@@ -331,26 +331,26 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                 # db_save(id=current_id, name=current_name, path=current_path, is_directory=True, parent_id=parent_id)
                 crud.create_directory(
                     db=db,
-                    id=current_id,
-                    name=current_name,
-                    path=current_path,
+                    id=current_dir_id,
+                    name=current_dir_name,
+                    path=current_dir_path,
                     is_directory=True,
                     parent_id=parent_id,
                     created_at=datetime.now().isoformat()
                 )            
                 results.append({
                     "type": "directory",
-                    "id": current_id,
-                    "name": current_name,
-                    "path": current_path,
+                    "id": current_dir_id,
+                    "name": current_dir_name,
+                    "path": current_dir_path,
                     "status": "success"
                 })
             except Exception as e:
                 results.append({
                     "type": "directory",
-                    "id": current_id,
-                    "name": current_name,
-                    "path": current_path,
+                    "id": current_dir_id,
+                    "name": current_dir_name,
+                    "path": current_dir_path,
                     "status": "error",
                     "error": str(e)
                 })
@@ -358,27 +358,34 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
 
             # 3-1. 하위 디렉토리 탐색
             for child_name, child_tree in subtree.items():
-                await traverse(child_name, child_tree, current_id, current_path)
+                await traverse(child_name, child_tree, current_dir_id, current_dir_path)
 
             # 3-2. 해당 디렉토리에 포함된 파일 처리
-            prefix = "/"
+            
             for upload_file in files:
                 # 파일 객체는 upload_file에 저장됨.
 
-                _, _, result = upload_file.filename.partition('/')
-                full_path = result = '/'+ result
-                if not full_path.startswith(prefix):
-                    continue
-                rel_path = full_path[len(prefix):]
-                dir_part, file_name = os.path.split(rel_path)
-                current_rel = current_path[len(root_path):].strip("/")  #*
-                if dir_part == current_rel:
+                # 현재 저장할 파일이 현재 디렉토리 구조에 실제 존재하는 지 판단
+
+                # 파일 명에서 디렉토리 부분 추출
+                # <로직>
+                # 경로에서 파일명 제거 후 디렉토리 부분 추출
+                dir_part = os.path.dirname(upload_file.filename)
+                
+                # 맨 앞에 '/' 추가 (os.path.dirname 결과가 '.'인 경우 처리)
+                dir_part_exclution_filename = '/' + dir_part if dir_part != '.' else '/'                              
+                # </로직>
+
+                # T : 현재 저장할 파일이 현재 디렉토리에 존재하는 게 맞다.
+                # F : 현재 저장할 파일이 현재 디렉토리에 존재하는 게 아니다.
+                if current_dir_path == dir_part_exclution_filename:
                     # file_id = str(uuid.uuid4())
-                    file_path= result # f"{current_path.rstrip('/')}/{file_name}" <- result로 대체.
-                    # file_path = os.path.join(current_path, file_name)  #* 변경된 부분
+                    file_path= "/"+upload_file.filename
+
+                    # file_path에서 파일 명만 추출.
+                    file_name = os.path.basename(file_path)
                     # DB 저장: 파일
                     
-                    document_id = None
                     # <복붙>
                     try:
                         # <s3업로드 예외 처리 try except>
@@ -418,20 +425,17 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                         )
                         # </s3업로드, 파일 처리 및 return 예외 처리>
                     
+
+
                         # <디렉토리 정보 처리>
-                        #이 파일의 parent_id 얻어오는 쿼리문.
-                        parent_id = crud.get_parent_id_by_id(db, str(document_id))
-
                         # 디렉토리 업로드 시에는 해당 문서의 id를 사용.
-                        id = document_id
-
                         crud.create_directory(
                             db=db,
-                            id=id,
+                            id=document_id,
                             name=file_name,
                             path=file_path,
                             is_directory=False,
-                            parent_id=parent_id,
+                            parent_id=current_dir_id,
                             created_at=datetime.now().isoformat()
                         )
                         # </디렉토리 정보 처리> 
@@ -454,7 +458,6 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                             "error": str(e)
                         })                    
                     # </복붙>
-                    
 
         # 4. 실제 트리 순회 시작
         # root 자체가 아닌, 루트의 자식들부터 순회하도록 변경  #* 변경된 부분
