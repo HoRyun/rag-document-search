@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import "./RegisterForm.css";
 
+// const API_BASE_URL = "http://43.200.3.86:8000/fast_api";
 const API_BASE_URL = "http://localhost:8000/fast_api";
 
 const RegisterForm = ({ onRegisterSuccess, onShowLogin }) => {
@@ -40,9 +41,9 @@ const RegisterForm = ({ onRegisterSuccess, onShowLogin }) => {
           <h2>회원가입</h2>
           <p>새 계정을 생성하여 파일 관리 시스템을 이용하세요</p>
         </div>
-        
+
         {error && <div className="error-message">{error}</div>}
-        
+
         <form onSubmit={handleRegister}>
           <div className="form-group">
             <label htmlFor="username">사용자 이름</label>
@@ -55,7 +56,7 @@ const RegisterForm = ({ onRegisterSuccess, onShowLogin }) => {
               placeholder="사용자 이름을 입력하세요"
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="email">이메일</label>
             <input
@@ -67,7 +68,7 @@ const RegisterForm = ({ onRegisterSuccess, onShowLogin }) => {
               placeholder="이메일을 입력하세요"
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="password">비밀번호</label>
             <input
@@ -79,12 +80,16 @@ const RegisterForm = ({ onRegisterSuccess, onShowLogin }) => {
               placeholder="비밀번호를 입력하세요"
             />
           </div>
-          
-          <button type="submit" className="register-button" disabled={isLoading}>
+
+          <button
+            type="submit"
+            className="register-button"
+            disabled={isLoading}
+          >
             {isLoading ? "가입 중..." : "가입하기"}
           </button>
         </form>
-        
+
         <div className="register-footer">
           <p>이미 계정이 있으신가요?</p>
           <button onClick={onShowLogin} className="login-link">

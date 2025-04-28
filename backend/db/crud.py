@@ -57,7 +57,7 @@ def get_only_directory(db: Session):
     stmt = select(models.Directory).where(models.Directory.is_directory == True)
     result = db.execute(stmt)
     directories = result.scalars().all()
-    return [{"id": d.id, "name": d.name, "path": d.path} for d in directories]
+    return [{"id": d.id, "name": d.name, "path": d.path, "parent_id": d.parent_id} for d in directories]
 
 # 정상 작동하는 함수
 def get_parent_id_by_id(db: Session, document_id: str):

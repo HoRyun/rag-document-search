@@ -49,9 +49,11 @@ app.include_router(api_router, prefix="/fast_api")
 # 기본 경로
 @app.get("/")
 def read_root():
+    """Welcome message"""
     return {"message": "Welcome to RAG Document Search API"}
 
 # 헬스체크 엔드포인트
 @app.get("/health")
 def health_check():
+    """Server Heal Check"""
     return {"status": "healthy"}
