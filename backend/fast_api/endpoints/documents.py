@@ -146,24 +146,24 @@ async def get_filesystem_structure(
 
         # <로직>
         # 1) 최상위 디렉토리 이름(root) 찾기
-        root = next((d['name'] for d in directories if d['id'] == 'home'), None)
-        if root is None:
-            raise ValueError("최상위 디렉토리(id='home')를 찾을 수 없습니다.")
+        root = next((d['name'] for d in directories if d['parent_id'] == None), None)
+        if not root:
+            raise ValueError("최상위 디렉토리(parent_id='None')를 찾을 수 없습니다.")
 
         # 2) 새 리스트에 수정된 객체 생성
         your_result = []
         for d in directories:
-            # 앞뒤 슬래시 제거 후 분할
-            parts = d['path'].strip('/').split('/')
-            # 최상위 디렉토리 이름이 맨 앞에 있으면 제거
-            if parts and parts[0] == root:
-                parts = parts[1:]
-            # 남은 부분으로 새 경로 구성 (없으면 루트 '/')
-            new_path = '/' + '/'.join(parts) if parts else '/'
+            # # 앞뒤 슬래시 제거 후 분할
+            # parts = d['path'].strip('/').split('/')
+            # # 최상위 디렉토리 이름이 맨 앞에 있으면 제거
+            # if parts and parts[0] == root:
+            #     parts = parts[1:]
+            # # 남은 부분으로 새 경로 구성 (없으면 루트 '/')
+            # new_path = '/' + '/'.join(parts) if parts else '/'
             your_result.append({
                 'id':   d['id'],
                 'name': d['name'],
-                'path': new_path
+                'path': d['path']
             })
         # </로직>
         directories = your_result
