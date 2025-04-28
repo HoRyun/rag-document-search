@@ -361,7 +361,6 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                 await traverse(child_name, child_tree, current_dir_id, current_dir_path)
 
             # 3-2. 해당 디렉토리에 포함된 파일 처리
-            
             for upload_file in files:
                 # 파일 객체는 upload_file에 저장됨.
 
@@ -406,7 +405,7 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                             print(f"s3 업로드 중 오류 발생: {str(e)}")
                             results.append({
                                 "type": "file",
-                                "id": document_id,
+                                "id": None,
                                 "name": file_name,
                                 "path": file_path,
                                 "status": "error",
