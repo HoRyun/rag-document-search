@@ -59,12 +59,13 @@ def get_only_directory(db: Session):
     directories = result.scalars().all()
     return [{"id": d.id, "name": d.name, "path": d.path, "parent_id": d.parent_id} for d in directories]
 
-# 정상 작동하는 함수
+# 파일의 id로 부모 디렉토리의 아이디를 가져오는 함수
 def get_parent_id_by_id(db: Session, document_id: str):
     stmt = select(models.Directory.parent_id).where(models.Directory.id == document_id)
     result = db.execute(stmt)
     return result.scalar()
 
+# 파일의 경로로 부모 디렉토리의 아이디를 가져오는 함수
 def get_parent_id_by_path(db: Session, path: str):
     stmt = select(models.Directory.parent_id).where(models.Directory.path == path)
     result = db.execute(stmt)
