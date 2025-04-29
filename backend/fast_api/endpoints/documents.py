@@ -447,12 +447,13 @@ async def process_file_uploads(files, current_upload_path, directory_structure, 
                             "path": file_path,
                             "status": "success"
                         })
+                        # 파일 저장 도중에 실패할 경우.
                     except Exception as e:
                         results.append({
                             "type": "file",
                             "id": document_id,
                             "name": upload_file.filename,
-                            "path": path,
+                            "path": current_upload_path,
                             "status": "error",
                             "error": str(e)
                         })                    
