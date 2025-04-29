@@ -96,7 +96,8 @@ def list_items(
 @router.post("/manage")
 async def upload_document(
     files: List[UploadFile] = File(None), # None을 ... 으로 변경
-    path: str = Form("/"),
+    current_upload_path: str = Form(None),
+    # current_upload_path: str = Query("/", description="현재 경로"),
     directory_structure: str = Form(None),
     operations: str = Form(None),
     current_user: User = Depends(get_current_user),
@@ -113,7 +114,7 @@ async def upload_document(
 
         # 1 & 2. 파일 업로드 처리 (디렉토리 구조 포함 또는 단일 파일)
         if files:
-            file_results = await process_file_uploads(files, path, directory_structure, current_user, db)
+            file_results = await process_file_uploads(files, current_upload_path, directory_structure, current_user, db)
             results["items"].extend(file_results)
 
         
@@ -187,7 +188,7 @@ async def query_document(query: str = Form(...)):
 
 # 유틸 함수
 
-async def process_file_uploads(files, path, directory_structure, current_user, db):
+async def process_file_uploads(files, current_upload_path, directory_structure, current_user, db):
     """파일 업로드 처리 (디렉토리 구조 포함/미포함)"""
     import json
     from typing import Dict, Any
@@ -204,7 +205,7 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
             try:
                 # 파일 이름과 파일 경로를 미리 준비해서 전달하기.
                 file_name = files[0].filename
-                file_path = path+file_name
+                file_path = current_upload_path+file_name
 
 
                 # <파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
@@ -227,7 +228,7 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
 
 
 
-                # 3. DB에 파일 정보 저장 및 문서 처리
+                # 3. documents 테이블에 파일 정보 저장 및 문서 처리
                 document_id = await process_document(
                     file_name=file_name,# 파일의 정보를 사용하기 위해 그대로 전달. 파일의 정보 중에서 파일 이름만 필요하므로 미리 파일 이름을 뽑아서 전달하기.
                     file_path=file_path,
@@ -244,14 +245,13 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                     "type": "file",
                     "id": document_id,
                     "name": files[0].filename,
-                    "path": path,
+                    "path": current_upload_path,
                     "status": "error",
                     "error": str(e)
                 }) 
             # <디렉토리 정보 처리>
-            #이 파일의 parent_id 얻어오는 쿼리문. # 이 코드에는 문제가 있다. 문서 id는 문서 자체의 id이다. 해당
-            parent_id = crud.get_parent_id_by_id(db, str(document_id))
-
+            #이 파일의 parent_id 얻어오는 쿼리문. # 이 코드에는 문제가 있다. 문서 id는 문서 자체의 id이다.
+            parent_id = crud.get_parent_id_by_path(db, current_upload_path)
             # 단일 파일 업로드 시에는 고유한 아이디 값으로 저장함.
             id = str(uuid.uuid4())
 
@@ -259,7 +259,7 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                 db=db,
                 id=id,
                 name=files[0].filename,
-                path=path,
+                path=current_upload_path,
                 is_directory=False,
                 parent_id=parent_id,
                 created_at=datetime.now().isoformat()
@@ -271,7 +271,7 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                 "type": "file",
                 "id": id,
                 "name": files[0].filename,
-                "path": path,
+                "path": current_upload_path,
                 "status": "error",
                 "error": str(e)
             })
@@ -447,12 +447,13 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                             "path": file_path,
                             "status": "success"
                         })
+                        # 파일 저장 도중에 실패할 경우.
                     except Exception as e:
                         results.append({
                             "type": "file",
                             "id": document_id,
                             "name": upload_file.filename,
-                            "path": path,
+                            "path": current_upload_path,
                             "status": "error",
                             "error": str(e)
                         })                    
