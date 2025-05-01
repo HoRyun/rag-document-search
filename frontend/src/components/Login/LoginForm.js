@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import axios from "axios";
 import "./LoginForm.css";
 
-const API_BASE_URL = "http://43.200.3.86:8000/fast_api";
+// const API_BASE_URL = "http://43.200.3.86:8000/fast_api";
+const API_BASE_URL = "http://localhost:8000/fast_api";
 
 const LoginForm = ({ onLoginSuccess, onShowRegister }) => {
   const [username, setUsername] = useState("");
@@ -43,9 +44,9 @@ const LoginForm = ({ onLoginSuccess, onShowRegister }) => {
           <h2>로그인</h2>
           <p>파일 관리 시스템에 오신 것을 환영합니다</p>
         </div>
-        
+
         {error && <div className="error-message">{error}</div>}
-        
+
         <form onSubmit={handleLogin}>
           <div className="form-group">
             <label htmlFor="username">사용자 이름</label>
@@ -58,7 +59,7 @@ const LoginForm = ({ onLoginSuccess, onShowRegister }) => {
               placeholder="사용자 이름을 입력하세요"
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="password">비밀번호</label>
             <input
@@ -70,12 +71,12 @@ const LoginForm = ({ onLoginSuccess, onShowRegister }) => {
               placeholder="비밀번호를 입력하세요"
             />
           </div>
-          
+
           <button type="submit" className="login-button" disabled={isLoading}>
             {isLoading ? "로그인 중..." : "로그인"}
           </button>
         </form>
-        
+
         <div className="login-footer">
           <p>계정이 없으신가요?</p>
           <button onClick={onShowRegister} className="register-link">

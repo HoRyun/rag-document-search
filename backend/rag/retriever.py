@@ -104,7 +104,8 @@ def do_mmr(candidate_docs):
 
     selected_docs = []
     lambda_val = 0.5  # MMR 가중치 - 관련성과 다양성 균형
-    max_documents = 5  # 최종 반환 문서 수
+    max_documents = 3  # 최종 반환 문서 수
+
 
     # 유사도 기준으로 정렬
     candidate_docs = sorted(candidate_docs, key=lambda x: x["similarity"], reverse=True)
