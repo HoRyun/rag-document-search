@@ -7,6 +7,7 @@ import Chatbot from "./components/Chatbot/Chatbot";
 import LoginForm from "./components/Login/LoginForm";
 import RegisterForm from "./components/Login/RegisterForm";
 import "./App.css";
+import "./Theme.css"; // 테마 CSS 추가
 
 // API 기본 URL 설정
 // const API_BASE_URL = "http://43.200.3.86:8000/fast_api";
@@ -30,6 +31,40 @@ function App() {
 
   // 로딩 상태
   const [isLoading, setIsLoading] = useState(false);
+
+  // 테마 상태 (다크 모드)
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // 컴포넌트 마운트 시 로그인 상태 확인 및 테마 설정 불러오기
+  useEffect(() => {
+    // 토큰이 있으면 사용자 정보 가져오기
+    const token = localStorage.getItem("token");
+    if (token) {
+      fetchUserInfo(token);
+    }
+    
+    // 저장된 테마 설정 불러오기
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme === "dark") {
+      setIsDarkMode(true);
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  }, []);
+
+  // 테마 토글 핸들러
+  const toggleTheme = () => {
+    const newTheme = !isDarkMode;
+    setIsDarkMode(newTheme);
+    
+    // 문서 루트에 테마 속성 설정
+    document.documentElement.setAttribute(
+      "data-theme", 
+      newTheme ? "dark" : "light"
+    );
+    
+    // 테마 설정 저장
+    localStorage.setItem("theme", newTheme ? "dark" : "light");
+  };
 
   // 컴포넌트 마운트 시 로그인 상태 확인
   useEffect(() => {
@@ -682,7 +717,7 @@ function App() {
 
   return (
     <div className="app">
-      <Header onLogout={handleLogout} username={user?.username} />
+      <Header onLogout={handleLogout} username={user?.username} isDarkMode={isDarkMode} toggleTheme={toggleTheme}/>
       <div className="main-container">
         <Sidebar
           directories={directories}

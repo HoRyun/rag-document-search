@@ -7,18 +7,19 @@
   border-radius: 8px;
   transition: background-color 0.2s;
   position: relative;
+  color: var(--text-primary);
 }
 
 .file-item:hover {
-  background-color: #f5f5f5;
+  background-color: var(--item-hover);
 }
 
 .file-item.directory-item {
-  background-color: rgba(255, 208, 76, 0.05);
+  background-color: var(--folder-bg);
 }
 
 .file-item.directory-item:hover {
-  background-color: rgba(255, 208, 76, 0.1);
+  background-color: var(--folder-hover);
 }
 
 .file-icon {
@@ -28,6 +29,12 @@
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
+  transition: filter 0.3s;
+}
+
+/* Dark mode SVG 필터 추가 */
+[data-theme="dark"] .file-icon {
+  filter: brightness(0.8) saturate(0.9);
 }
 
 .document-icon {
@@ -65,7 +72,8 @@
   white-space: nowrap;
   text-align: center;
   font-size: 12px;
-  color: #333;
+  color: var(--text-primary);
+  transition: color 0.3s;
 }
 
 /* 이름 변경 스타일 */
@@ -78,33 +86,37 @@
   width: 100%;
   padding: 3px 6px;
   font-size: 12px;
-  border: 1px solid #4285f4;
+  border: 1px solid var(--highlight-color);
   border-radius: 4px;
   outline: none;
-  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+  box-shadow: 0 0 0 2px rgba(var(--highlight-color-rgb), 0.2);
   text-align: center;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: border-color 0.3s, box-shadow 0.3s, background-color 0.3s, color 0.3s;
 }
 
 /* 컨텍스트 메뉴 스타일 */
 .context-menu {
-  background-color: white;
+  background-color: var(--bg-primary);
   border-radius: 4px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 10px var(--shadow-color);
   width: 150px;
   z-index: 100;
   overflow: hidden;
+  transition: background-color 0.3s, box-shadow 0.3s;
 }
 
 .context-menu-item {
   padding: 8px 12px;
   cursor: pointer;
   font-size: 14px;
-  color: #333;
-  transition: background-color 0.2s;
+  color: var(--text-primary);
+  transition: background-color 0.2s, color 0.3s;
 }
 
 .context-menu-item:hover {
-  background-color: #f5f5f5;
+  background-color: var(--item-hover);
 }
 
 .context-menu-item.delete-item {
@@ -112,5 +124,5 @@
 }
 
 .context-menu-item.delete-item:hover {
-  background-color: #ffebee;
+  background-color: rgba(211, 47, 47, 0.1);
 }
