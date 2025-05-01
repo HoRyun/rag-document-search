@@ -4,9 +4,17 @@ uploads/
 ollama/*
 ollama/
 
+#배포 파일
+package/
+
+#aws 파일
+aws/
 
 #cursor 파일
 .cursor/*
+
+#zip 파일
+*.zip
 
 #테스트 용 주피터 노트북
 *test.ipynb
