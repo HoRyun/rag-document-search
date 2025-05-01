@@ -130,12 +130,14 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
         const existingFile = files.find(file => file.name === item.name);
         let newFileName = item.name;
         
-        if (existingFile) {
+        if (existingFile && clipboard.operation === 'copy') {
           // 사용자에게 확인 또는 자동으로 새 이름 생성
           const nameParts = item.name.split('.');
           const ext = nameParts.length > 1 ? '.' + nameParts.pop() : '';
           const baseName = nameParts.join('.');
-          newFileName = `${baseName} - 복사본${ext}`;
+          // Note: 아래 변수는 실제 백엔드 연동 구현에서 사용될 예정입니다
+          // const newFileName = `${baseName} - 복사본${ext}`;
+          // 백엔드 연동 또는 새 이름 지정 로직은 여기에 추가될 예정임
         }
         
         if (clipboard.operation === 'copy') {
