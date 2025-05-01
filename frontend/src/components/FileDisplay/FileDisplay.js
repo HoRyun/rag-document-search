@@ -19,6 +19,7 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
 
   // 이름 변경 모달 상태
   const [itemToRename, setItemToRename] = useState(null);
+  const [newName, setNewName] = useState('');
   const [showRenameModal, setShowRenameModal] = useState(false);
 
   // 이동 모달 상태
@@ -86,16 +87,6 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
     }
   };
 
-  // 알림 표시 함수
-  const showNotification = useCallback((message) => {
-    setNotification({ visible: true, message });
-    
-    // 3초 후 알림 숨기기
-    setTimeout(() => {
-      setNotification({ visible: false, message: '' });
-    }, 3000);
-  }, []);
-
   // 복사 처리
   const handleCopyItems = useCallback(() => {
     if (selectedItems.length === 0) return;
@@ -109,7 +100,7 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
       : `${itemsToCopy.length}개 항목 복사됨`;
     
     showNotification(message);
-  }, [selectedItems, files, showNotification]);
+  }, [selectedItems, files]);
 
   // 잘라내기 처리
   const handleCutItems = useCallback(() => {
@@ -124,7 +115,7 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
       : `${itemsToCut.length}개 항목 잘라내기됨`;
     
     showNotification(message);
-  }, [selectedItems, files, showNotification]);
+  }, [selectedItems, files]);
 
   // 붙여넣기 처리
   const handlePasteItems = useCallback(async () => {
@@ -137,14 +128,14 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
       for (const item of clipboard.items) {
         // 이름 충돌 처리 - 같은 이름의 파일이 있는지 확인
         const existingFile = files.find(file => file.name === item.name);
-        let newItemName = item.name;
+        let newFileName = item.name;
         
         if (existingFile) {
           // 사용자에게 확인 또는 자동으로 새 이름 생성
           const nameParts = item.name.split('.');
           const ext = nameParts.length > 1 ? '.' + nameParts.pop() : '';
           const baseName = nameParts.join('.');
-          newItemName = `${baseName} - 복사본${ext}`;
+          newFileName = `${baseName} - 복사본${ext}`;
         }
         
         if (clipboard.operation === 'copy') {
@@ -173,7 +164,7 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
     } finally {
       setIsLocalLoading(false);
     }
-  }, [clipboard, files, currentPath, onMoveItem, onRefresh, showNotification]);
+  }, [clipboard, files, currentPath, onMoveItem, onRefresh]);
 
   // 선택된 항목 삭제 처리
   const handleDeleteSelectedItems = useCallback(async () => {
@@ -207,36 +198,29 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
         setIsLocalLoading(false);
       }
     }
-  }, [selectedItems, files, onDeleteItem, onRefresh, showNotification]);
+  }, [selectedItems, files, onDeleteItem, onRefresh]);
   
   // 이름 변경 시작
   const startRenameItem = (item) => {
     setItemToRename(item);
+    setNewName(item.name);
     setShowRenameModal(true);
   };
 
   // 이름 변경 제출 핸들러
   const handleRenameSubmit = async (e) => {
     e.preventDefault();
-    if (!itemToRename || !itemToRename.name || itemToRename.name === "") {
-      setShowRenameModal(false);
-      return;
-    }
-    
-    const renameInput = document.getElementById('newName');
-    const newNameValue = renameInput ? renameInput.value : '';
-    
-    if (!newNameValue.trim() || newNameValue === itemToRename.name) {
+    if (!itemToRename || !newName.trim() || newName === itemToRename.name) {
       setShowRenameModal(false);
       return;
     }
     
     try {
       setIsLocalLoading(true);
-      await onRenameItem(itemToRename.id, newNameValue);
+      await onRenameItem(itemToRename.id, newName);
       
       // 이름 변경 성공 알림
-      showNotification(`"${itemToRename.name}"의 이름이 "${newNameValue}"으로 변경되었습니다`);
+      showNotification(`"${itemToRename.name}"의 이름이 "${newName}"으로 변경되었습니다`);
       
       // 목록 갱신
       onRefresh();
@@ -316,6 +300,16 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
         type: 'display' // 파일 표시 영역 컨텍스트 메뉴
       });
     }
+  };
+
+  // 알림 표시 함수
+  const showNotification = (message) => {
+    setNotification({ visible: true, message });
+    
+    // 3초 후 알림 숨기기
+    setTimeout(() => {
+      setNotification({ visible: false, message: '' });
+    }, 3000);
   };
 
   // 키보드 이벤트 리스너 설정
@@ -406,7 +400,15 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedItems, clipboard, files, handleCopyItems, handleCutItems, handleDeleteSelectedItems, handlePasteItems]);
+  }, [
+    selectedItems, 
+    clipboard, 
+    files, 
+    handleCopyItems, 
+    handleCutItems, 
+    handlePasteItems, 
+    handleDeleteSelectedItems
+  ]);
 
   // 컨텍스트 메뉴 외부 클릭 감지
   useEffect(() => {
@@ -804,9 +806,9 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
   };
 
   // 파일/폴더 이름 변경 처리
-  const handleItemRename = (itemId, newName) => {
+  const handleItemRename = (itemId, renamedName) => {
     if (onRenameItem) {
-      onRenameItem(itemId, newName);
+      onRenameItem(itemId, renamedName);
     }
   };
 
@@ -1079,7 +1081,8 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
                 <input
                   type="text"
                   id="newName"
-                  defaultValue={itemToRename ? itemToRename.name : ''}
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
                   placeholder="새 이름을 입력하세요"
                   className="folder-name-input"
                   autoFocus
@@ -1096,6 +1099,7 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
                 <button 
                   type="submit" 
                   className="create-btn"
+                  disabled={!newName.trim() || newName === itemToRename?.name}
                 >
                   변경
                 </button>
