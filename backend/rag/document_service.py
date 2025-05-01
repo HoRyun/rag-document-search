@@ -23,8 +23,10 @@ def get_all_documents(db: Session):
     """모든 문서 조회"""
     return db.query(Document).all()
 
+
 async def process_document(
-    file: UploadFile, 
+    file_name: str,
+    file_path: str,
     file_content: bytes,
     user_id: int, 
     db: Session,
@@ -34,7 +36,7 @@ async def process_document(
 
     # 1. 업로드 된 파일의 형식을 확인한다.
     # 파일 확장자 추출
-    file_extension = file.filename.split('.')[-1].lower()
+    file_extension = file_name.split('.')[-1].lower()
 
     # 지원되는 파일 형식 확인
     if file_extension not in ['pdf', 'docx', 'hwp', 'hwpx']:
@@ -43,17 +45,18 @@ async def process_document(
             detail="지원되지 않는 파일 형식입니다. PDF, DOCX, HWP 또는 HWPX 파일만 업로드 가능합니다."
         )
     
-    # 파일의 경로 추출
-    file_path = file.filename
+    # 파일의 경로 # 아래 코드는 삭제
+    # file_path = path+file.filename
 
     # 파일의 이름 추출
-    file_name = os.path.basename(file_path)
+    # file_name = os.path.basename(file_path)
 
 
 
 
     try:
         
+
         # 2. 업로드 된 파일의 정보를 db에 저장한다.
         # 업로드 된 파일의 이름, 업로드 시간, 사용자 아이디를 DB의 documents 테이블에 저장.
         # DB의 documents 테이블에 문서 정보 저장. # 이 코드는 이 위치에 있어야 함.
@@ -72,6 +75,7 @@ async def process_document(
         # crud.add_directory_size(db, db_document.id, file.size)
         # 2. 업로드 된 파일의 정보를 db에 저장한다.
 
+
         # 3. 파일 형식에 따라 문서 로드
         # 파일을 읽어 문자열 리스트로 반환하는 작업을 한다.
         if file_extension == 'pdf':
@@ -79,9 +83,8 @@ async def process_document(
         elif file_extension == 'docx':
             documents = await load_docx(file_content) # file 대신 file_content를 매개변수로 전달
         elif file_extension in ['hwp', 'hwpx']:
-            documents = load_hwp(file, file_extension)
-        # 3. 파일 형식에 따라 문서 로드
-
+            # documents = load_hwp(file, file_extension)
+            pass
 
 
 
@@ -89,6 +92,7 @@ async def process_document(
         # 문자열 리스트화 된 문서를 조각으로 나눈다.
         chunked_documents = chunk_documents(documents, file_path, file_name)
         # 4. 문서 청킹
+
 
         # 5. 벡터 스토어에 청크들을 저장
         # 청크들을 임베딩하여 벡터 스토어에 저장한다.

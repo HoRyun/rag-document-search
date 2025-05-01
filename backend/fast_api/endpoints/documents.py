@@ -55,7 +55,7 @@ def list_items(
     try:
         
         filtered_items = []
-
+        
         # 프론트 엔드에서 선택한 경로
         selected_path = path
         # <db에서 디렉토리 정보와 파일 정보 가져오기>
@@ -87,6 +87,7 @@ def list_items(
         filtered_items.extend([dict(item) for item in file_result])
         filtered_items.extend([dict(item) for item in dir_result])
         # </가져온 정보를 filtered_items에 추가>
+
         
         return {"items": filtered_items}
     except Exception as e:
@@ -95,12 +96,14 @@ def list_items(
 @router.post("/manage")
 async def upload_document(
     files: List[UploadFile] = File(None), # None을 ... 으로 변경
-    path: str = Form("/"),
+    current_upload_path: str = Form(None),
+    # current_upload_path: str = Query("/", description="현재 경로"),
     directory_structure: str = Form(None),
     operations: str = Form(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    """통합 문서 / 디렉토리 관리"""
     from typing import Dict, Any
     try:
         results = {
@@ -111,7 +114,7 @@ async def upload_document(
 
         # 1 & 2. 파일 업로드 처리 (디렉토리 구조 포함 또는 단일 파일)
         if files:
-            file_results = await process_file_uploads(files, path, directory_structure, current_user, db)
+            file_results = await process_file_uploads(files, current_upload_path, directory_structure, current_user, db)
             results["items"].extend(file_results)
 
         
@@ -144,24 +147,24 @@ async def get_filesystem_structure(
 
         # <로직>
         # 1) 최상위 디렉토리 이름(root) 찾기
-        root = next((d['name'] for d in directories if d['id'] == 'home'), None)
-        if root is None:
-            raise ValueError("최상위 디렉토리(id='home')를 찾을 수 없습니다.")
+        root = next((d['name'] for d in directories if d['parent_id'] == None), None)
+        if not root:
+            raise ValueError("최상위 디렉토리(parent_id='None')를 찾을 수 없습니다.")
 
         # 2) 새 리스트에 수정된 객체 생성
         your_result = []
         for d in directories:
-            # 앞뒤 슬래시 제거 후 분할
-            parts = d['path'].strip('/').split('/')
-            # 최상위 디렉토리 이름이 맨 앞에 있으면 제거
-            if parts and parts[0] == root:
-                parts = parts[1:]
-            # 남은 부분으로 새 경로 구성 (없으면 루트 '/')
-            new_path = '/' + '/'.join(parts) if parts else '/'
+            # # 앞뒤 슬래시 제거 후 분할
+            # parts = d['path'].strip('/').split('/')
+            # # 최상위 디렉토리 이름이 맨 앞에 있으면 제거
+            # if parts and parts[0] == root:
+            #     parts = parts[1:]
+            # # 남은 부분으로 새 경로 구성 (없으면 루트 '/')
+            # new_path = '/' + '/'.join(parts) if parts else '/'
             your_result.append({
                 'id':   d['id'],
                 'name': d['name'],
-                'path': new_path
+                'path': d['path']
             })
         # </로직>
         directories = your_result
@@ -170,7 +173,6 @@ async def get_filesystem_structure(
             "directories": directories}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching filesystem structure: {str(e)}")
-
 
 @router.post("/query")
 async def query_document(query: str = Form(...)):
@@ -186,7 +188,7 @@ async def query_document(query: str = Form(...)):
 
 # 유틸 함수
 
-async def process_file_uploads(files, path, directory_structure, current_user, db):
+async def process_file_uploads(files, current_upload_path, directory_structure, current_user, db):
     """파일 업로드 처리 (디렉토리 구조 포함/미포함)"""
     import json
     from typing import Dict, Any
@@ -201,6 +203,9 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
             # <if len(files) == 1: 의 예외 처리 구역>
             # <s3업로드, 파일 처리 및 return 예외 처리>
             try:
+                # 파일 이름과 파일 경로를 미리 준비해서 전달하기.
+                file_name = files[0].filename
+                file_path = current_upload_path+file_name
 
 
                 # <파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
@@ -212,7 +217,7 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
 
                 # S3 업로드.
                 # 이 부분에서 파일은 한 번 읽힘.
-                s3_key = f"uploads/{current_user.username}/{files[0].filename}"
+                s3_key = f"uploads/{current_user.username}/{file_name}"
                 s3_client.upload_fileobj(
                     Fileobj=files[0].file,
                     Bucket=S3_BUCKET_NAME,
@@ -220,9 +225,13 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                     ExtraArgs={'ContentType': files[0].content_type}
                 )
 
-                # 3. DB에 파일 정보 저장 및 문서 처리
+
+
+
+                # 3. documents 테이블에 파일 정보 저장 및 문서 처리
                 document_id = await process_document(
-                    file=files[0],# 파일의 정보를 사용하기 위해 그대로 전달.
+                    file_name=file_name,# 파일의 정보를 사용하기 위해 그대로 전달. 파일의 정보 중에서 파일 이름만 필요하므로 미리 파일 이름을 뽑아서 전달하기.
+                    file_path=file_path,
                     file_content=file_content, # 메모리에 읽은 파일의 실제 데이터를 전달.
                     user_id=current_user.id,
                     db=db,
@@ -236,14 +245,13 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                     "type": "file",
                     "id": document_id,
                     "name": files[0].filename,
-                    "path": path,
+                    "path": current_upload_path,
                     "status": "error",
                     "error": str(e)
                 }) 
             # <디렉토리 정보 처리>
-            #이 파일의 parent_id 얻어오는 쿼리문.
-            parent_id = crud.get_parent_id_by_id(db, str(document_id))
-
+            #이 파일의 parent_id 얻어오는 쿼리문. # 이 코드에는 문제가 있다. 문서 id는 문서 자체의 id이다.
+            parent_id = crud.get_parent_id_by_path(db, current_upload_path)
             # 단일 파일 업로드 시에는 고유한 아이디 값으로 저장함.
             id = str(uuid.uuid4())
 
@@ -251,7 +259,7 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                 db=db,
                 id=id,
                 name=files[0].filename,
-                path=path,
+                path=current_upload_path,
                 is_directory=False,
                 parent_id=parent_id,
                 created_at=datetime.now().isoformat()
@@ -263,7 +271,7 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                 "type": "file",
                 "id": id,
                 "name": files[0].filename,
-                "path": path,
+                "path": current_upload_path,
                 "status": "error",
                 "error": str(e)
             })
@@ -274,9 +282,9 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
 
         # 2. 최상위 디렉토리 처리
         root_name, root_children = next(iter(tree.items()))
-        root_id = "home"
+        root_id = str(uuid.uuid4())
         # root_path에 root_name 포함 
-        root_path = "/"  
+        root_path = "/" + root_name
         # DB 저장: 최상위 디렉토리
         # <예외 처리 구역>
         try:
@@ -312,10 +320,10 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
         # 3. 재귀로 하위 디렉토리 및 파일 처리
         async def traverse(name: str, subtree: Dict[str, Any], parent_id: str, parent_path: str):
             # 디렉토리 생성
-            current_id = str(uuid.uuid4())
-            current_name = name
+            current_dir_id = str(uuid.uuid4())
+            current_dir_name = name
             #* 변경: OS 종속적 os.path.join 대신 '/' 문자열 조합 사용
-            current_path = f"{parent_path.rstrip('/')}/{name}" 
+            current_dir_path = f"{parent_path.rstrip('/')}/{name}" 
             
             # DB 저장: 디렉토리
             # <예외 처리 구역>
@@ -323,26 +331,26 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                 # db_save(id=current_id, name=current_name, path=current_path, is_directory=True, parent_id=parent_id)
                 crud.create_directory(
                     db=db,
-                    id=current_id,
-                    name=current_name,
-                    path=current_path,
+                    id=current_dir_id,
+                    name=current_dir_name,
+                    path=current_dir_path,
                     is_directory=True,
                     parent_id=parent_id,
                     created_at=datetime.now().isoformat()
                 )            
                 results.append({
                     "type": "directory",
-                    "id": current_id,
-                    "name": current_name,
-                    "path": current_path,
+                    "id": current_dir_id,
+                    "name": current_dir_name,
+                    "path": current_dir_path,
                     "status": "success"
                 })
             except Exception as e:
                 results.append({
                     "type": "directory",
-                    "id": current_id,
-                    "name": current_name,
-                    "path": current_path,
+                    "id": current_dir_id,
+                    "name": current_dir_name,
+                    "path": current_dir_path,
                     "status": "error",
                     "error": str(e)
                 })
@@ -350,27 +358,33 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
 
             # 3-1. 하위 디렉토리 탐색
             for child_name, child_tree in subtree.items():
-                await traverse(child_name, child_tree, current_id, current_path)
+                await traverse(child_name, child_tree, current_dir_id, current_dir_path)
 
             # 3-2. 해당 디렉토리에 포함된 파일 처리
-            prefix = "/"
             for upload_file in files:
                 # 파일 객체는 upload_file에 저장됨.
 
-                _, _, result = upload_file.filename.partition('/')
-                full_path = result = '/'+ result
-                if not full_path.startswith(prefix):
-                    continue
-                rel_path = full_path[len(prefix):]
-                dir_part, file_name = os.path.split(rel_path)
-                current_rel = current_path[len(root_path):].strip("/")  #*
-                if dir_part == current_rel:
+                # 현재 저장할 파일이 현재 디렉토리 구조에 실제 존재하는 지 판단
+
+                # 파일 명에서 디렉토리 부분 추출
+                # <로직>
+                # 경로에서 파일명 제거 후 디렉토리 부분 추출
+                dir_part = os.path.dirname(upload_file.filename)
+                
+                # 맨 앞에 '/' 추가 (os.path.dirname 결과가 '.'인 경우 처리)
+                dir_part_exclution_filename = '/' + dir_part if dir_part != '.' else '/'                              
+                # </로직>
+
+                # T : 현재 저장할 파일이 현재 디렉토리에 존재하는 게 맞다.
+                # F : 현재 저장할 파일이 현재 디렉토리에 존재하는 게 아니다.
+                if current_dir_path == dir_part_exclution_filename:
                     # file_id = str(uuid.uuid4())
-                    file_path= result # f"{current_path.rstrip('/')}/{file_name}" <- result로 대체.
-                    # file_path = os.path.join(current_path, file_name)  #* 변경된 부분
+                    file_path= "/"+upload_file.filename
+
+                    # file_path에서 파일 명만 추출.
+                    file_name = os.path.basename(file_path)
                     # DB 저장: 파일
                     
-                    document_id = None
                     # <복붙>
                     try:
                         # <s3업로드 예외 처리 try except>
@@ -380,7 +394,7 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                             # </파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
 
                             # S3 업로드 (BytesIO 없이 UploadFile.file 직접 사용)
-                            s3_key = f"uploads/{current_user.username}/{upload_file.filename}"
+                            s3_key = f"uploads/{current_user.username}/{file_name}"
                             s3_client.upload_fileobj(
                                 Fileobj=upload_file.file,
                                 Bucket=S3_BUCKET_NAME,
@@ -391,9 +405,9 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                             print(f"s3 업로드 중 오류 발생: {str(e)}")
                             results.append({
                                 "type": "file",
-                                "id": document_id,
-                                "name": upload_file.filename,
-                                "path": path,
+                                "id": None,
+                                "name": file_name,
+                                "path": file_path,
                                 "status": "error",
                                 "error": str(e)
                             })
@@ -401,7 +415,8 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
 
                         # 3. DB 저장 및 문서 처리
                         document_id = await process_document(
-                            file=upload_file,
+                            file_name=file_name,
+                            file_path=file_path,
                             file_content=file_content,
                             user_id=current_user.id,
                             db=db,
@@ -409,20 +424,17 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                         )
                         # </s3업로드, 파일 처리 및 return 예외 처리>
                     
+
+
                         # <디렉토리 정보 처리>
-                        #이 파일의 parent_id 얻어오는 쿼리문.
-                        parent_id = crud.get_parent_id_by_id(db, str(document_id))
-
                         # 디렉토리 업로드 시에는 해당 문서의 id를 사용.
-                        id = document_id
-
                         crud.create_directory(
                             db=db,
-                            id=id,
+                            id=document_id,
                             name=file_name,
                             path=file_path,
                             is_directory=False,
-                            parent_id=parent_id,
+                            parent_id=current_dir_id,
                             created_at=datetime.now().isoformat()
                         )
                         # </디렉토리 정보 처리> 
@@ -435,17 +447,17 @@ async def process_file_uploads(files, path, directory_structure, current_user, d
                             "path": file_path,
                             "status": "success"
                         })
+                        # 파일 저장 도중에 실패할 경우.
                     except Exception as e:
                         results.append({
                             "type": "file",
                             "id": document_id,
                             "name": upload_file.filename,
-                            "path": path,
+                            "path": current_upload_path,
                             "status": "error",
                             "error": str(e)
                         })                    
                     # </복붙>
-                    
 
         # 4. 실제 트리 순회 시작
         # root 자체가 아닌, 루트의 자식들부터 순회하도록 변경  #* 변경된 부분
@@ -491,7 +503,6 @@ def process_directory_operations(operations, user_id, db):
                     parent_id=parent_id,
                     created_at=datetime.now().isoformat()
                 )
-             
                 
                 results.append({
                     "operation": "create",
