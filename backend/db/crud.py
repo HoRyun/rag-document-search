@@ -11,17 +11,21 @@ def create_user(db: Session, username: str, email: str, password_hash: str):
     db.refresh(db_user)
     return db_user
 
+# 사용자의 id로 사용자 정보를 가져오는 함수
 def get_user_by_id(db: Session, user_id: int):
     return db.query(models.User).filter(models.User.id == user_id).first()
 
-# 문서 관련 CRUD
-def create_document(db: Session, filename: str, s3_key: str, user_id: int):
-    db_document = models.Document(filename=filename, s3_key=s3_key, user_id=user_id)
+# DB의 documents 테이블에 문서 정보 저장
+def add_documents(db: Session, filename: str, s3_key: str, upload_time: datetime, user_id: int):
+    db_document = models.Document(filename=filename, s3_key=s3_key, upload_time=upload_time, user_id=user_id)
     db.add(db_document)
     db.commit()
     db.refresh(db_document)
     return db_document
 
+
+
+# 문서 청크를 저장하는 함수
 def add_document_chunk(db: Session, document_id: int, content: str, meta: dict, embedding=None):
     db_chunk = models.DocumentChunk(
         document_id=document_id,
@@ -34,6 +38,7 @@ def add_document_chunk(db: Session, document_id: int, content: str, meta: dict, 
     db.refresh(db_chunk)
     return db_chunk
 
+# 문서의 id로 문서 청크를 가져오는 함수
 def get_document_chunks_by_document_id(db: Session, document_id: int):
     return db.query(models.DocumentChunk).filter(models.DocumentChunk.document_id == document_id).all()
 
@@ -52,7 +57,7 @@ def create_directory(db: Session, id: str, name: str, path: str, is_directory: b
     db.refresh(db_directory)
     return db_directory
 
-# 정상 작동하는 함수
+# 디렉토리의 정보만 가져오는 함수
 def get_only_directory(db: Session):
     stmt = select(models.Directory).where(models.Directory.is_directory == True)
     result = db.execute(stmt)
@@ -65,11 +70,9 @@ def get_parent_id_by_id(db: Session, document_id: str):
     result = db.execute(stmt)
     return result.scalar()
 
-# 파일의 경로로 부모 디렉토리의 아이디를 가져오는 함수
-def get_parent_id_by_path(db: Session, path: str):
-    stmt = select(models.Directory.parent_id).where(models.Directory.path == path)
+# 파일의 경로 데이터로 현재 디렉토리의 아이디를 가져오는 함수
+def get_directory_id_by_path(db: Session, path: str):
+    stmt = select(models.Directory.id).where(models.Directory.path == path)
     result = db.execute(stmt)
     return result.scalar()
-
-
 

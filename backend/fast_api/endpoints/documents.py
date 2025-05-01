@@ -96,8 +96,7 @@ def list_items(
 @router.post("/manage")
 async def upload_document(
     files: List[UploadFile] = File(None), # None을 ... 으로 변경
-    current_upload_path: str = Form(None),
-    # current_upload_path: str = Query("/", description="현재 경로"),
+    path: str = Form(None),
     directory_structure: str = Form(None),
     operations: str = Form(None),
     current_user: User = Depends(get_current_user),
@@ -105,6 +104,15 @@ async def upload_document(
 ):
     """통합 문서 / 디렉토리 관리"""
     from typing import Dict, Any
+
+    # API 테스트 용 코드.
+    # if current_upload_path == '':
+    #     current_upload_path = None
+    # if operations == '':
+    #     operations = None
+    
+    current_upload_path = path
+
     try:
         results = {
             "success": True,
@@ -205,7 +213,7 @@ async def process_file_uploads(files, current_upload_path, directory_structure, 
             try:
                 # 파일 이름과 파일 경로를 미리 준비해서 전달하기.
                 file_name = files[0].filename
-                file_path = current_upload_path+file_name
+                file_path = current_upload_path+"/"+file_name
 
 
                 # <파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
@@ -250,8 +258,8 @@ async def process_file_uploads(files, current_upload_path, directory_structure, 
                     "error": str(e)
                 }) 
             # <디렉토리 정보 처리>
-            #이 파일의 parent_id 얻어오는 쿼리문. # 이 코드에는 문제가 있다. 문서 id는 문서 자체의 id이다.
-            parent_id = crud.get_parent_id_by_path(db, current_upload_path)
+            #이 파일이 저장될 디렉토리의 id 얻어오는 쿼리문.("A"라는 디렉토리에 파일을 저장해야 한다면 A디렉토리는 파일의 부모 디렉토리가 되므로 A디렉토리의 id를 가져와야 한다.)
+            parent_id = crud.get_directory_id_by_path(db, current_upload_path)
             # 단일 파일 업로드 시에는 고유한 아이디 값으로 저장함.
             id = str(uuid.uuid4())
 
@@ -259,12 +267,12 @@ async def process_file_uploads(files, current_upload_path, directory_structure, 
                 db=db,
                 id=id,
                 name=files[0].filename,
-                path=current_upload_path,
+                path=file_path,
                 is_directory=False,
                 parent_id=parent_id,
                 created_at=datetime.now().isoformat()
             )
-            # </디렉토리 정보 처리>            
+            # </디렉토리 정보 처리>           
             # </if len(files) == 1: 의 예외 처리 구역>
         except Exception as e:
             results.append({
