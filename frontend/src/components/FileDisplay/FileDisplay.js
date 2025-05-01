@@ -128,16 +128,66 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
       for (const item of clipboard.items) {
         // 이름 충돌 처리 - 같은 이름의 파일이 있는지 확인
         const existingFile = files.find(file => file.name === item.name);
-        let newFileName = item.name;
         
         if (existingFile && clipboard.operation === 'copy') {
           // 사용자에게 확인 또는 자동으로 새 이름 생성
-          const nameParts = item.name.split('.');
-          const ext = nameParts.length > 1 ? '.' + nameParts.pop() : '';
-          const baseName = nameParts.join('.');
-          // Note: 아래 변수는 실제 백엔드 연동 구현에서 사용될 예정입니다
+          // 백엔드 연동 시 이름 충돌 처리를 위한 코드 (현재는 주석 처리)
+          // const nameParts = item.name.split('.');
+          // const ext = nameParts.length > 1 ? '.' + nameParts.pop() : '';
+          // const baseName = nameParts.join('.');
           // const newFileName = `${baseName} - 복사본${ext}`;
-          // 백엔드 연동 또는 새 이름 지정 로직은 여기에 추가될 예정임
+          
+          // 백엔드 연동 또는 새 이름 지정 로직은 향후 구현 예정
+          console.log('파일 이름 충돌 감지:', item.name);
+        }
+        
+        if (clipboard.operation === 'copy') {
+          // 복사 구현: 현재는 백엔드 API 연동이 필요하므로 실제 구현은 생략
+          // 알림 표시
+          showNotification('복사된 항목을 백엔드에 저장하는 기능은 아직 구현되지 않았습니다');
+        } else if (clipboard.operation === 'cut') {
+          // 이동 구현: onMoveItem 함수 호출
+          await onMoveItem(item.id, currentPath);
+        }
+      }
+      
+      // 붙여넣기 후 클립보드 초기화 (cut인 경우만)
+      if (clipboard.operation === 'cut') {
+        setClipboard({ items: [], operation: null });
+      }
+      
+      // 선택 해제
+      setSelectedItems([]);
+      
+      // 목록 갱신
+      onRefresh();
+    } catch (error) {
+      console.error("Error pasting items:", error);
+      showNotification('항목 붙여넣기 중 오류가 발생했습니다');
+    } finally {
+      setIsLocalLoading(false);
+    }
+  }, [clipboard, files, currentPath, onMoveItem, onRefresh]);const handlePasteItems = useCallback(async () => {
+    if (clipboard.items.length === 0) return;
+    
+    try {
+      setIsLocalLoading(true);
+      
+      // 복사 또는 이동 작업 실행
+      for (const item of clipboard.items) {
+        // 이름 충돌 처리 - 같은 이름의 파일이 있는지 확인
+        const existingFile = files.find(file => file.name === item.name);
+        
+        if (existingFile && clipboard.operation === 'copy') {
+          // 사용자에게 확인 또는 자동으로 새 이름 생성
+          // 백엔드 연동 시 이름 충돌 처리를 위한 코드 (현재는 주석 처리)
+          // const nameParts = item.name.split('.');
+          // const ext = nameParts.length > 1 ? '.' + nameParts.pop() : '';
+          // const baseName = nameParts.join('.');
+          // const newFileName = `${baseName} - 복사본${ext}`;
+          
+          // 백엔드 연동 또는 새 이름 지정 로직은 향후 구현 예정
+          console.log('파일 이름 충돌 감지:', item.name);
         }
         
         if (clipboard.operation === 'copy') {
