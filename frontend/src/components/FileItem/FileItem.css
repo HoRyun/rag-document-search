@@ -126,3 +126,20 @@
 .context-menu-item.delete-item:hover {
   background-color: rgba(211, 47, 47, 0.1);
 }
+
+/* 선택된 항목 스타일 */
+.file-item.selected {
+  background-color: rgba(var(--highlight-color-rgb), 0.1);
+  border: 2px solid var(--highlight-color);
+  padding: 8px; /* 테두리 추가로 패딩 감소 */
+}
+
+.file-item.selected:hover {
+  background-color: rgba(var(--highlight-color-rgb), 0.15);
+}
+
+/* 사용자 선택 방지 */
+.file-item {
+  user-select: none; /* 텍스트 선택 방지 */
+  outline: none; /* 기본 포커스 아웃라인 제거 */
+}
