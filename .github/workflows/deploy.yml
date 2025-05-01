@@ -36,7 +36,7 @@ jobs:
 
       - name: Render new ECS task definition
         id: task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@v2
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: ecs-task-definition.json
           container-name: rag-document-management-backend
