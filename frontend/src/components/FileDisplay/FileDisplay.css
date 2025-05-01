@@ -61,6 +61,49 @@
   transition: color 0.3s;
 }
 
+/* 도구 모음 스타일 추가 */
+.toolbar {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 10px;
+  padding: 5px 0;
+}
+
+.toolbar-btn {
+  padding: 6px 12px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.3s, border-color 0.3s;
+}
+
+.toolbar-btn:hover:not(:disabled) {
+  background-color: var(--item-hover);
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toolbar-btn.delete-btn {
+  color: #d32f2f;
+}
+
+.toolbar-btn.delete-btn:hover:not(:disabled) {
+  background-color: rgba(211, 47, 47, 0.1);
+}
+
+.toolbar-separator {
+  width: 1px;
+  background-color: var(--border-color);
+  margin: 0 5px;
+  transition: background-color 0.3s;
+}
+
 .file-actions {
   display: flex;
   gap: 10px;
@@ -265,6 +308,34 @@
   transition: color 0.3s;
 }
 
+/* 이동 모달 스타일 */
+.move-modal-content {
+  padding: 20px;
+}
+
+.move-modal-content p {
+  margin-bottom: 15px;
+  color: var(--text-secondary);
+  transition: color 0.3s;
+}
+
+.move-modal-content select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: border-color 0.2s, background-color 0.3s, color 0.3s;
+}
+
+.move-modal-content select:focus {
+  outline: none;
+  border-color: var(--highlight-color);
+  box-shadow: 0 0 0 2px rgba(var(--highlight-color-rgb), 0.2);
+}
+
 .folder-name-input {
   width: 100%;
   padding: 10px 12px;
@@ -351,4 +422,65 @@
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* 컨텍스트 메뉴 스타일 */
+.context-menu {
+  background-color: var(--bg-primary);
+  border-radius: 4px;
+  box-shadow: 0 2px 10px var(--shadow-color);
+  width: 180px;
+  z-index: 100;
+  overflow: hidden;
+  transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.context-menu-item {
+  padding: 10px 15px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary);
+  transition: background-color 0.2s, color 0.3s;
+}
+
+.context-menu-item:hover {
+  background-color: var(--item-hover);
+}
+
+.context-menu-item.delete-item {
+  color: #d32f2f;
+}
+
+.context-menu-item.delete-item:hover {
+  background-color: rgba(211, 47, 47, 0.1);
+}
+
+/* 알림 스타일 */
+.notification {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  border-radius: 4px;
+  box-shadow: 0 2px 10px var(--shadow-color);
+  z-index: 1001;
+  font-size: 14px;
+  max-width: 400px;
+  text-align: center;
+  animation: notification-fade-in 0.3s ease-out;
+  transition: background-color 0.3s, color 0.3s, box-shadow 0.3s;
+}
+
+@keyframes notification-fade-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 20px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }

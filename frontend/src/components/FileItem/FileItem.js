@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './FileItem.css';
 
-const FileItem = ({ file, onClick, onDoubleClick, onDelete, onRename }) => {
+const FileItem = ({ file, onClick, onDoubleClick, onDelete, onRename, onMove, isSelected }) => {
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState('');
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -129,10 +129,32 @@ const FileItem = ({ file, onClick, onDoubleClick, onDelete, onRename }) => {
     setShowContextMenu(false);
   };
 
+  // 컨텍스트 메뉴 항목 클릭 핸들러
+  const handleCopyPath = () => {
+    // 파일 경로 복사 (예: 현재 경로 + 파일명)
+    const path = file.path || file.name;
+    navigator.clipboard.writeText(path)
+      .then(() => {
+        console.log('경로가 클립보드에 복사되었습니다:', path);
+      })
+      .catch(err => {
+        console.error('경로 복사 중 오류 발생:', err);
+      });
+    setShowContextMenu(false);
+  };
+  
+  // 이동 처리
+  const handleMove = () => {
+    if (onMove) {
+      onMove(file);
+    }
+    setShowContextMenu(false);
+  };
+
   return (
     <div 
       ref={itemRef}
-      className={`file-item ${file.isDirectory || file.type === 'folder' ? 'directory-item' : ''}`}
+      className={`file-item ${file.isDirectory || file.type === 'folder' ? 'directory-item' : ''} ${isSelected ? 'selected' : ''}`}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
@@ -167,6 +189,12 @@ const FileItem = ({ file, onClick, onDoubleClick, onDelete, onRename }) => {
         >
           <div className="context-menu-item" onClick={handleRenameStart}>
             이름 변경
+          </div>
+          <div className="context-menu-item" onClick={handleCopyPath}>
+            경로 복사
+          </div>
+          <div className="context-menu-item" onClick={handleMove}>
+            이동
           </div>
           <div className="context-menu-item delete-item" onClick={handleDelete}>
             삭제
