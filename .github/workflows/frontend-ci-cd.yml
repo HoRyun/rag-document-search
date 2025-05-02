@@ -3,12 +3,9 @@ name: RAG Document Search Frontend CI/CD Pipeline
 on:
   push:
     branches: [ develop-front ]
-    paths:
-      - 'frontend/**'
+
   pull_request:
     branches: [ main ]
-    paths:
-      - 'frontend/**'
 
 jobs:
   test-frontend:
