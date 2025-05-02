@@ -56,6 +56,12 @@ jobs:
             RDS_PASSWORD=${{ secrets.RDS_PASSWORD }}
             RDS_ENDPOINT=${{ secrets.RDS_ENDPOINT }}
             RDS_DB_NAME=${{ secrets.RDS_DB_NAME }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            LANGCHAIN_API_KEY=${{ secrets.LANGCHAIN_API_KEY }}
+            LANGCHAIN_PROJECT=${{ secrets.LANGCHAIN_PROJECT }}
+            LANGCHAIN_ENDPOINT=${{ secrets.LANGCHAIN_ENDPOINT }}
+            LANGCHAIN_TRACING_V2=${{ secrets.LANGCHAIN_TRACING_V2 }}
+            S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
             DATABASE_URL=postgresql+psycopg://${{ secrets.RDS_USER }}:${{ secrets.RDS_PASSWORD }}@${{ secrets.RDS_ENDPOINT }}:5432/${{ secrets.RDS_DB_NAME }}
 
       - name: Deploy ECS service with new task definition
