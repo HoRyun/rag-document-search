@@ -59,30 +59,17 @@
         && ls -la /usr/local/bin/
     
     # 환경 변수 설정
-    ENV RDS_USER=$RDS_USER \
-        RDS_PASSWORD=$RDS_PASSWORD \
-        RDS_ENDPOINT=$RDS_ENDPOINT \
-        RDS_DB_NAME=$RDS_DB_NAME \
-        OPENAI_API_KEY=$OPENAI_API_KEY \
-        LANGCHAIN_API_KEY=$LANGCHAIN_API_KEY \
-        LANGCHAIN_PROJECT=$LANGCHAIN_PROJECT \
-        LANGCHAIN_ENDPOINT=$LANGCHAIN_ENDPOINT \
-        LANGCHAIN_TRACING_V2=$LANGCHAIN_TRACING_V2 \
-        S3_BUCKET_NAME=$S3_BUCKET_NAME \
-        DATABASE_URL=postgresql+psycopg://$RDS_USER:$RDS_PASSWORD@$RDS_ENDPOINT:5432/$RDS_DB_NAME
-    
-    # 환경 변수를 .env 파일로 생성
-    RUN echo "RDS_USER=${RDS_USER}" > .env && \
-        echo "RDS_PASSWORD=${RDS_PASSWORD}" >> .env && \
-        echo "RDS_ENDPOINT=${RDS_ENDPOINT}" >> .env && \
-        echo "RDS_DB_NAME=${RDS_DB_NAME}" >> .env && \
-        echo "OPENAI_API_KEY=${OPENAI_API_KEY}" >> .env && \
-        echo "LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}" >> .env && \
-        echo "LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT}" >> .env && \
-        echo "LANGCHAIN_ENDPOINT=${LANGCHAIN_ENDPOINT}" >> .env && \
-        echo "LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2}" >> .env && \
-        echo "S3_BUCKET_NAME=${S3_BUCKET_NAME}" >> .env && \
-        echo "DATABASE_URL=${DATABASE_URL}" >> .env
+    ENV RDS_USER=${RDS_USER} \
+        RDS_PASSWORD=${RDS_PASSWORD} \
+        RDS_ENDPOINT=${RDS_ENDPOINT} \
+        RDS_DB_NAME=${RDS_DB_NAME} \
+        OPENAI_API_KEY=${OPENAI_API_KEY} \
+        LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY} \
+        LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT} \
+        LANGCHAIN_ENDPOINT=${LANGCHAIN_ENDPOINT} \
+        LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2} \
+        S3_BUCKET_NAME=${S3_BUCKET_NAME} \
+        DATABASE_URL=postgresql+psycopg://${RDS_USER}:${RDS_PASSWORD}@${RDS_ENDPOINT}:5432/${RDS_DB_NAME}
     
     # 애플리케이션 코드 복사
     COPY . .
