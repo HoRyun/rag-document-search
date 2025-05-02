@@ -32,7 +32,6 @@
     ARG LANGCHAIN_ENDPOINT
     ARG LANGCHAIN_TRACING_V2
     ARG S3_BUCKET_NAME
-    ARG DATABASE_URL
     
     # 런타임 라이브러리 설치
     RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -70,7 +69,7 @@
         LANGCHAIN_ENDPOINT=$LANGCHAIN_ENDPOINT \
         LANGCHAIN_TRACING_V2=$LANGCHAIN_TRACING_V2 \
         S3_BUCKET_NAME=$S3_BUCKET_NAME \
-        DATABASE_URL=$DATABASE_URL
+        DATABASE_URL=postgresql+psycopg://$RDS_USER:$RDS_PASSWORD@$RDS_ENDPOINT:5432/$RDS_DB_NAME
     
     # 환경 변수를 .env 파일로 생성
     RUN echo "RDS_USER=${RDS_USER}" > .env && \
