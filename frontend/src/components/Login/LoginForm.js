@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import axios from "axios";
 import "./LoginForm.css";
 
-// const API_BASE_URL = "http://43.200.3.86:8000/fast_api";
-const API_BASE_URL = "http://localhost:8000/fast_api";
+const API_BASE_URL = "http://13.209.97.6:8000/fast_api";
+//const API_BASE_URL = "http://localhost:8000/fast_api";
 
 const LoginForm = ({ onLoginSuccess, onShowRegister }) => {
   const [username, setUsername] = useState("");

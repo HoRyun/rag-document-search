@@ -10,8 +10,8 @@ import "./App.css";
 import "./Theme.css"; // 테마 CSS 추가
 
 // API 기본 URL 설정
-// const API_BASE_URL = "http://43.200.3.86:8000/fast_api";
-const API_BASE_URL = "http://localhost:8000/fast_api";
+const API_BASE_URL = "http://13.209.97.6:8000/fast_api";
+//const API_BASE_URL = "http://localhost:8000/fast_api";
 
 function App() {
   const [files, setFiles] = useState([]);
