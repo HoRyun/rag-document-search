@@ -2,7 +2,7 @@ name: Backend Deploy to ECS (develop-cloud)
 
 on:
   push:
-    branches: [ develop-cloud ]
+    branches: [ develop-cloud, develop-backend ]
 
 jobs:
   build-and-deploy-backend:
