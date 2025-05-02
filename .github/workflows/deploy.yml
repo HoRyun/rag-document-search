@@ -51,6 +51,12 @@ jobs:
           task-definition: ecs-task-definition.json
           container-name: rag-document-management-backend
           image: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+          environment-variables: |
+            RDS_USER=${{ secrets.RDS_USER }}
+            RDS_PASSWORD=${{ secrets.RDS_PASSWORD }}
+            RDS_ENDPOINT=${{ secrets.RDS_ENDPOINT }}
+            RDS_DB_NAME=${{ secrets.RDS_DB_NAME }}
+            DATABASE_URL=postgresql+psycopg://${{ secrets.RDS_USER }}:${{ secrets.RDS_PASSWORD }}@${{ secrets.RDS_ENDPOINT }}:5432/${{ secrets.RDS_DB_NAME }}
 
       - name: Deploy ECS service with new task definition
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
