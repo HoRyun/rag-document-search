@@ -1,0 +1,123 @@
+name: RAG Document Search Frontend CI/CD Pipeline
+
+on:
+  push:
+    branches: [ develop-front ]
+    paths:
+      - 'frontend/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'frontend/**'
+
+jobs:
+  test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      # 여기에 테스트 코드 추가 가능
+      # - name: Run tests
+      #   run: |
+      #     cd frontend
+      #     npm test
+
+  build-and-deploy:
+    needs: test-frontend
+    if: success() && github.ref == 'refs/heads/develop-front'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+      
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: Deploy to S3
+        run: |
+          aws s3 sync frontend/build/ s3://${{ secrets.AWS_S3_BUCKET }} --delete
+      
+      # CloudFront 캐시 무효화 (CDN을 사용하는 경우)
+      #- name: Invalidate CloudFront cache
+      #  if: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID != '' }}
+      #  run: |
+      #    aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
+
+  build-docker-image:
+    needs: test-frontend
+    if: success() && github.ref == 'refs/heads/develop-front'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Prepare Docker Tags
+        id: prep
+        run: |
+          DOCKER_TAG=$(echo "${{ github.ref_name }}" | sed 's/\//-/g')
+          echo "docker_tag=${DOCKER_TAG}" >> $GITHUB_OUTPUT
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache-frontend
+          key: ${{ runner.os }}-buildx-frontend-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-frontend-
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push image (frontend)
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/rag-document-frontend:${{ github.sha }}
+            ${{ secrets.DOCKER_USERNAME }}/rag-document-frontend:${{ steps.prep.outputs.docker_tag }}
+            ${{ secrets.DOCKER_USERNAME }}/rag-document-frontend:latest
+          cache-from: type=local,src=/tmp/.buildx-cache-frontend
+          cache-to: type=local,dest=/tmp/.buildx-cache-new-frontend,mode=max
+
+      - name: Move cache (frontend)
+        run: |
+          rm -rf /tmp/.buildx-cache-frontend
+          mv /tmp/.buildx-cache-new-frontend /tmp/.buildx-cache-frontend
