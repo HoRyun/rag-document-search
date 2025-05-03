@@ -129,6 +129,7 @@ async def upload_document(
         # 3 & 4. 디렉토리 작업 처리 (생성, 이동, 삭제 등)
         if operations:
             try:
+                # 
                 ops_data: Dict[str, Any] = json.loads(operations)
                 op_results = process_directory_operations(ops_data, current_user.id, db)
                 results["items"].extend(op_results)
@@ -226,6 +227,21 @@ async def process_file_uploads(files, current_upload_path, directory_structure, 
                 # S3 업로드.
                 # 이 부분에서 파일은 한 번 읽힘.
                 s3_key = f"uploads/{current_user.username}/{file_name}"
+                # 업로드 할 파일이 documents 테이블에 이미 존재하는 지 확인
+                    # s3_key로 파일 존재 여부 확인
+                file_info = crud.get_file_info_by_s3_key(db, s3_key)
+                    # 존재할 경우 파일 이름 뒤에 (n)을 붙여서 업로드
+                if file_info:
+                    # 중복 파일명 처리
+                    file_name = generate_unique_filename(db, file_name)
+                    # 파일 경로 업데이트
+                    file_path = current_upload_path+"/"+file_name
+                    # 중복 파일명 처리 후 업로드 경로 재설정
+                    s3_key = f"uploads/{current_user.username}/{file_name}"
+                else:
+                    # 존재하지 않을 경우 계속 진행.
+                    pass
+
                 s3_client.upload_fileobj(
                     Fileobj=files[0].file,
                     Bucket=S3_BUCKET_NAME,
@@ -261,12 +277,12 @@ async def process_file_uploads(files, current_upload_path, directory_structure, 
             #이 파일이 저장될 디렉토리의 id 얻어오는 쿼리문.("A"라는 디렉토리에 파일을 저장해야 한다면 A디렉토리는 파일의 부모 디렉토리가 되므로 A디렉토리의 id를 가져와야 한다.)
             parent_id = crud.get_directory_id_by_path(db, current_upload_path)
             # 단일 파일 업로드 시에는 고유한 아이디 값으로 저장함.
-            id = str(uuid.uuid4())
+            id = document_id
 
             crud.create_directory(
                 db=db,
                 id=id,
-                name=files[0].filename,
+                name=file_name,
                 path=file_path,
                 is_directory=False,
                 parent_id=parent_id,
@@ -292,7 +308,14 @@ async def process_file_uploads(files, current_upload_path, directory_structure, 
         root_name, root_children = next(iter(tree.items()))
         root_id = str(uuid.uuid4())
         # root_path에 root_name 포함 
-        root_path = "/" + root_name
+        # root_path = "/" + root_name
+        root_path = current_upload_path + "/" + root_name
+
+
+        parent_id = crud.get_directory_id_by_path(db, current_upload_path)
+        if parent_id is None:
+            parent_id = None
+
         # DB 저장: 최상위 디렉토리
         # <예외 처리 구역>
         try:
@@ -304,7 +327,7 @@ async def process_file_uploads(files, current_upload_path, directory_structure, 
                 name=root_name,
                 path=root_path,
                 is_directory=True,
-                parent_id=None,
+                parent_id=parent_id,
                 created_at=datetime.now().isoformat()
             )
             results.append({
@@ -376,18 +399,21 @@ async def process_file_uploads(files, current_upload_path, directory_structure, 
 
                 # 파일 명에서 디렉토리 부분 추출
                 # <로직>
+                # add prefix.
+                added_current_upload_path_to_filename = current_upload_path + "/" + upload_file.filename
                 # 경로에서 파일명 제거 후 디렉토리 부분 추출
-                dir_part = os.path.dirname(upload_file.filename)
+                dir_part = os.path.dirname(added_current_upload_path_to_filename)
                 
                 # 맨 앞에 '/' 추가 (os.path.dirname 결과가 '.'인 경우 처리)
-                dir_part_exclution_filename = '/' + dir_part if dir_part != '.' else '/'                              
+                dir_part_exclution_filename = dir_part if dir_part != '.' else '/'                              
                 # </로직>
 
                 # T : 현재 저장할 파일이 현재 디렉토리에 존재하는 게 맞다.
                 # F : 현재 저장할 파일이 현재 디렉토리에 존재하는 게 아니다.
                 if current_dir_path == dir_part_exclution_filename:
                     # file_id = str(uuid.uuid4())
-                    file_path= "/"+upload_file.filename
+                    # file_path= "/"+upload_file.filename
+                    file_path= current_dir_path + "/" + os.path.basename(upload_file.filename)
 
                     # file_path에서 파일 명만 추출.
                     file_name = os.path.basename(file_path)
@@ -401,8 +427,23 @@ async def process_file_uploads(files, current_upload_path, directory_structure, 
                             file_content = await upload_file.read()
                             # </파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
 
-                            # S3 업로드 (BytesIO 없이 UploadFile.file 직접 사용)
                             s3_key = f"uploads/{current_user.username}/{file_name}"
+                            # 업로드 할 파일이 documents 테이블에 이미 존재하는 지 확인
+                                # s3_key로 파일 존재 여부 확인
+                            file_info = crud.get_file_info_by_s3_key(db, s3_key)
+                                # 존재할 경우 파일 이름 뒤에 (n)을 붙여서 업로드
+                            if file_info:
+                                # 중복 파일명 처리
+                                file_name = generate_unique_filename(db, file_name)
+                                # 파일 경로 업데이트
+                                file_path = current_dir_path+"/"+file_name
+                                # 중복 파일명 처리 후 업로드 경로 재설정
+                                s3_key = f"uploads/{current_user.username}/{file_name}"
+                            else:
+                                # 존재하지 않을 경우 계속 진행.
+                                pass
+
+                            # S3 업로드 (BytesIO 없이 UploadFile.file 직접 사용)
                             s3_client.upload_fileobj(
                                 Fileobj=upload_file.file,
                                 Bucket=S3_BUCKET_NAME,
@@ -482,7 +523,7 @@ def process_directory_operations(operations, user_id, db):
     
     for op in operations:
         op_type = op.get("operation_type")
-        
+        reserved_item_id = op.get("item_id", None)
         reserved_path = op.get("path", "/")
 
         try:
@@ -559,9 +600,10 @@ def process_directory_operations(operations, user_id, db):
             
             # 항목 삭제
             # elif op_type == "delete":
-            #     item_id = op.get("item_id")
                 
-            #     if item_id in filesystem:
+            #     # id로 
+
+            #     if reserved_item_id in filesystem:
             #         # 디렉토리인 경우
             #         item = filesystem[item_id]
             #         del filesystem[item_id]
@@ -668,3 +710,35 @@ def get_file_type(filename):
         return "folder"
     
     return "blank"
+
+
+
+def generate_unique_filename(db: Session, file_name: str) -> str:
+    """
+    DB에 없는 고유한 파일명을 돌려줍니다.
+
+    Parameters
+    ----------
+    db : Session
+        SQLAlchemy 세션
+    file_name : str
+        저장하려는 원본 파일 이름 (예: 'report.pdf', 'report(2).pdf')
+
+    Returns
+    -------
+    str
+        DB에 존재하지 않는 새 파일 이름
+    """
+    import re
+    from db import crud
+    # 기본 이름·확장자·초기 번호 추출
+    m = re.match(r'^(.*?)(?:\((\d+)\))?(\.[^.]+)$', file_name)
+    base, num_str, ext = m.group(1), m.group(2), m.group(3)
+    next_n = int(num_str) + 1 if num_str else 1
+
+    candidate = file_name  # 우선 그대로 시도
+    while crud.get_file_info_by_filename(db, candidate):
+        candidate = f"{base}({next_n}){ext}"
+        next_n += 1
+
+    return candidate

@@ -76,3 +76,20 @@ def get_directory_id_by_path(db: Session, path: str):
     result = db.execute(stmt)
     return result.scalar()
 
+# 특정 파일의 경로에 존재하는 부모 디렉토리의 아이디를 가져오는 함수
+def get_parent_id_by_path(db: Session, path: str):
+    stmt = select(models.Directory.parent_id).where(models.Directory.path == path)
+    result = db.execute(stmt)
+    return result.scalar()
+
+# s3_key로 파일 존재 여부 확인
+def get_file_info_by_s3_key(db: Session, s3_key: str):
+    return db.query(models.Document).filter(models.Document.s3_key == s3_key).first()
+
+# 동일한 파일 이름이 존재하는 지 확인
+def get_file_info_by_filename(db: Session, filename: str):
+    return db.query(models.Document).filter(models.Document.filename == filename).first()
+
+
+
+
