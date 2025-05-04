@@ -1,0 +1,45 @@
+:root {
+    /* 라이트 모드 변수 */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f5f5f5;
+    --bg-tertiary: #f9f9f9;
+    --text-primary: #333333;
+    --text-secondary: #666666;
+    --text-tertiary: #999999;
+    --border-color: #dddddd;
+    --highlight-color: #4285f4;
+    --highlight-color-rgb: 66, 133, 244;
+    --highlight-hover: #3367d6;
+    --item-hover: #f5f5f5;
+    --folder-color: #ffd04c;
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --folder-bg: rgba(255, 208, 76, 0.05);
+    --folder-hover: rgba(255, 208, 76, 0.1);
+    --scrollbar-track: #f1f1f1;
+    --scrollbar-thumb: #888888;
+    --scrollbar-thumb-hover: #666666;
+    --modal-overlay: rgba(0, 0, 0, 0.5);
+  }
+  
+  /* 다크 모드 변수 */
+  [data-theme="dark"] {
+    --bg-primary: #1e1e1e;
+    --bg-secondary: #2d2d2d;
+    --bg-tertiary: #252525;
+    --text-primary: #e0e0e0;
+    --text-secondary: #b0b0b0;
+    --text-tertiary: #808080;
+    --border-color: #444444;
+    --highlight-color: #5c9eff;
+    --highlight-color-rgb: 92, 158, 255;
+    --highlight-hover: #4285f4;
+    --item-hover: #333333;
+    --folder-color: #ffc107;
+    --shadow-color: rgba(0, 0, 0, 0.3);
+    --folder-bg: rgba(255, 193, 7, 0.05);
+    --folder-hover: rgba(255, 193, 7, 0.1);
+    --scrollbar-track: #2d2d2d;
+    --scrollbar-thumb: #555555;
+    --scrollbar-thumb-hover: #777777;
+    --modal-overlay: rgba(0, 0, 0, 0.7);
+  }

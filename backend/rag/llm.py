@@ -16,7 +16,13 @@ def format_docs(docs):
     """
     if not docs:
         return "관련 문서를 찾을 수 없습니다."
-    return "\n\n".join(doc.page_content for doc in docs)
+    
+    formatted_docs = []
+    for doc in docs:
+        content = f"<The name of this document:{doc.metadata['document_name']}> <The path of this document>{doc.metadata['document_path']}</The path of this document> {doc.page_content} </The name of this document:{doc.metadata['document_name']}>"
+        formatted_docs.append(content)
+    
+    return "\n\n".join(formatted_docs)
 
 
 
@@ -30,8 +36,10 @@ def get_llms_answer(docs: list[Document], query: str) -> str:
         """
         You are an assistant for question-answering tasks. 
         Use the following pieces of retrieved context to answer the question. 
-        If you don't know the answer, just say that you don't know. 
+        If you don't know the answer, just say that you don't know.
+        Please provide the user with the file path information corresponding to the file they are requesting. Write the information after inserting one line break.
         Answer in Korean.
+
     <Question> {question} </Question>
     <Context> {context} </Context>
     Answer:
