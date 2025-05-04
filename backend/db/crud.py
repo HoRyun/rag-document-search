@@ -88,6 +88,7 @@ def get_file_info_by_s3_key(db: Session, s3_key: str):
 
 # 동일한 파일 이름이 존재하는 지 확인
 def get_file_info_by_filename(db: Session, filename: str):
+    """Documents 테이블에 동일한 이름의 파일이 있는지 확인한다."""
     return db.query(models.Document).filter(models.Document.filename == filename).first()
 
 def delete_document_by_id(db: Session, document_id: int):
@@ -122,4 +123,11 @@ def get_file_path_by_id(db: Session, document_id: int):
 
 def get_file_name_by_id(db: Session, document_id: int):
     return db.query(models.Directory).filter(models.Directory.id == str(document_id)).first().name
+
+
+
+
+
+
+
 
