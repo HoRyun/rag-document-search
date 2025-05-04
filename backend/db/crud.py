@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from . import models
 from datetime import datetime
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete, text
 
 # 사용자 관련 CRUD
 def create_user(db: Session, username: str, email: str, password_hash: str):
@@ -90,6 +90,36 @@ def get_file_info_by_s3_key(db: Session, s3_key: str):
 def get_file_info_by_filename(db: Session, filename: str):
     return db.query(models.Document).filter(models.Document.filename == filename).first()
 
+def delete_document_by_id(db: Session, document_id: int):
+    try:
+        # 개별 DELETE 문을 실행
+        db.execute(
+            text("DELETE FROM document_chunks WHERE document_id = :doc_id"),
+            {"doc_id": document_id}
+        )
+        
+        db.execute(
+            text("DELETE FROM documents WHERE id = :doc_id"),
+            {"doc_id": document_id}
+        )
+        
+        db.execute(
+            text("DELETE FROM directories WHERE id = CAST(:doc_id AS TEXT)"),
+            {"doc_id": document_id}
+        )
+        
+        db.commit()
+        return True
+    except Exception as e:
+        db.rollback()
+        raise e
 
+def get_s3_key_by_id(db: Session, document_id: int):
+    return db.query(models.Document).filter(models.Document.id == document_id).first().s3_key
 
+def get_file_path_by_id(db: Session, document_id: int):
+    return db.query(models.Directory).filter(models.Directory.id == str(document_id)).first().path
+
+def get_file_name_by_id(db: Session, document_id: int):
+    return db.query(models.Directory).filter(models.Directory.id == str(document_id)).first().name
 

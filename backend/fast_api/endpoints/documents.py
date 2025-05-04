@@ -96,7 +96,7 @@ def list_items(
 @router.post("/manage")
 async def upload_document(
     files: List[UploadFile] = File(None), # None을 ... 으로 변경
-    path: str = Form(None),
+    path: str = Form('/'),
     directory_structure: str = Form(None),
     operations: str = Form(None),
     current_user: User = Depends(get_current_user),
@@ -111,6 +111,7 @@ async def upload_document(
     # if operations == '':
     #     operations = None
     
+    # path는 사용자가 유저 인터페이스 창에서 선택한 경로이다.
     current_upload_path = path
 
     try:
@@ -195,8 +196,8 @@ async def query_document(query: str = Form(...)):
     return {"answer": answer} 
 
 
-# 유틸 함수
 
+# 유틸 함수
 async def process_file_uploads(files, current_upload_path, directory_structure, current_user, db):
     """파일 업로드 처리 (디렉토리 구조 포함/미포함)"""
     import json
@@ -214,7 +215,10 @@ async def process_file_uploads(files, current_upload_path, directory_structure, 
             try:
                 # 파일 이름과 파일 경로를 미리 준비해서 전달하기.
                 file_name = files[0].filename
-                file_path = current_upload_path+"/"+file_name
+                if current_upload_path == '/':
+                    file_path = current_upload_path+file_name
+                else:
+                    file_path = current_upload_path+"/"+file_name
 
 
                 # <파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
@@ -308,8 +312,10 @@ async def process_file_uploads(files, current_upload_path, directory_structure, 
         root_name, root_children = next(iter(tree.items()))
         root_id = str(uuid.uuid4())
         # root_path에 root_name 포함 
-        # root_path = "/" + root_name
-        root_path = current_upload_path + "/" + root_name
+        if current_upload_path == '/':
+            root_path = current_upload_path+root_name
+        else:
+            root_path = current_upload_path+"/"+root_name
 
 
         parent_id = crud.get_directory_id_by_path(db, current_upload_path)
@@ -400,7 +406,7 @@ async def process_file_uploads(files, current_upload_path, directory_structure, 
                 # 파일 명에서 디렉토리 부분 추출
                 # <로직>
                 # add prefix.
-                added_current_upload_path_to_filename = current_upload_path + "/" + upload_file.filename
+                added_current_upload_path_to_filename = current_dir_path + "/" + upload_file.filename
                 # 경로에서 파일명 제거 후 디렉토리 부분 추출
                 dir_part = os.path.dirname(added_current_upload_path_to_filename)
                 
@@ -599,35 +605,30 @@ def process_directory_operations(operations, user_id, db):
             #         })
             
             # 항목 삭제
-            # elif op_type == "delete":
+            elif op_type == "delete":
                 
-            #     # id로 
+                file_id = int(reserved_item_id)
+                file_name = crud.get_file_name_by_id(db, file_id)
+                file_path = crud.get_file_path_by_id(db, file_id)
 
-            #     if reserved_item_id in filesystem:
-            #         # 디렉토리인 경우
-            #         item = filesystem[item_id]
-            #         del filesystem[item_id]
-                    
-            #         # TODO: 실제 구현에서는 DB에서 항목 삭제
-                    
-            #         results.append({
-            #             "operation": "delete",
-            #             "type": "directory" if item["is_directory"] else "file",
-            #             "id": item_id,
-            #             "name": item["name"],
-            #             "path": item["path"],
-            #             "status": "success"
-            #         })
-            #     else:
-            #         # TODO: 파일인 경우 DB에서 삭제
-                    
-            #         results.append({
-            #             "operation": "delete",
-            #             "id": item_id,
-            #             "status": "not_found",
-            #             "error": "Item not found"
-            #         })
-            
+                # s3에서 삭제
+                    # 삭제를 위해 s3_key값을 검색해서 가져오기
+                s3_key = crud.get_s3_key_by_id(db, file_id)
+                    # s3에서 삭제
+                s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=s3_key)
+
+                # documents 테이블에서 해당 id의 데이터를 삭제하면서 document_chunks, directories 테이블에서 데이터 삭제.
+                crud.delete_document_by_id(db, file_id)
+
+                results.append({
+                    "operation": "delete",
+                    "type": "file",
+                    "id": file_id,
+                    "name": file_name,
+                    "path": file_path,
+                    "status": "success"
+                })
+
             # 항목 이름 변경
             # elif op_type == "rename":
             #     item_id = op.get("item_id")
