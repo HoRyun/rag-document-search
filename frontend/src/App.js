@@ -7,10 +7,11 @@ import Chatbot from "./components/Chatbot/Chatbot";
 import LoginForm from "./components/Login/LoginForm";
 import RegisterForm from "./components/Login/RegisterForm";
 import "./App.css";
+import "./Theme.css"; // 테마 CSS 추가
 
 // API 기본 URL 설정
-// const API_BASE_URL = "http://43.200.3.86:8000/fast_api";
-const API_BASE_URL = "http://localhost:8000/fast_api";
+const API_BASE_URL = "http://13.209.97.6:8000/fast_api";
+//const API_BASE_URL = "http://localhost:8000/fast_api";
 
 function App() {
   const [files, setFiles] = useState([]);
@@ -30,6 +31,40 @@ function App() {
 
   // 로딩 상태
   const [isLoading, setIsLoading] = useState(false);
+
+  // 테마 상태 (다크 모드)
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // 컴포넌트 마운트 시 로그인 상태 확인 및 테마 설정 불러오기
+  useEffect(() => {
+    // 토큰이 있으면 사용자 정보 가져오기
+    const token = localStorage.getItem("token");
+    if (token) {
+      fetchUserInfo(token);
+    }
+    
+    // 저장된 테마 설정 불러오기
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme === "dark") {
+      setIsDarkMode(true);
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  }, []);
+
+  // 테마 토글 핸들러
+  const toggleTheme = () => {
+    const newTheme = !isDarkMode;
+    setIsDarkMode(newTheme);
+    
+    // 문서 루트에 테마 속성 설정
+    document.documentElement.setAttribute(
+      "data-theme", 
+      newTheme ? "dark" : "light"
+    );
+    
+    // 테마 설정 저장
+    localStorage.setItem("theme", newTheme ? "dark" : "light");
+  };
 
   // 컴포넌트 마운트 시 로그인 상태 확인
   useEffect(() => {
@@ -476,11 +511,16 @@ function App() {
     }
   };
 
-  // 파일/폴더 이동 처리
+  // 파일/폴더 이동 처리 개선
   const handleMoveItem = async (itemId, newPath) => {
     try {
       setIsLoading(true);
       const token = localStorage.getItem("token");
+
+      // 디버깅 정보 로깅
+      console.log(`===== 파일/폴더 이동 디버깅 정보 =====`);
+      console.log(`항목 ID: ${itemId}`);
+      console.log(`새 경로: ${newPath}`);
 
       // 이동 작업 정의
       const operations = [
@@ -495,67 +535,62 @@ function App() {
       const formData = new FormData();
       formData.append("operations", JSON.stringify(operations));
 
+      console.log("API 요청 URL:", `${API_BASE_URL}/documents/manage`);
+      console.log("요청 데이터:", JSON.stringify(operations));
+
       // API 호출
-      await axios.post(`${API_BASE_URL}/documents/manage`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await axios.post(
+        `${API_BASE_URL}/documents/manage`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      console.log(`API 응답:`, response.data);
+      console.log(`===== 파일/폴더 이동 디버깅 정보 종료 =====`);
 
       // 성공 시 문서 목록 새로고침
       fetchDocuments();
       // 디렉토리 구조도 새로고침
       fetchDirectories();
+      
+      return response.data;
     } catch (error) {
       console.error("Error moving item:", error);
+      
+      // 오류 상세 정보 로깅
+      console.log(`===== 파일/폴더 이동 오류 정보 =====`);
+      if (error.response) {
+        console.log(`서버 응답 상태: ${error.response.status}`);
+        console.log(`서버 응답 데이터:`, error.response.data);
+      } else if (error.request) {
+        console.log(`요청 정보 (응답 없음):`, error.request);
+      } else {
+        console.log(`오류 메시지: ${error.message}`);
+      }
+      console.log(`오류 설정:`, error.config);
+      console.log(`===== 파일/폴더 이동 오류 정보 종료 =====`);
+      
       alert("항목 이동 중 오류가 발생했습니다.");
+      throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 파일/폴더 삭제 처리
-  const handleDeleteItem = async (itemId) => {
-    try {
-      setIsLoading(true);
-      const token = localStorage.getItem("token");
-
-      // 삭제 작업 정의
-      const operations = [
-        {
-          operation_type: "delete",
-          item_id: itemId,
-        },
-      ];
-
-      // FormData 생성
-      const formData = new FormData();
-      formData.append("operations", JSON.stringify(operations));
-
-      // API 호출
-      await axios.post(`${API_BASE_URL}/documents/manage`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      // 성공 시 문서 목록 새로고침
-      fetchDocuments();
-      // 디렉토리 구조도 새로고침
-      fetchDirectories();
-    } catch (error) {
-      console.error("Error deleting item:", error);
-      alert("항목 삭제 중 오류가 발생했습니다.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // 파일/폴더 이름 변경 처리
+  // 파일/폴더 이름 변경 처리 개선
   const handleRenameItem = async (itemId, newName) => {
     try {
       setIsLoading(true);
       const token = localStorage.getItem("token");
+
+      // 디버깅 정보 로깅
+      console.log(`===== 파일/폴더 이름 변경 디버깅 정보 =====`);
+      console.log(`항목 ID: ${itemId}`);
+      console.log(`새 이름: ${newName}`);
 
       // 이름 변경 작업 정의
       const operations = [
@@ -570,20 +605,115 @@ function App() {
       const formData = new FormData();
       formData.append("operations", JSON.stringify(operations));
 
+      console.log("API 요청 URL:", `${API_BASE_URL}/documents/manage`);
+      console.log("요청 데이터:", JSON.stringify(operations));
+
       // API 호출
-      await axios.post(`${API_BASE_URL}/documents/manage`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await axios.post(
+        `${API_BASE_URL}/documents/manage`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      console.log(`API 응답:`, response.data);
+      console.log(`===== 파일/폴더 이름 변경 디버깅 정보 종료 =====`);
 
       // 성공 시 문서 목록 새로고침
       fetchDocuments();
       // 디렉토리 구조도 새로고침
       fetchDirectories();
+      
+      return response.data;
     } catch (error) {
       console.error("Error renaming item:", error);
+      
+      // 오류 상세 정보 로깅
+      console.log(`===== 파일/폴더 이름 변경 오류 정보 =====`);
+      if (error.response) {
+        console.log(`서버 응답 상태: ${error.response.status}`);
+        console.log(`서버 응답 데이터:`, error.response.data);
+      } else if (error.request) {
+        console.log(`요청 정보 (응답 없음):`, error.request);
+      } else {
+        console.log(`오류 메시지: ${error.message}`);
+      }
+      console.log(`오류 설정:`, error.config);
+      console.log(`===== 파일/폴더 이름 변경 오류 정보 종료 =====`);
+      
       alert("이름 변경 중 오류가 발생했습니다.");
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 파일/폴더 삭제 처리 개선
+  const handleDeleteItem = async (itemId) => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem("token");
+
+      // 디버깅 정보 로깅
+      console.log(`===== 파일/폴더 삭제 디버깅 정보 =====`);
+      console.log(`항목 ID: ${itemId}`);
+
+      // 삭제 작업 정의
+      const operations = [
+        {
+          operation_type: "delete",
+          item_id: itemId,
+        },
+      ];
+
+      // FormData 생성
+      const formData = new FormData();
+      formData.append("operations", JSON.stringify(operations));
+
+      console.log("API 요청 URL:", `${API_BASE_URL}/documents/manage`);
+      console.log("요청 데이터:", JSON.stringify(operations));
+
+      // API 호출
+      const response = await axios.post(
+        `${API_BASE_URL}/documents/manage`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      console.log(`API 응답:`, response.data);
+      console.log(`===== 파일/폴더 삭제 디버깅 정보 종료 =====`);
+
+      // 성공 시 문서 목록 새로고침
+      fetchDocuments();
+      // 디렉토리 구조도 새로고침
+      fetchDirectories();
+      
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      
+      // 오류 상세 정보 로깅
+      console.log(`===== 파일/폴더 삭제 오류 정보 =====`);
+      if (error.response) {
+        console.log(`서버 응답 상태: ${error.response.status}`);
+        console.log(`서버 응답 데이터:`, error.response.data);
+      } else if (error.request) {
+        console.log(`요청 정보 (응답 없음):`, error.request);
+      } else {
+        console.log(`오류 메시지: ${error.message}`);
+      }
+      console.log(`오류 설정:`, error.config);
+      console.log(`===== 파일/폴더 삭제 오류 정보 종료 =====`);
+      
+      alert("항목 삭제 중 오류가 발생했습니다.");
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -628,7 +758,7 @@ function App() {
     }
   };
 
-  // 로그인 성공 핸들러
+// 로그인 성공 핸들러
   const handleLoginSuccess = () => {
     const token = localStorage.getItem("token");
     fetchUserInfo(token);
@@ -682,7 +812,7 @@ function App() {
 
   return (
     <div className="app">
-      <Header onLogout={handleLogout} username={user?.username} />
+      <Header onLogout={handleLogout} username={user?.username} isDarkMode={isDarkMode} toggleTheme={toggleTheme}/>
       <div className="main-container">
         <Sidebar
           directories={directories}
@@ -692,6 +822,7 @@ function App() {
         />
         <FileDisplay
           files={files}
+          directories={directories}
           currentPath={currentPath}
           onAddFile={handleAddFile}
           onCreateFolder={handleCreateFolder}
