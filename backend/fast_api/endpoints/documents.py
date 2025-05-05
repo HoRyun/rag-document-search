@@ -79,6 +79,7 @@ def list_items(
                 WHERE path LIKE :selected_path || '/%' 
                 AND path NOT LIKE :selected_path || '/%/%' 
                 AND is_directory = TRUE
+                AND id <> 'root'
             """)
             dir_result = connection.execute(dir_query, {"selected_path": selected_path}).mappings().fetchall()
         # </db에서 디렉토리 정보와 파일 정보 가져오기>
@@ -122,20 +123,22 @@ async def upload_document(
         }
 
         # 1 & 2. 파일 업로드 처리 (디렉토리 구조 포함 또는 단일 파일)
-        # 단일 파일인 경우
-        if os.path.dirname(files[0].filename) == "":
-            # 파일 업로드 처리
-            file_results = await process_file_uploads(files, current_upload_path, current_user, db)
-            results["items"].extend(file_results)
-        else:
-            # 디렉토리 업로드인 경우
-            # 디렉토리 업로드 처리
-            directory_results = await process_directory_uploads(current_upload_path, directory_structure, db)
-            results["items"].extend(directory_results)
+        # 파일이 존재하는 경우에 아래 코드 실행. (operations작업과 구분.)
+        if files:
+            # 단일 파일인 경우
+            if os.path.dirname(files[0].filename) == "":
+                # 파일 업로드 처리
+                file_results = await process_file_uploads(files, current_upload_path, current_user, db)
+                results["items"].extend(file_results)
+            else:
+                # 디렉토리 업로드인 경우
+                # 디렉토리 업로드 처리
+                directory_results = await process_directory_uploads(current_upload_path, directory_structure, db)
+                results["items"].extend(directory_results)
 
-            # 파일 업로드 처리
-            file_results = await process_file_uploads(files, current_upload_path, current_user, db)
-            results["items"].extend(file_results)
+                # 파일 업로드 처리
+                file_results = await process_file_uploads(files, current_upload_path, current_user, db)
+                results["items"].extend(file_results)
         
         # 3 & 4. 디렉토리 작업 처리 (생성, 이동, 삭제 등)
         if operations:
@@ -160,6 +163,7 @@ async def get_filesystem_structure(
     """
     전체 파일 시스템 구조 반환
     """
+    # get_filesystem_structure 엔드포인트와 "/"엔드포인트가 프론트엔드 입장에서 어떤 차이를 가지는지 알아보기.
     from db import crud
     try:
         # 디렉토리만 필터링. 디렉토리 구조만 보내면 됨.
@@ -167,20 +171,17 @@ async def get_filesystem_structure(
 
         # <로직>
         # 1) 최상위 디렉토리 이름(root) 찾기
-        root = next((d['name'] for d in directories if d['parent_id'] == None), None)
+        root = next((d['name'] for d in directories if d['parent_id'] == "root"), None)
         if not root:
-            raise ValueError("최상위 디렉토리(parent_id='None')를 찾을 수 없습니다.")
+            raise ValueError("최상위 디렉토리(parent_id='root')를 찾을 수 없습니다.")
 
         # 2) 새 리스트에 수정된 객체 생성
         your_result = []
         for d in directories:
-            # # 앞뒤 슬래시 제거 후 분할
-            # parts = d['path'].strip('/').split('/')
-            # # 최상위 디렉토리 이름이 맨 앞에 있으면 제거
-            # if parts and parts[0] == root:
-            #     parts = parts[1:]
-            # # 남은 부분으로 새 경로 구성 (없으면 루트 '/')
-            # new_path = '/' + '/'.join(parts) if parts else '/'
+            # 루트 디렉토리는 제외.( 루트 디렉토리는 프론트엔드에서 처리해준다.)
+            # db입장에서 필요한 데이터이지만 프론트 엔드로 해당 정보를 보낼 시 이미 프론트엔드에서 처리하기 때문에 충돌이 발생하여 버그가 발생함.
+            if d['id'] == "root":
+                continue
             your_result.append({
                 'id':   d['id'],
                 'name': d['name'],
@@ -403,27 +404,46 @@ def process_directory_operations(operations, user_id, db):
             # 항목 삭제
             elif op_type == "delete":
                 
-                file_id = int(reserved_item_id)
-                file_name = crud.get_file_name_by_id(db, file_id)
-                file_path = crud.get_file_path_by_id(db, file_id)
+                item_is_directory = crud.get_file_is_directory_by_id(db, reserved_item_id)
 
-                # s3에서 삭제
-                    # 삭제를 위해 s3_key값을 검색해서 가져오기
-                s3_key = crud.get_s3_key_by_id(db, file_id)
+                if item_is_directory:
+                    # 디렉토리인 경우
+                    item_id = reserved_item_id
+                    # 디렉토리 삭제
+                    crud.delete_directory_by_id(db, item_id)
+
+                    results.append({
+                        "operation": "delete",
+                        "type": "directory",
+                        "id": item_id,
+                        "name": item_name,
+                        "path": item_path,
+                        "status": "success"
+                    })
+                else:
+                    # 파일인 경우
+                    item_id = int(reserved_item_id)
+                    item_name = crud.get_file_name_by_id(db, item_id)
+                    item_path = crud.get_file_path_by_id(db, item_id)                    
                     # s3에서 삭제
-                s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=s3_key)
+                        # 삭제를 위해 s3_key값을 검색해서 가져오기
+                    s3_key = crud.get_s3_key_by_id(db, item_id)
+                        # s3에서 삭제
+                    s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=s3_key)
 
-                # documents 테이블에서 해당 id의 데이터를 삭제하면서 document_chunks, directories 테이블에서 데이터 삭제.
-                crud.delete_document_by_id(db, file_id)
+                    # documents 테이블에서 해당 id의 데이터를 삭제하면서 document_chunks, directories 테이블에서 데이터 삭제.
+                    crud.delete_document_by_id(db, item_id)
 
-                results.append({
-                    "operation": "delete",
-                    "type": "file",
-                    "id": file_id,
-                    "name": file_name,
-                    "path": file_path,
-                    "status": "success"
-                })
+                    results.append({
+                        "operation": "delete",
+                        "type": "file",
+                        "id": item_id,
+                        "name": item_name,
+                        "path": item_path,
+                        "status": "success"
+                    })
+
+
 
             # 항목 이름 변경
             # elif op_type == "rename":
@@ -561,7 +581,9 @@ def process_top_directory(tree, current_upload_path: str, db: Session):
     parent_id = crud.get_directory_id_by_path(db, current_upload_path)
 
     if parent_id is None:
-        parent_id = None
+        # 루트 위치에 업로드 하는 경우
+        # 부모 아이디를 "root"로 설정.
+        parent_id = "root"
 
 
     top_dir_results = {

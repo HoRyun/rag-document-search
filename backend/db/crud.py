@@ -91,6 +91,13 @@ def get_file_info_by_filename(db: Session, filename: str):
     """Documents 테이블에 동일한 이름의 파일이 있는지 확인한다."""
     return db.query(models.Document).filter(models.Document.filename == filename).first()
 
+def delete_directory_by_id(db: Session, directory_id: str):
+    db.execute(
+        text("DELETE FROM directories WHERE id = :dir_id"),
+        {"dir_id": directory_id}
+    )
+    db.commit()
+
 def delete_document_by_id(db: Session, document_id: int):
     try:
         # 개별 DELETE 문을 실행
@@ -123,6 +130,9 @@ def get_file_path_by_id(db: Session, document_id: int):
 
 def get_file_name_by_id(db: Session, document_id: int):
     return db.query(models.Directory).filter(models.Directory.id == str(document_id)).first().name
+
+def get_file_is_directory_by_id(db: Session, document_id: str):
+    return db.query(models.Directory).filter(models.Directory.id == document_id).first().is_directory
 
 
 
