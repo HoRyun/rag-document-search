@@ -4,11 +4,15 @@ uploads/
 ollama/*
 ollama/
 
-#배포 파일
+
+#aws
+aws/
+
+#deploy
 package/
 
-#aws 파일
-aws/
+#zip
+*.zip
 
 #cursor 파일
 .cursor/*

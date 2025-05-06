@@ -4,18 +4,19 @@
   right: 20px;
   width: 120px;
   height: 40px;
-  background-color: #4285f4;
-  color: #fff;
+  background-color: var(--highlight-color);
+  color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   font-size: 16px;
   z-index: 1000;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 10px var(--shadow-color);
+  transition: background-color 0.3s, box-shadow 0.3s;
 }
 
 .chatbot-toggle:hover {
-  background-color: #3367d6;
+  background-color: var(--highlight-hover);
 }
 
 .chatbot-container {
@@ -24,14 +25,14 @@
   right: 20px;
   width: 400px;
   height: 500px;
-  background-color: #fff;
+  background-color: var(--bg-primary);
   border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 10px var(--shadow-color);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   z-index: 1000;
-  transition: transform 0.3s ease, opacity 0.3s ease;
+  transition: transform 0.3s ease, opacity 0.3s ease, background-color 0.3s, box-shadow 0.3s;
 }
 
 .chatbot-container.open {
@@ -44,8 +45,9 @@
   justify-content: space-between;
   align-items: center;
   padding: 15px;
-  background-color: #4285f4;
-  color: #fff;
+  background-color: var(--highlight-color);
+  color: white;
+  transition: background-color 0.3s;
 }
 
 .chatbot-header h3 {
@@ -56,7 +58,7 @@
 .close-btn {
   background: none;
   border: none;
-  color: #fff;
+  color: white;
   font-size: 24px;
   cursor: pointer;
 }
@@ -67,7 +69,8 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  background-color: #f9f9f9;
+  background-color: var(--bg-secondary);
+  transition: background-color 0.3s;
 }
 
 .message {
@@ -76,26 +79,27 @@
   border-radius: 18px;
   margin-bottom: 10px;
   word-wrap: break-word;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 2px var(--shadow-color);
+  transition: background-color 0.3s, color 0.3s, box-shadow 0.3s;
 }
 
 .message.bot {
   align-self: flex-start;
-  background-color: #fff;
-  color: #333;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   border-bottom-left-radius: 4px;
 }
 
 .message.user {
   align-self: flex-end;
-  background-color: #4285f4;
-  color: #fff;
+  background-color: var(--highlight-color);
+  color: white;
   border-bottom-right-radius: 4px;
 }
 
 .message.typing {
-  background-color: #f0f0f0;
-  color: #666;
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
   font-style: italic;
 }
 
@@ -116,28 +120,32 @@
 .chatbot-input {
   display: flex;
   padding: 10px;
-  border-top: 1px solid #eee;
-  background-color: #fff;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--bg-primary);
+  transition: background-color 0.3s, border-color 0.3s;
 }
 
 .chatbot-input input {
   flex: 1;
   padding: 10px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-color);
   border-radius: 20px;
   font-size: 14px;
   margin-right: 10px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s, color 0.3s, border-color 0.3s;
 }
 
 .chatbot-input input:focus {
   outline: none;
-  border-color: #4285f4;
+  border-color: var(--highlight-color);
 }
 
 .chatbot-input button {
   padding: 10px 15px;
-  background-color: #4285f4;
-  color: #fff;
+  background-color: var(--highlight-color);
+  color: white;
   border: none;
   border-radius: 20px;
   cursor: pointer;
@@ -146,11 +154,11 @@
 }
 
 .chatbot-input button:hover {
-  background-color: #3367d6;
+  background-color: var(--highlight-hover);
 }
 
 .chatbot-input button:disabled {
-  background-color: #a0c4ff;
+  background-color: rgba(var(--highlight-color-rgb), 0.5);
   cursor: not-allowed;
 }
 
