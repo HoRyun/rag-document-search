@@ -327,79 +327,187 @@ def process_directory_operations(operations, user_id, db):
     for op in operations:
         op_type = op.get("operation_type")
         reserved_item_id = op.get("item_id", None)
+        reserved_item_name = op.get("name", None)
         reserved_path = op.get("path", "/")
+        if op.get("path", "/") == "":
+            reserved_path = "/"
 
         try:
             # 새 폴더 생성
             if op_type == "create":
-                dir_id = str(uuid.uuid4())
-                path = op.get("path", "/")
-                name = op.get("name")
+                new_folder_id = str(uuid.uuid4())
                 
                 # 경로 정규화
-                if not path.endswith("/"):
-                    path += "/"
+                if not reserved_path.endswith("/"):
+                    reserved_path += "/"
                     
-                new_path = path + name
+                new_path = reserved_path + reserved_item_name
                 
-                # 부모 디렉토리 id 가져오는 코드.
-                parent_id = crud.get_parent_id_by_path(db,reserved_path)
-                
-                # 디렉토리 정보 저장
-                crud.create_directory(
-                    db=db,
-                    id=dir_id,
-                    name=name,
-                    path=new_path,
-                    is_directory=True,
-                    parent_id=parent_id,
-                    created_at=datetime.now().isoformat()
-                )
-                
-                results.append({
-                    "operation": "create",
-                    "type": "directory",
-                    "id": dir_id,
-                    "name": name,
-                    "path": new_path,
-                    "status": "success"
-                })
+                if reserved_path == "/":
+                    # 새 폴더를 생성하는 위치가 루트인 경우
+                    # 새 폴더의 parent_id는 root이다.
+                    parent_id = "root"
+                    # 디렉토리 테이블에 저장할 데이터 준비
+                    directory_value_dict = {
+                        "id": new_folder_id,
+                        "name": reserved_item_name,
+                        "path": new_path,
+                        "is_directory": True,
+                        "parent_id": parent_id,
+                        "created_at": datetime.now().isoformat(),
+                        "operation":op_type
+                    }                    
+                    # 디렉토리 정보 저장
+                    results.append(store_directory_table(db, directory_value_dict))                    
+                else:
+                    # 새 폴더를 생성하는 위치가 루트가 아닌 경우
+                    # 부모 디렉토리 id 가져오는 코드.
+                    parent_id = crud.get_parent_id_by_path(db,reserved_path)
+                    # 디렉토리 테이블에 저장할 데이터 준비
+                    directory_value_dict = {
+                        "id": new_folder_id,
+                        "name": reserved_item_name,
+                        "path": new_path,
+                        "is_directory": True,
+                        "parent_id": parent_id,
+                        "created_at": datetime.now().isoformat(),
+                        "operation":op_type
+                    }                    
+                    # 디렉토리 정보 저장
+                    results.append(store_directory_table(db, directory_value_dict))
             
             # 항목 이동
-            # elif op_type == "move":
-            #     item_id = op.get("item_id")
-            #     new_path = op.get("new_path")
-                
-            #     if item_id in filesystem:
-            #         # 디렉토리인 경우
-            #         item = filesystem[item_id]
-            #         old_path = item["path"]
-                    
-            #         # 경로 업데이트
-            #         item["path"] = new_path
-            #         filesystem[item_id] = item
-                    
-            #         # TODO: 실제 구현에서는 DB에서 경로 업데이트
-                    
-            #         results.append({
-            #             "operation": "move",
-            #             "type": "directory" if item["is_directory"] else "file",
-            #             "id": item_id,
-            #             "name": item["name"],
-            #             "old_path": old_path,
-            #             "new_path": new_path,
-            #             "status": "success"
-            #         })
-            #     else:
-            #         # TODO: 파일인 경우 DB에서 경로 업데이트
-                    
-            #         results.append({
-            #             "operation": "move",
-            #             "id": item_id,
-            #             "new_path": new_path,
-            #             "status": "not_found",
-            #             "error": "Item not found"
-            #         })
+            elif op_type == "move":
+                new_path = op.get("new_path", "/")
+                # target item의 parent_id 가져오기
+                target_item_parent_id = crud.get_parent_id_by_id(db, reserved_item_id)
+                # target item의 기존 경로 가져오기
+                target_item_path = crud.get_file_path_by_id(db, reserved_item_id)
+                # target item의 이름 가져오기
+                target_item_name = crud.get_file_name_by_id(db, reserved_item_id)
+                # target item의 타입 가져오기
+                target_item_type = crud.get_file_is_directory_by_id(db, reserved_item_id)
+                # 목적지의 id값 가져오기
+                destination_id = crud.get_directory_id_by_path(db, new_path)
+
+                # target item의 새로운 parent_id 준비
+                target_new_parent_id = destination_id
+
+                if target_item_parent_id == "root":
+                    # target이 root디렉토리에 존재하는 경우
+                    if new_path != "/":
+                        # new_path가 root가 아닌 경우
+
+                        # target item의 새로운 경로 준비
+                        target_new_path = new_path + target_item_path  
+                        # target item이 디렉토리인 경우 하위 아이템이 존재한다면 해당 item의 레코드를 반환
+                        target_item_children = crud.get_directory_by_parent_id(db, reserved_item_id)
+                        if target_item_children:
+                            # 하위 아이템이 존재하는 경우
+                            # 하위 아이템이 존재하는 경우에는 sql 스크립트를 실행. (자식 아이템까지 재귀적으로 처리됨.)
+                            crud.update_directory_with_sql_file_safe(db, reserved_item_id, target_item_path, target_new_path, target_new_parent_id)
+                            results.append({
+                                            "operation": "move",
+                                            "type": "directory" if target_item_type else "file",
+                                            "id": reserved_item_id,
+                                            "name": target_item_name,
+                                            "old_path": target_item_path,
+                                            "new_path": target_new_path,
+                                            "status": "success"})                            
+                        else:
+                            # 하위 아이템이 존재하지 않는 경우
+                            # 디렉토리 경로 및 부모 id 업데이트
+                            crud.update_directory_path_and_parent(db, reserved_item_id, target_new_path, target_new_parent_id)
+                            results.append({
+                                            "operation": "move",
+                                            "type": "directory" if target_item_type else "file",
+                                            "id": reserved_item_id,
+                                            "name": target_item_name,
+                                            "old_path": target_item_path,
+                                            "new_path": target_new_path,
+                                            "status": "success"})
+                            
+
+                    else:
+                        # new_path가 root인 경우(이동하지 않음)
+                        # 아무 작업도 하지 않음.
+                        results.append({
+                                        "operation": "move",
+                                        "type": "directory" if target_item_type else "file",
+                                        "id": reserved_item_id,
+                                        "name": target_item_name,
+                                        "old_path": target_item_path,
+                                        "new_path": new_path,
+                                        "status": "success"})
+                else:
+                    # target이 root디렉토리에 존재하지 않는 경우
+                    # target item이 디렉토리인 경우 하위 아이템이 존재한다면 해당 item의 레코드를 반환
+                    target_item_children = crud.get_directory_by_parent_id(db, reserved_item_id)
+                    # 부모 아이템의 path
+                    parent_item_path = crud.get_file_path_by_id(db, target_item_parent_id)                    
+                    if new_path != "/":
+                        # new_path가 root가 아닌 경우
+                        if target_item_children:
+                            # 하위 아이템이 존재하는 경우
+                            # target item의 새로운 경로 준비
+                            target_new_path = new_path + target_item_path.replace(parent_item_path, "")
+                            # 디렉토리 경로 및 부모 id 업데이트
+                            # 하위 아이템이 존재하는 경우에는 sql 스크립트를 실행. (자식 아이템까지 재귀적으로 처리됨.)
+                            crud.update_directory_with_sql_file_safe(db, reserved_item_id, target_item_path, target_new_path, target_new_parent_id)
+                            results.append({
+                                            "operation": "move",
+                                            "type": "directory" if target_item_type else "file",
+                                            "id": reserved_item_id,
+                                            "name": target_item_name,
+                                            "old_path": target_item_path,
+                                            "new_path": target_new_path,
+                                            "status": "success"})                            
+                        else:
+                            # 하위 아이템이 존재하지 않는 경우
+                            # target item의 새로운 경로 준비
+                            target_new_path = new_path + '/' + target_item_name
+                            # 디렉토리 경로 및 부모 id 업데이트
+                            crud.update_directory_path_and_parent(db, reserved_item_id, target_new_path, target_new_parent_id)
+                            results.append({
+                                            "operation": "move",
+                                            "type": "directory" if target_item_type else "file",
+                                            "id": reserved_item_id,
+                                            "name": target_item_name,
+                                            "old_path": target_item_path,
+                                            "new_path": target_new_path,
+                                            "status": "success"})                            
+                    else:
+                        # new_path가 root인 경우
+                        if target_item_children:
+                            # 하위 아이템이 존재하는 경우
+                            # target item의 새로운 경로 준비
+                            target_new_path = target_item_path.replace(parent_item_path, "")
+                            # 디렉토리 경로 및 부모 id 업데이트
+                            # 하위 아이템이 존재하는 경우에는 sql 스크립트를 실행. (자식 아이템까지 재귀적으로 처리됨.)
+                            crud.update_directory_with_sql_file_safe(db, reserved_item_id, target_item_path, target_new_path, target_new_parent_id)                            
+                            results.append({
+                                            "operation": "move",
+                                            "type": "directory" if target_item_type else "file",
+                                            "id": reserved_item_id,
+                                            "name": target_item_name,
+                                            "old_path": target_item_path,
+                                            "new_path": target_new_path,
+                                            "status": "success"})                      
+                        else:
+                            # 하위 아이템이 존재하지 않는 경우
+                            # target item의 새로운 경로 준비
+                            target_new_path = new_path + target_item_name
+                            # 디렉토리 경로 및 부모 id 업데이트
+                            crud.update_directory_path_and_parent(db, reserved_item_id, target_new_path, target_new_parent_id)
+                            results.append({
+                                            "operation": "move",
+                                            "type": "directory" if target_item_type else "file",
+                                            "id": reserved_item_id,
+                                            "name": target_item_name,
+                                            "old_path": target_item_path,
+                                            "new_path": target_new_path,
+                                            "status": "success"})  
+
             
             # 항목 삭제
             elif op_type == "delete":
@@ -610,22 +718,41 @@ def store_directory_table(db: Session, value_dict: dict):
         type = "file"
 
     try:
-        crud.create_directory(
-            db=db,
-            id=value_dict["id"],
-            name=value_dict["name"],
-            path=value_dict["path"],
-            is_directory=value_dict["is_directory"],
-            parent_id=value_dict["parent_id"],
-            created_at=value_dict["created_at"]
-        )
-        return {
-            "type": type,
-            "id": value_dict["id"],
-            "name": value_dict["name"],
-            "path": value_dict["path"],
-            "status": "success"
-        }
+        if value_dict["operation"] == "create":
+            crud.create_directory(
+                db=db,
+                id=value_dict["id"],
+                name=value_dict["name"],
+                path=value_dict["path"],
+                is_directory=value_dict["is_directory"],
+                parent_id=value_dict["parent_id"],
+                created_at=value_dict["created_at"]
+            )
+            return {
+                "operation": "create",
+                "type": "directory",
+                "id": value_dict["id"],
+                "name": value_dict["name"],
+                "path": value_dict["path"],
+                "status": "success"
+            }
+        else:           
+            crud.create_directory(
+                db=db,
+                id=value_dict["id"],
+                name=value_dict["name"],
+                path=value_dict["path"],
+                is_directory=value_dict["is_directory"],
+                parent_id=value_dict["parent_id"],
+                created_at=value_dict["created_at"]
+            )
+            return {
+                "type": type,
+                "id": value_dict["id"],
+                "name": value_dict["name"],
+                "path": value_dict["path"],
+                "status": "success"
+            }
     except Exception as e:
         return {
             "type": type,

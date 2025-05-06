@@ -64,20 +64,23 @@ def get_only_directory(db: Session):
     directories = result.scalars().all()
     return [{"id": d.id, "name": d.name, "path": d.path, "parent_id": d.parent_id} for d in directories]
 
-# 파일의 id로 부모 디렉토리의 아이디를 가져오는 함수
-def get_parent_id_by_id(db: Session, document_id: str):
-    stmt = select(models.Directory.parent_id).where(models.Directory.id == document_id)
+def get_parent_id_by_id(db: Session, item_id: str):
+    """아이템의 id로 해당 아이템 레코드에서 parent_id 필드의 값을 가져온다."""
+    stmt = select(models.Directory.parent_id).where(models.Directory.id == item_id)
     result = db.execute(stmt)
     return result.scalar()
 
-# 파일의 경로 데이터로 현재 디렉토리의 아이디를 가져오는 함수
+
+
 def get_directory_id_by_path(db: Session, path: str):
+    """아이템의 경로 값으로 해당 아이템의 id값을 가져온다."""
     stmt = select(models.Directory.id).where(models.Directory.path == path)
     result = db.execute(stmt)
     return result.scalar()
 
 # 특정 파일의 경로에 존재하는 부모 디렉토리의 아이디를 가져오는 함수
 def get_parent_id_by_path(db: Session, path: str):
+    """아이템의 경로 값으로 해당 아이템의 parent_id필드의 값을 가져온다."""
     stmt = select(models.Directory.parent_id).where(models.Directory.path == path)
     result = db.execute(stmt)
     return result.scalar()
@@ -125,19 +128,92 @@ def delete_document_by_id(db: Session, document_id: int):
 def get_s3_key_by_id(db: Session, document_id: int):
     return db.query(models.Document).filter(models.Document.id == document_id).first().s3_key
 
-def get_file_path_by_id(db: Session, document_id: int):
-    return db.query(models.Directory).filter(models.Directory.id == str(document_id)).first().path
+def get_file_path_by_id(db: Session, item_id: str):
+    """아이템의 id로 해당 아이템 레코드에서 path 필드의 값을 가져온다."""
+    return db.query(models.Directory).filter(models.Directory.id == item_id).first().path
 
-def get_file_name_by_id(db: Session, document_id: int):
-    return db.query(models.Directory).filter(models.Directory.id == str(document_id)).first().name
+def get_file_name_by_id(db: Session, item_id: str):
+    """아이템의 id로 해당 아이템 레코드에서 name 필드의 값을 가져온다."""
+    return db.query(models.Directory).filter(models.Directory.id == item_id).first().name
 
-def get_file_is_directory_by_id(db: Session, document_id: str):
-    return db.query(models.Directory).filter(models.Directory.id == document_id).first().is_directory
-
-
-
-
-
+def get_file_is_directory_by_id(db: Session, item_id: str):
+    """아이템의 id로 해당 아이템 레코드에서 is_directory 필드의 값을 가져온다."""
+    return db.query(models.Directory).filter(models.Directory.id == item_id).first().is_directory
 
 
+def update_directory_path_and_parent(db: Session, item_id: str, target_new_path: str, target_new_parent_id: str):
+    """아이템의 id로 해당 아이템의 경로와 부모 ID를 업데이트한다."""
+    from sqlalchemy import update
+    stmt = update(models.Directory).where(models.Directory.id == item_id).values(
+        path=target_new_path,
+        parent_id=target_new_parent_id
+    )
+    db.execute(stmt)
+    db.commit()
+    return db.query(models.Directory).filter(models.Directory.id == item_id).first()
 
+
+# directories테이블에서 parent_id필드 값이 target의 id값인 레코드를 선택하여 가져온다.
+def get_directory_by_parent_id(db: Session, item_id: str):
+    """directories테이블의 parent_id필드 값 == item_id인 레코드를 선택하여 가져온다."""
+    stmt = select(models.Directory).where(models.Directory.parent_id == item_id)
+    result = db.execute(stmt)
+    return result.scalars().all()
+
+
+def update_directory_with_sql_file_safe(db: Session, item_id: str, target_item_path: str, target_new_path: str, target_new_parent_id: str):
+    """SQL 스크립트를 개별 명령으로 분리하여 실행하여 디렉토리 정보를 업데이트한다."""
+    from sqlalchemy import text
+    
+    # 트랜잭션 시작
+    db.execute(text("BEGIN;"))
+    
+    # 1. 부모 ID 업데이트
+    update_parent_sql = """
+    UPDATE directories
+    SET parent_id = :new_parent_id
+    WHERE id = :tgt_id;
+    """
+    db.execute(
+        text(update_parent_sql),
+        {"tgt_id": item_id, "new_parent_id": target_new_parent_id}
+    )
+    
+    # 2. 경로 업데이트를 위한 재귀 쿼리
+    update_path_sql = """
+    WITH RECURSIVE subtree AS (
+        SELECT id, path
+        FROM directories
+        WHERE id = :tgt_id
+        UNION ALL
+        SELECT d.id, d.path
+        FROM directories d
+        JOIN subtree s ON d.parent_id = s.id
+    )
+    UPDATE directories AS d
+    SET path = regexp_replace(d.path,
+                             '^' || :old_prefix,
+                             :new_prefix)
+    FROM subtree
+    WHERE d.id = subtree.id;
+    """
+    db.execute(
+        text(update_path_sql),
+        {"tgt_id": item_id, "old_prefix": target_item_path, "new_prefix": target_new_path}
+    )
+    
+    # 트랜잭션 커밋
+    db.commit()
+    
+    # # 선택적으로 확인용 SELECT 쿼리 실행
+    # check_sql = """
+    # SELECT id, path, parent_id
+    # FROM directories
+    # WHERE path LIKE :new_prefix || '%';
+    # """
+    # result = db.execute(
+    #     text(check_sql),
+    #     {"new_prefix": target_new_path}
+    # )
+    
+    return db.query(models.Directory).filter(models.Directory.id == item_id).first()
