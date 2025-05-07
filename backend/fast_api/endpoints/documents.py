@@ -41,6 +41,53 @@ if not S3_BUCKET_NAME:
 
 router = APIRouter()
 
+''' 함수 인덱스
+
+
+get("/")
+list_items
+
+post("/manage")
+upload_document
+
+get("/structure")
+get_filesystem_structure
+
+post("/query")
+query_document
+
+디렉토리 업로드 처리
+process_directory_uploads
+
+파일 업로드 처리
+process_file_uploads
+
+디렉토리 작업 처리(생성, 이동, 삭제 등)
+process_directory_operations
+
+파일 타입 유추
+get_file_type
+
+고유 파일명 생성
+generate_unique_filename
+
+최상위 디렉토리 처리
+process_top_directory
+
+디렉토리 테이블에 디렉토리 정보를 저장
+store_directory_table
+
+파일 이름 추출
+set_filename
+
+파일 경로 설정
+set_file_path
+
+s3 업로드
+upload_file_to_s3
+
+'''
+
 
 @router.get("/")
 def list_items(
@@ -508,7 +555,6 @@ def process_directory_operations(operations, user_id, db):
                                             "new_path": target_new_path,
                                             "status": "success"})  
 
-            
             # 항목 삭제
             elif op_type == "delete":
                 
@@ -530,12 +576,12 @@ def process_directory_operations(operations, user_id, db):
                     })
                 else:
                     # 파일인 경우
-                    item_id = int(reserved_item_id)
+                    item_id = reserved_item_id
                     item_name = crud.get_file_name_by_id(db, item_id)
                     item_path = crud.get_file_path_by_id(db, item_id)                    
                     # s3에서 삭제
                         # 삭제를 위해 s3_key값을 검색해서 가져오기
-                    s3_key = crud.get_s3_key_by_id(db, item_id)
+                    s3_key = crud.get_s3_key_by_id(db, int(item_id))
                         # s3에서 삭제
                     s3_client.delete_object(Bucket=S3_BUCKET_NAME, Key=s3_key)
 
@@ -550,8 +596,6 @@ def process_directory_operations(operations, user_id, db):
                         "path": item_path,
                         "status": "success"
                     })
-
-
 
             # 항목 이름 변경
             # elif op_type == "rename":
@@ -708,7 +752,7 @@ def process_top_directory(tree, current_upload_path: str, db: Session):
 
 
 def store_directory_table(db: Session, value_dict: dict):
-    """디렉토리 테이블 저장"""
+    """디렉토리 테이블에 디렉토리 정보를 저장"""
     from db import crud
 
     # 디렉토리 / 파일 구분

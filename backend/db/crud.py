@@ -126,6 +126,7 @@ def delete_document_by_id(db: Session, document_id: int):
         raise e
 
 def get_s3_key_by_id(db: Session, document_id: int):
+    """Documents 테이블에서 해당 아이템의 id로 s3_key 필드의 값을 가져온다."""
     return db.query(models.Document).filter(models.Document.id == document_id).first().s3_key
 
 def get_file_path_by_id(db: Session, item_id: str):
