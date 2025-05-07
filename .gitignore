@@ -4,6 +4,7 @@ uploads/
 ollama/*
 ollama/
 
+
 #aws
 aws/
 
@@ -15,6 +16,9 @@ package/
 
 #cursor 파일
 .cursor/*
+
+#zip 파일
+*.zip
 
 #테스트 용 주피터 노트북
 *test.ipynb

@@ -1,15 +1,17 @@
-import os
-from fastapi import UploadFile, HTTPException
-from sqlalchemy.orm import Session
 from datetime import datetime
 import traceback
 
+# fastapi 관련
+from fastapi import HTTPException
+
+# db 관련 
+from sqlalchemy.orm import Session
+from db import crud
+from db.models import Document
 
 # 함수 불러오기
-from db.models import Document
 from rag.embeddings import embed_query
 from rag.vectorstore import save_to_vector_store
-
 from rag.retriever import search_similarity, do_mmr
 from rag.file_load import (
     load_pdf, 
@@ -17,6 +19,9 @@ from rag.file_load import (
     load_hwp, 
 )
 from rag.chunking import chunk_documents
+
+
+
 
 
 def get_all_documents(db: Session):
@@ -60,20 +65,15 @@ async def process_document(
         # 2. 업로드 된 파일의 정보를 db에 저장한다.
         # 업로드 된 파일의 이름, 업로드 시간, 사용자 아이디를 DB의 documents 테이블에 저장.
         # DB의 documents 테이블에 문서 정보 저장. # 이 코드는 이 위치에 있어야 함.
-        db_document = Document(
-            filename=file_name,
-            s3_key=s3_key,
-            upload_time=datetime.now(),
-            user_id=user_id
-        )
-        db.add(db_document)
-        db.commit()
-        db.refresh(db_document)
-        # 2. 업로드 된 파일의 정보를 db에 저장한다.
+        
+        # 문서 정보 저장 중 오류 발생 시 예외 처리
+        try:
+            crud.add_documents(db, file_name, s3_key, datetime.now(), user_id)
+        except Exception as e:
+            print(f"Error adding documents: {str(e)}")
+            print(traceback.format_exc())
+            raise HTTPException(status_code=500, detail=f"Error adding documents: {str(e)}")
 
-        # 이 코드에서 에러를 발생시키므로 주석 처리
-        # crud.add_directory_size(db, db_document.id, file.size)
-        # 2. 업로드 된 파일의 정보를 db에 저장한다.
 
 
         # 3. 파일 형식에 따라 문서 로드
