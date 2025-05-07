@@ -7,11 +7,10 @@ import Chatbot from "./components/Chatbot/Chatbot";
 import LoginForm from "./components/Login/LoginForm";
 import RegisterForm from "./components/Login/RegisterForm";
 import "./App.css";
-import "./Theme.css"; // 테마 CSS 추가
+import "./Theme.css";
 
 // API 기본 URL 설정
-const API_BASE_URL = "http://13.209.97.6:8000/fast_api";
-//const API_BASE_URL = "http://localhost:8000/fast_api";
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000/fast_api";
 
 function App() {
   const [files, setFiles] = useState([]);
@@ -511,23 +510,24 @@ function App() {
     }
   };
 
-  // 파일/폴더 이동 처리 개선
-  const handleMoveItem = async (itemId, newPath) => {
+  // 일반화된 파일 작업 함수 - 이동 및 복사에 사용
+  const handleItemOperation = async (itemId, targetPath, operationType = "move") => {
     try {
       setIsLoading(true);
       const token = localStorage.getItem("token");
 
       // 디버깅 정보 로깅
-      console.log(`===== 파일/폴더 이동 디버깅 정보 =====`);
+      console.log(`===== 파일/폴더 ${operationType} 디버깅 정보 =====`);
       console.log(`항목 ID: ${itemId}`);
-      console.log(`새 경로: ${newPath}`);
+      console.log(`대상 경로: ${targetPath}`);
+      console.log(`작업 유형: ${operationType}`);
 
-      // 이동 작업 정의
+      // 작업 정의
       const operations = [
         {
-          operation_type: "move",
+          operation_type: operationType, // "move" 또는 "copy"
           item_id: itemId,
-          new_path: newPath === "/" ? "" : newPath,
+          target_path: targetPath === "/" ? "" : targetPath,
         },
       ];
 
@@ -550,7 +550,7 @@ function App() {
       );
 
       console.log(`API 응답:`, response.data);
-      console.log(`===== 파일/폴더 이동 디버깅 정보 종료 =====`);
+      console.log(`===== 파일/폴더 ${operationType} 디버깅 정보 종료 =====`);
 
       // 성공 시 문서 목록 새로고침
       fetchDocuments();
@@ -559,10 +559,10 @@ function App() {
       
       return response.data;
     } catch (error) {
-      console.error("Error moving item:", error);
+      console.error(`Error ${operationType} item:`, error);
       
       // 오류 상세 정보 로깅
-      console.log(`===== 파일/폴더 이동 오류 정보 =====`);
+      console.log(`===== 파일/폴더 ${operationType} 오류 정보 =====`);
       if (error.response) {
         console.log(`서버 응답 상태: ${error.response.status}`);
         console.log(`서버 응답 데이터:`, error.response.data);
@@ -572,13 +572,23 @@ function App() {
         console.log(`오류 메시지: ${error.message}`);
       }
       console.log(`오류 설정:`, error.config);
-      console.log(`===== 파일/폴더 이동 오류 정보 종료 =====`);
+      console.log(`===== 파일/폴더 ${operationType} 오류 정보 종료 =====`);
       
-      alert("항목 이동 중 오류가 발생했습니다.");
+      alert(`항목 ${operationType === "move" ? "이동" : "복사"} 중 오류가 발생했습니다.`);
       throw error;
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // 파일/폴더 이동 처리 - 일반화된 함수 사용
+  const handleMoveItem = async (itemId, newPath) => {
+    return handleItemOperation(itemId, newPath, "move");
+  };
+
+  // 파일/폴더 복사 처리 - 일반화된 함수 사용
+  const handleCopyItem = async (itemId, newPath) => {
+    return handleItemOperation(itemId, newPath, "copy");
   };
 
   // 파일/폴더 이름 변경 처리 개선
@@ -758,7 +768,7 @@ function App() {
     }
   };
 
-// 로그인 성공 핸들러
+  // 로그인 성공 핸들러
   const handleLoginSuccess = () => {
     const token = localStorage.getItem("token");
     fetchUserInfo(token);
@@ -827,6 +837,7 @@ function App() {
           onAddFile={handleAddFile}
           onCreateFolder={handleCreateFolder}
           onMoveItem={handleMoveItem}
+          onCopyItem={handleCopyItem} // 새로 추가된 props
           onDeleteItem={handleDeleteItem}
           onRenameItem={handleRenameItem}
           onFolderOpen={handleFolderOpen}
