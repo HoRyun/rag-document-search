@@ -33,7 +33,6 @@ const FileDisplay = ({
   // 드래그 선택(rubber band selection) 관련 상태 추가
   const [isDraggingSelection, setIsDraggingSelection] = useState(false);
   const [selectionRect, setSelectionRect] = useState({ startX: 0, startY: 0, endX: 0, endY: 0 });
-  const [startPoint, setStartPoint] = useState({ x: 0, y: 0 });
   // 드래그 직후 상태 추적용 상태 변수 추가
   const [justFinishedDragging, setJustFinishedDragging] = useState(false);
 
@@ -69,7 +68,7 @@ const FileDisplay = ({
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top + fileDisplayRef.current.scrollTop;
       
-      setStartPoint({ x, y });
+      // 선택 시작점과 선택 영역 초기화
       setSelectionRect({ startX: x, startY: y, endX: x, endY: y });
       setIsDraggingSelection(true);
       
@@ -85,7 +84,7 @@ const FileDisplay = ({
 
   // 마우스 이동 이벤트 핸들러 - 드래그 선택 업데이트
   const handleMouseMove = (e) => {
-    if (isDraggingSelection) {
+    if (isDraggingSelection && fileDisplayRef.current) {
       const rect = fileDisplayRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top + fileDisplayRef.current.scrollTop;
@@ -96,7 +95,7 @@ const FileDisplay = ({
         endY: y
       }));
       
-      // 선택 영역 내 아이템 계산
+      // 선택 영역 내 아이템 계산 - 이 부분이 중요!
       updateItemsInSelectionRect();
     }
   };
@@ -104,6 +103,9 @@ const FileDisplay = ({
   // 마우스 업 이벤트 핸들러 - 드래그 선택 종료
   const handleMouseUp = () => {
     if (isDraggingSelection) {
+      // 드래그 선택 완료 시 선택 영역 내의 항목 최종 계산
+      updateItemsInSelectionRect();
+      
       setIsDraggingSelection(false);
       setJustFinishedDragging(true);
       
@@ -120,6 +122,8 @@ const FileDisplay = ({
 
   // 선택 영역 내에 있는 아이템 업데이트
   const updateItemsInSelectionRect = () => {
+    if (!fileDisplayRef.current) return;
+    
     // 정규화된 사각형 계산 (startX가 항상 endX보다 작게)
     const normalizedRect = {
       left: Math.min(selectionRect.startX, selectionRect.endX),
@@ -135,7 +139,7 @@ const FileDisplay = ({
     // 현재 선택된 아이템 목록 복사
     // Ctrl 또는 Shift 키가 눌려있을 때 기존 선택 유지
     let newSelectedItems = isCtrlPressed || isShiftPressed ? [...selectedItems] : [];
-  
+
     // 선택 시작 시 이미 선택된 파일 목록 저장
     const initialSelectedItems = [...newSelectedItems];
     
@@ -180,7 +184,7 @@ const FileDisplay = ({
             }
           }
           
-          // 선택된 스타일 클래스 추가
+          // 선택된 스타일 적용 (aria-selected 속성)
           item.setAttribute('aria-selected', 'true');
         } else if (!isCtrlPressed && !isShiftPressed) {
           // Ctrl 또는 Shift 키가 눌려있지 않으면, 선택 영역을 벗어난 항목은 선택 해제
@@ -347,7 +351,7 @@ const FileDisplay = ({
     } finally {
       setIsLocalLoading(false);
     }
-  }, [clipboard, files, currentPath, onCopyItem, onMoveItem, onRefresh, setSelectedItems]);
+  }, [clipboard, files, currentPath, onCopyItem, onMoveItem, onRefresh]);
 
   // 선택된 항목 삭제 처리
   const handleDeleteSelectedItems = useCallback(async () => {
@@ -608,7 +612,14 @@ const FileDisplay = ({
         window.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDraggingSelection, selectionRect, isCtrlPressed, isShiftPressed, justFinishedDragging]);
+  }, [
+    isDraggingSelection,
+    selectionRect,
+    isCtrlPressed,
+    isShiftPressed,
+    justFinishedDragging,
+    selectedItems // 이 의존성을 추가하여 선택 상태 변경 시 이벤트 핸들러 업데이트
+  ]);
 
   // 컨텍스트 메뉴 외부 클릭 감지
   useEffect(() => {
