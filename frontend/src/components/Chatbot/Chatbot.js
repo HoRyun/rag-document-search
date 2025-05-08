@@ -222,6 +222,9 @@ const Chatbot = ({
         case COMMAND_TYPES.SUMMARIZE_DOCUMENT:
           responseText = `"${commandResult.document.name}" 문서의 요약을 생성했습니다.`;
           break;
+        default:
+          responseText = '명령을 처리합니다.';
+          break;
       }
       
       const botMessage = {
@@ -312,6 +315,9 @@ const Chatbot = ({
         } else {
           successMessage = `요약본을 저장하지 않았습니다.`;
         }
+        break;
+      default:
+        successMessage = '작업이 완료되었습니다.';
         break;
     }
     
