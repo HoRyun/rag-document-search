@@ -99,7 +99,7 @@ async def process_document(
         try:
             # chunked_documents를 db로 보낼때 비동기 처리를 하면 됨.
             # chunked_documents는 문서에 따라 여러 개의 데이터가 들어가니까 비동기 처리를 해야 함.
-            document_id = save_to_vector_store(chunked_documents)
+            document_id = await save_to_vector_store(chunked_documents)
             print(f"Document {file_name} uploaded and processed successfully")
         except Exception as ve:
             print(f"벡터 저장 중 오류 발생 {str(ve)}")
