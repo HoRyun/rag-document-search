@@ -57,7 +57,7 @@ const FileDisplay = ({
   const fileDisplayRef = useRef(null);
 
   // 마우스 다운 이벤트 핸들러 - 드래그 선택 시작
-  const handleMouseDown = (e) => {
+  const handleMouseDown = useCallback((e) => {
     // 파일이나 폴더가 아닌 빈 영역을 클릭했을 때만 드래그 선택 시작
     if (e.target === fileDisplayRef.current || e.target.className === 'file-grid') {
       // 마우스 우클릭이면 건너뛰기 (컨텍스트 메뉴용)
@@ -80,10 +80,10 @@ const FileDisplay = ({
       // 이벤트 기본 동작 방지
       e.preventDefault();
     }
-  };
+  }, [fileDisplayRef, isCtrlPressed, isShiftPressed]);
 
   // 마우스 이동 이벤트 핸들러 - 드래그 선택 업데이트
-  const handleMouseMove = (e) => {
+  const handleMouseMove = useCallback((e) => {
     if (isDraggingSelection && fileDisplayRef.current) {
       const rect = fileDisplayRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -98,10 +98,10 @@ const FileDisplay = ({
       // 선택 영역 내 아이템 계산 - 이 부분이 중요!
       updateItemsInSelectionRect();
     }
-  };
+  }, [isDraggingSelection, fileDisplayRef, updateItemsInSelectionRect]);
 
   // 마우스 업 이벤트 핸들러 - 드래그 선택 종료
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     if (isDraggingSelection) {
       // 드래그 선택 완료 시 선택 영역 내의 항목 최종 계산
       updateItemsInSelectionRect();
@@ -118,10 +118,10 @@ const FileDisplay = ({
         setLastSelectedItem(selectedItems[selectedItems.length - 1]);
       }
     }
-  };
-
+  }, [isDraggingSelection, updateItemsInSelectionRect, selectedItems]);
+  
   // 선택 영역 내에 있는 아이템 업데이트
-  const updateItemsInSelectionRect = () => {
+  const updateItemsInSelectionRect = useCallback(() => {
     if (!fileDisplayRef.current) return;
     
     // 정규화된 사각형 계산 (startX가 항상 endX보다 작게)
@@ -193,10 +193,10 @@ const FileDisplay = ({
         }
       }
     });
-    
+
     // 선택된 아이템 목록 업데이트
     setSelectedItems(newSelectedItems);
-  };
+  }, [fileDisplayRef, selectionRect, isCtrlPressed, isShiftPressed, selectedItems]);
 
   // 항목 선택 처리
   const handleItemSelect = (itemId) => {
@@ -618,7 +618,10 @@ const FileDisplay = ({
     isCtrlPressed,
     isShiftPressed,
     justFinishedDragging,
-    selectedItems // 이 의존성을 추가하여 선택 상태 변경 시 이벤트 핸들러 업데이트
+    selectedItems,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp
   ]);
 
   // 컨텍스트 메뉴 외부 클릭 감지
