@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './FileItem.css';
 
-const FileItem = ({ file, onClick, onDoubleClick, onDelete, onRename, onMove, isSelected }) => {
+const FileItem = ({ file, onClick, onDoubleClick, onDelete, onRename, onMove, onCopy, isSelected }) => {
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState('');
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -158,6 +158,8 @@ const FileItem = ({ file, onClick, onDoubleClick, onDelete, onRename, onMove, is
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
+      data-file-id={file.id}
+      aria-selected={isSelected ? 'true' : 'false'}
     >
       <div className={`file-icon ${getFileIcon()}`}></div>
       
@@ -192,6 +194,9 @@ const FileItem = ({ file, onClick, onDoubleClick, onDelete, onRename, onMove, is
           </div>
           <div className="context-menu-item" onClick={handleCopyPath}>
             경로 복사
+          </div>
+          <div className="context-menu-item" onClick={() => onCopy && onCopy(file)}>
+            복사
           </div>
           <div className="context-menu-item" onClick={handleMove}>
             이동
