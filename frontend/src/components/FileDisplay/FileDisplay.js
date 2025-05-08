@@ -33,7 +33,6 @@ const FileDisplay = ({
   // 드래그 선택(rubber band selection) 관련 상태 추가
   const [isDraggingSelection, setIsDraggingSelection] = useState(false);
   const [selectionRect, setSelectionRect] = useState({ startX: 0, startY: 0, endX: 0, endY: 0 });
-  const [startPoint, setStartPoint] = useState({ x: 0, y: 0 });
   // 드래그 직후 상태 추적용 상태 변수 추가
   const [justFinishedDragging, setJustFinishedDragging] = useState(false);
 
@@ -57,69 +56,10 @@ const FileDisplay = ({
   const uploadButtonRef = useRef(null);
   const fileDisplayRef = useRef(null);
 
-  // 마우스 다운 이벤트 핸들러 - 드래그 선택 시작
-  const handleMouseDown = (e) => {
-    // 파일이나 폴더가 아닌 빈 영역을 클릭했을 때만 드래그 선택 시작
-    if (e.target === fileDisplayRef.current || e.target.className === 'file-grid') {
-      // 마우스 우클릭이면 건너뛰기 (컨텍스트 메뉴용)
-      if (e.button === 2) return;
-      
-      // 파일 영역에 대한 상대적 위치 계산
-      const rect = fileDisplayRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top + fileDisplayRef.current.scrollTop;
-      
-      setStartPoint({ x, y });
-      setSelectionRect({ startX: x, startY: y, endX: x, endY: y });
-      setIsDraggingSelection(true);
-      
-      // Ctrl이나 Shift 키가 눌려있지 않으면 기존 선택 해제
-      if (!isCtrlPressed && !isShiftPressed) {
-        setSelectedItems([]);
-      }
-      
-      // 이벤트 기본 동작 방지
-      e.preventDefault();
-    }
-  };
-
-  // 마우스 이동 이벤트 핸들러 - 드래그 선택 업데이트
-  const handleMouseMove = (e) => {
-    if (isDraggingSelection) {
-      const rect = fileDisplayRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top + fileDisplayRef.current.scrollTop;
-      
-      setSelectionRect(prev => ({
-        ...prev,
-        endX: x,
-        endY: y
-      }));
-      
-      // 선택 영역 내 아이템 계산
-      updateItemsInSelectionRect();
-    }
-  };
-
-  // 마우스 업 이벤트 핸들러 - 드래그 선택 종료
-  const handleMouseUp = () => {
-    if (isDraggingSelection) {
-      setIsDraggingSelection(false);
-      setJustFinishedDragging(true);
-      
-      // 짧은 시간 후 드래그 직후 상태 초기화
-      setTimeout(() => {
-        setJustFinishedDragging(false);
-      }, 100); // 100ms 지연
-      
-      if (selectedItems.length > 0) {
-        setLastSelectedItem(selectedItems[selectedItems.length - 1]);
-      }
-    }
-  };
-
   // 선택 영역 내에 있는 아이템 업데이트
-  const updateItemsInSelectionRect = () => {
+  const updateItemsInSelectionRect = useCallback(() => {
+    if (!fileDisplayRef.current) return;
+    
     // 정규화된 사각형 계산 (startX가 항상 endX보다 작게)
     const normalizedRect = {
       left: Math.min(selectionRect.startX, selectionRect.endX),
@@ -135,7 +75,7 @@ const FileDisplay = ({
     // 현재 선택된 아이템 목록 복사
     // Ctrl 또는 Shift 키가 눌려있을 때 기존 선택 유지
     let newSelectedItems = isCtrlPressed || isShiftPressed ? [...selectedItems] : [];
-  
+
     // 선택 시작 시 이미 선택된 파일 목록 저장
     const initialSelectedItems = [...newSelectedItems];
     
@@ -180,7 +120,7 @@ const FileDisplay = ({
             }
           }
           
-          // 선택된 스타일 클래스 추가
+          // 선택된 스타일 적용 (aria-selected 속성)
           item.setAttribute('aria-selected', 'true');
         } else if (!isCtrlPressed && !isShiftPressed) {
           // Ctrl 또는 Shift 키가 눌려있지 않으면, 선택 영역을 벗어난 항목은 선택 해제
@@ -192,7 +132,71 @@ const FileDisplay = ({
     
     // 선택된 아이템 목록 업데이트
     setSelectedItems(newSelectedItems);
-  };
+  }, [fileDisplayRef, selectionRect, isCtrlPressed, isShiftPressed, selectedItems]);
+
+  // 마우스 다운 이벤트 핸들러 - 드래그 선택 시작
+  const handleMouseDown = useCallback((e) => {
+    // 파일이나 폴더가 아닌 빈 영역을 클릭했을 때만 드래그 선택 시작
+    if (e.target === fileDisplayRef.current || e.target.className === 'file-grid') {
+      // 마우스 우클릭이면 건너뛰기 (컨텍스트 메뉴용)
+      if (e.button === 2) return;
+      
+      // 파일 영역에 대한 상대적 위치 계산
+      const rect = fileDisplayRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top + fileDisplayRef.current.scrollTop;
+      
+      // 선택 시작점과 선택 영역 초기화
+      setSelectionRect({ startX: x, startY: y, endX: x, endY: y });
+      setIsDraggingSelection(true);
+      
+      // Ctrl이나 Shift 키가 눌려있지 않으면 기존 선택 해제
+      if (!isCtrlPressed && !isShiftPressed) {
+        setSelectedItems([]);
+      }
+      
+      // 이벤트 기본 동작 방지
+      e.preventDefault();
+    }
+  }, [fileDisplayRef, isCtrlPressed, isShiftPressed]);
+
+  // 마우스 이동 이벤트 핸들러 - 드래그 선택 업데이트
+  const handleMouseMove = useCallback((e) => {
+    if (isDraggingSelection && fileDisplayRef.current) {
+      const rect = fileDisplayRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top + fileDisplayRef.current.scrollTop;
+      
+      setSelectionRect(prev => ({
+        ...prev,
+        endX: x,
+        endY: y
+      }));
+      
+      // 선택 영역 내 아이템 계산 - 이 부분이 중요!
+      updateItemsInSelectionRect();
+    }
+  }, [isDraggingSelection, fileDisplayRef, updateItemsInSelectionRect]);
+
+  // 마우스 업 이벤트 핸들러 - 드래그 선택 종료
+  const handleMouseUp = useCallback(() => {
+    if (isDraggingSelection) {
+      // 드래그 선택 완료 시 선택 영역 내의 항목 최종 계산
+      updateItemsInSelectionRect();
+      
+      setIsDraggingSelection(false);
+      setJustFinishedDragging(true);
+      
+      // 짧은 시간 후 드래그 직후 상태 초기화
+      setTimeout(() => {
+        setJustFinishedDragging(false);
+      }, 100); // 100ms 지연
+      
+      if (selectedItems.length > 0) {
+        setLastSelectedItem(selectedItems[selectedItems.length - 1]);
+      }
+    }
+  }, [isDraggingSelection, updateItemsInSelectionRect, selectedItems]);
 
   // 항목 선택 처리
   const handleItemSelect = (itemId) => {
@@ -347,7 +351,7 @@ const FileDisplay = ({
     } finally {
       setIsLocalLoading(false);
     }
-  }, [clipboard, files, currentPath, onCopyItem, onMoveItem, onRefresh, setSelectedItems]);
+  }, [clipboard, files, currentPath, onCopyItem, onMoveItem, onRefresh]);
 
   // 선택된 항목 삭제 처리
   const handleDeleteSelectedItems = useCallback(async () => {
@@ -608,7 +612,17 @@ const FileDisplay = ({
         window.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDraggingSelection, selectionRect, isCtrlPressed, isShiftPressed, justFinishedDragging]);
+  }, [
+    isDraggingSelection,
+    selectionRect,
+    isCtrlPressed,
+    isShiftPressed,
+    justFinishedDragging,
+    selectedItems,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp
+  ]);
 
   // 컨텍스트 메뉴 외부 클릭 감지
   useEffect(() => {
