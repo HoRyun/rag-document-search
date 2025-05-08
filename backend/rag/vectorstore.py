@@ -2,10 +2,11 @@ from rag.embeddings import get_embeddings
 
 
 
-def save_to_vector_store(documents):
+async def save_to_vector_store(documents):
     """문서를 PostgreSQL 벡터 스토어에 저장합니다."""
     from db.database import SessionLocal
-    from db import crud, models
+    from db import models
+    import asyncio
     
     db = SessionLocal()
     try:
@@ -13,13 +14,14 @@ def save_to_vector_store(documents):
         embeddings = get_embeddings()
         
         # 각 청크에 대해
+        tasks = []
         for chunk in documents:
             # 해당 문서 찾기
             content = chunk.page_content
             metadata = chunk.metadata
             document_name = metadata.get("document_name", "")
             
-            # 문서 ID 찾기. 문서 이름이 db에 존재하면 해당 문서의 레코드 반환.
+            # 문서 ID 찾기. 문서 이름이 db에 존재하면 해당 문서의 레코드 반환. # 더 효율적인 방법으로 수정하기.
             document = db.query(models.Document).filter(models.Document.filename == document_name).first()
             
             if document:
@@ -29,19 +31,10 @@ def save_to_vector_store(documents):
                 # 콘텐츠와 메타데이터 결합
                 combined_text = f"{content} {metadata_text}"
                 
-                # 결합된 텍스트 임베딩
-                embedding_vector = embeddings.embed_query(combined_text)
-            
-                
-                # DB에 저장
-                crud.add_document_chunk(
-                    db=db,
-                    document_id=document.id,
-                    content=content,
-                    meta=metadata,
-                    embedding=embedding_vector
-                )
-                
+                # 임베딩 비동기 처리
+                tasks.append(start_embedding(db, embeddings, combined_text, document, content, metadata))
+        await asyncio.gather(*tasks)
+
         print(f"총 {len(documents)}개의 청크가 PostgreSQL에 저장되었습니다.")
         return document.id
     except Exception as e:
@@ -49,6 +42,20 @@ def save_to_vector_store(documents):
         raise e
     finally:
         db.close()
+
+async def start_embedding(db, embeddings, combined_text, document, content, metadata):
+    from db import crud
+
+    embedding_vector = embeddings.embed_query(combined_text)
+    
+    # DB에 저장
+    crud.add_document_chunk(
+        db=db,
+        document_id=document.id,
+        content=content,
+        meta=metadata,
+        embedding=embedding_vector
+    )    
 
 
 def manually_create_vector_extension(engine):
