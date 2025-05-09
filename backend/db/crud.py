@@ -3,6 +3,29 @@ from . import models
 from datetime import datetime
 from sqlalchemy import select, func, delete, text
 
+"""인덱스
+
+아이템의 path로 id를 가져오기
+get_directory_id_by_path
+
+아이템의 id로 아이템의 이름과 경로를 업데이트하기
+update_item_name_and_path
+
+아이템의 id로 아이템의 부모 id를 가져오기
+get_parent_id_by_id
+
+아이템의 id로 해당 아이템의 경로와 부모 ID를 업데이트한다.
+update_directory_path_and_parent
+
+아이템의 id로 해당 아이템의 이름, 경로, 부모id를 업데이트.
+update_directory_name_path_parent_id
+
+Documents 테이블에 동일한 이름의 파일이 있는지 확인한다.
+get_file_info_by_filename
+
+"""
+
+
 # 사용자 관련 CRUD
 def create_user(db: Session, username: str, email: str, password_hash: str):
     db_user = models.User(username=username, email=email, password_hash=password_hash)
@@ -94,6 +117,11 @@ def get_file_info_by_filename(db: Session, filename: str):
     """Documents 테이블에 동일한 이름의 파일이 있는지 확인한다."""
     return db.query(models.Document).filter(models.Document.filename == filename).first()
 
+# 동일한 디렉토리 이름이 존재하는 지 확인
+def get_directory_info_by_name(db: Session, directory_name: str):
+    """directories 테이블에 동일한 이름의 디렉토리가 있는지 확인한다."""
+    return db.query(models.Directory).filter(models.Directory.name == directory_name).first()
+
 def delete_directory_by_id(db: Session, directory_id: str):
     db.execute(
         text("DELETE FROM directories WHERE id = :dir_id"),
@@ -102,6 +130,7 @@ def delete_directory_by_id(db: Session, directory_id: str):
     db.commit()
 
 def delete_document_by_id(db: Session, document_id: int):
+    """파일 id로 테이블에서 파일 정보를 document_chunks테이블, documents테이블, directories테이블 순으로 삭제한다."""
     try:
         # 개별 DELETE 문을 실행
         db.execute(
@@ -125,20 +154,28 @@ def delete_document_by_id(db: Session, document_id: int):
         db.rollback()
         raise e
 
-def get_s3_key_by_id(db: Session, document_id: int):
+def get_s3_key_by_id(db: Session, document_id: any):
     """Documents 테이블에서 해당 아이템의 id로 s3_key 필드의 값을 가져온다."""
+    if isinstance(document_id, str):
+        document_id = int(document_id)
     return db.query(models.Document).filter(models.Document.id == document_id).first().s3_key
 
-def get_file_path_by_id(db: Session, item_id: str):
+def get_file_path_by_id(db: Session, item_id: any):
     """아이템의 id로 해당 아이템 레코드에서 path 필드의 값을 가져온다."""
+    if isinstance(item_id, int):
+        item_id = str(item_id)
     return db.query(models.Directory).filter(models.Directory.id == item_id).first().path
 
-def get_file_name_by_id(db: Session, item_id: str):
+def get_file_name_by_id(db: Session, item_id: any):
     """아이템의 id로 해당 아이템 레코드에서 name 필드의 값을 가져온다."""
+    if isinstance(item_id, int):
+        item_id = str(item_id)    
     return db.query(models.Directory).filter(models.Directory.id == item_id).first().name
 
-def get_file_is_directory_by_id(db: Session, item_id: str):
+def get_file_is_directory_by_id(db: Session, item_id: any):
     """아이템의 id로 해당 아이템 레코드에서 is_directory 필드의 값을 가져온다."""
+    if isinstance(item_id, int):
+        item_id = str(item_id)
     return db.query(models.Directory).filter(models.Directory.id == item_id).first().is_directory
 
 
@@ -155,15 +192,17 @@ def update_directory_path_and_parent(db: Session, item_id: str, target_new_path:
 
 
 # directories테이블에서 parent_id필드 값이 target의 id값인 레코드를 선택하여 가져온다.
-def get_directory_by_parent_id(db: Session, item_id: str):
+def get_directory_by_parent_id(db: Session, item_id: any):
     """directories테이블의 parent_id필드 값 == item_id인 레코드를 선택하여 가져온다."""
+    if isinstance(item_id, int):
+        item_id = str(item_id)
     stmt = select(models.Directory).where(models.Directory.parent_id == item_id)
     result = db.execute(stmt)
     return result.scalars().all()
 
 
 def update_directory_with_sql_file_safe(db: Session, item_id: str, target_item_path: str, target_new_path: str, target_new_parent_id: str):
-    """SQL 스크립트를 개별 명령으로 분리하여 실행하여 디렉토리 정보를 업데이트한다."""
+    """SQL 스크립트를 개별 명령으로 분리하여 실행하여 디렉토리 정보를 업데이트한다. (추가 설명 필요.)"""
     from sqlalchemy import text
     
     # 트랜잭션 시작
@@ -218,3 +257,117 @@ def update_directory_with_sql_file_safe(db: Session, item_id: str, target_item_p
     # )
     
     return db.query(models.Directory).filter(models.Directory.id == item_id).first()
+
+
+def update_item_name_and_path(db: Session, item_id: any, new_name: str, new_path: str):
+    """아이템의 id로 해당 아이템의 이름과 경로를 업데이트한다."""
+    from sqlalchemy import update
+    if isinstance(item_id, int):
+        item_id = str(item_id)    
+    stmt = update(models.Directory).where(models.Directory.id == item_id).values(
+        name=new_name,
+        path=new_path
+    )
+    db.execute(stmt)
+    db.commit()
+    return db.query(models.Directory).filter(models.Directory.id == item_id).first()
+
+
+# target 디렉토리 id의 값으로 해당 디렉토리의 자식 중 파일의 id만 모두 가져와서 리스트로 반환하는 함수.
+def get_file_ids_by_parent_directory_id(db: Session, directory_id: any):
+    """target 디렉토리 id의 값으로 해당 디렉토리의 자식 중 파일의 id만 모두 가져와서 리스트로 반환한다."""
+    if isinstance(directory_id, int):
+        directory_id = str(directory_id)
+    stmt = select(models.Directory.id).where(models.Directory.parent_id == directory_id)
+    result = db.execute(stmt)
+    return result.scalars().all()
+
+
+def get_child_file_ids(db: Session, target_directory_id: str):
+    """
+    특정 디렉토리의 모든 하위(재귀) 중 파일(is_directory=False)인 레코드의 id만 리스트로 반환
+    """
+    from sqlalchemy import text
+
+    sql = """
+    WITH RECURSIVE subtree AS (
+        SELECT id, is_directory
+        FROM directories
+        WHERE parent_id = :parent_id
+        UNION ALL
+        SELECT d.id, d.is_directory
+        FROM directories d
+        JOIN subtree s ON d.parent_id = s.id
+    )
+    SELECT id
+    FROM subtree
+    WHERE is_directory = FALSE;
+    """
+
+    result = db.execute(text(sql), {"parent_id": target_directory_id})
+    return [row[0] for row in result.fetchall()]
+
+
+
+def update_directory_and_child_dirs(
+    db: Session,
+    target_id: str,
+    old_path: str,
+    new_name: str,
+    new_path: str
+):
+    """
+    target 디렉토리의 이름과 경로를 변경하고,
+    target의 자식들 중 is_directory=True인 레코드들의 path를 새로운 이름/경로에 맞춰 일괄 변경
+    """
+    from sqlalchemy import text
+
+    # 1. target의 이름(name)과 경로(path) 변경
+    update_target_sql = """
+    UPDATE directories
+    SET name = :new_name, path = :new_path
+    WHERE id = :target_id;
+    """
+    db.execute(
+        text(update_target_sql),
+        {"new_name": new_name, "new_path": new_path, "target_id": target_id}
+    )
+
+    # 2. 자식 디렉토리들(is_directory=True)의 path 일괄 변경 (재귀)
+    update_children_sql = """
+    WITH RECURSIVE child_dirs AS (
+        SELECT id, path
+        FROM directories
+        WHERE parent_id = :target_id AND is_directory = TRUE
+        UNION ALL
+        SELECT d.id, d.path
+        FROM directories d
+        JOIN child_dirs c ON d.parent_id = c.id
+        WHERE d.is_directory = TRUE
+    )
+    UPDATE directories AS d
+    SET path = regexp_replace(d.path, '^' || :old_path, :new_path)
+    FROM child_dirs
+    WHERE d.id = child_dirs.id;
+    """
+    db.execute(
+        text(update_children_sql),
+        {"target_id": target_id, "old_path": old_path, "new_path": new_path}
+    )
+
+    db.commit()
+    return db.query(models.Directory).filter(models.Directory.id == target_id).first()
+
+
+
+def update_directory_name_path_parent_id(db: Session, item_id: any, new_name: str, new_path: str, new_parent_id: str):
+    """아이템의 id로 해당 아이템의 이름, 경로, 부모id를 업데이트한다."""
+    from sqlalchemy import update
+    if isinstance(item_id, int):
+        item_id = str(item_id)
+    stmt = update(models.Directory).where(models.Directory.id == item_id).values(
+        name=new_name, path=new_path, parent_id=new_parent_id)
+    db.execute(stmt)
+    db.commit()
+    return db.query(models.Directory).filter(models.Directory.id == item_id).first()
+

@@ -2,7 +2,20 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import FileItem from "../FileItem/FileItem";
 import "./FileDisplay.css";
 
-const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolder, onMoveItem, onDeleteItem, onRenameItem, onFolderOpen, onRefresh, isLoading }) => {
+const FileDisplay = ({ 
+  files, 
+  directories, 
+  currentPath, 
+  onAddFile, 
+  onCreateFolder, 
+  onMoveItem, 
+  onDeleteItem, 
+  onRenameItem, 
+  onFolderOpen, 
+  onCopyItem, // 새로 추가된 props
+  onRefresh, 
+  isLoading 
+}) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
@@ -16,6 +29,12 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
   const [isCtrlPressed, setIsCtrlPressed] = useState(false);
   const [isShiftPressed, setIsShiftPressed] = useState(false);
   const [lastSelectedItem, setLastSelectedItem] = useState(null);
+
+  // 드래그 선택(rubber band selection) 관련 상태 추가
+  const [isDraggingSelection, setIsDraggingSelection] = useState(false);
+  const [selectionRect, setSelectionRect] = useState({ startX: 0, startY: 0, endX: 0, endY: 0 });
+  // 드래그 직후 상태 추적용 상태 변수 추가
+  const [justFinishedDragging, setJustFinishedDragging] = useState(false);
 
   // 이름 변경 모달 상태
   const [itemToRename, setItemToRename] = useState(null);
@@ -37,9 +56,154 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
   const uploadButtonRef = useRef(null);
   const fileDisplayRef = useRef(null);
 
+  // 선택 영역 내에 있는 아이템 업데이트
+  const updateItemsInSelectionRect = useCallback(() => {
+    if (!fileDisplayRef.current) return;
+    
+    // 정규화된 사각형 계산 (startX가 항상 endX보다 작게)
+    const normalizedRect = {
+      left: Math.min(selectionRect.startX, selectionRect.endX),
+      top: Math.min(selectionRect.startY, selectionRect.endY),
+      right: Math.max(selectionRect.startX, selectionRect.endX),
+      bottom: Math.max(selectionRect.startY, selectionRect.endY)
+    };
+    
+    // 모든 파일 아이템 요소 가져오기
+    const fileItems = fileDisplayRef.current.querySelectorAll('.file-item');
+    const fileDisplayRect = fileDisplayRef.current.getBoundingClientRect();
+    
+    // 현재 선택된 아이템 목록 복사
+    // Ctrl 또는 Shift 키가 눌려있을 때 기존 선택 유지
+    let newSelectedItems = isCtrlPressed || isShiftPressed ? [...selectedItems] : [];
+
+    // 선택 시작 시 이미 선택된 파일 목록 저장
+    const initialSelectedItems = [...newSelectedItems];
+    
+    // 각 아이템이 선택 영역 내에 있는지 확인
+    fileItems.forEach((item) => {
+      const itemRect = item.getBoundingClientRect();
+      
+      // 아이템의 상대적 위치 계산
+      const itemLeft = itemRect.left - fileDisplayRect.left;
+      const itemTop = itemRect.top - fileDisplayRect.top + fileDisplayRef.current.scrollTop;
+      const itemRight = itemRect.right - fileDisplayRect.left;
+      const itemBottom = itemRect.bottom - fileDisplayRect.top + fileDisplayRef.current.scrollTop;
+      
+      // 아이템과 선택 영역이 겹치는지 확인
+      const isOverlapping = !(
+        itemRight < normalizedRect.left ||
+        itemLeft > normalizedRect.right ||
+        itemBottom < normalizedRect.top ||
+        itemTop > normalizedRect.bottom
+      );
+      
+      // 데이터 속성에서 파일 ID 가져오기
+      const fileId = item.getAttribute('data-file-id');
+      
+      if (fileId) {
+        if (isOverlapping) {
+          // Ctrl 키가 눌려있을 때: 선택 토글
+          if (isCtrlPressed) {
+            // 초기 선택에 없던 항목이면서 현재 드래그에 처음 포함된 경우에만 토글
+            if (!initialSelectedItems.includes(fileId) && !newSelectedItems.includes(fileId)) {
+              newSelectedItems.push(fileId);
+            } 
+            // 이미 초기 선택에 있었던 항목이 드래그 영역에 포함되면 선택 해제
+            else if (initialSelectedItems.includes(fileId) && newSelectedItems.includes(fileId)) {
+              newSelectedItems = newSelectedItems.filter(id => id !== fileId);
+            }
+          } 
+          // Shift 키나 일반 드래그: 항상 선택에 추가
+          else {
+            if (!newSelectedItems.includes(fileId)) {
+              newSelectedItems.push(fileId);
+            }
+          }
+          
+          // 선택된 스타일 적용 (aria-selected 속성)
+          item.setAttribute('aria-selected', 'true');
+        } else if (!isCtrlPressed && !isShiftPressed) {
+          // Ctrl 또는 Shift 키가 눌려있지 않으면, 선택 영역을 벗어난 항목은 선택 해제
+          newSelectedItems = newSelectedItems.filter(id => id !== fileId);
+          item.setAttribute('aria-selected', 'false');
+        }
+      }
+    });
+    
+    // 선택된 아이템 목록 업데이트
+    setSelectedItems(newSelectedItems);
+  }, [fileDisplayRef, selectionRect, isCtrlPressed, isShiftPressed, selectedItems]);
+
+  // 마우스 다운 이벤트 핸들러 - 드래그 선택 시작
+  const handleMouseDown = useCallback((e) => {
+    // 파일이나 폴더가 아닌 빈 영역을 클릭했을 때만 드래그 선택 시작
+    if (e.target === fileDisplayRef.current || e.target.className === 'file-grid') {
+      // 마우스 우클릭이면 건너뛰기 (컨텍스트 메뉴용)
+      if (e.button === 2) return;
+      
+      // 파일 영역에 대한 상대적 위치 계산
+      const rect = fileDisplayRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top + fileDisplayRef.current.scrollTop;
+      
+      // 선택 시작점과 선택 영역 초기화
+      setSelectionRect({ startX: x, startY: y, endX: x, endY: y });
+      setIsDraggingSelection(true);
+      
+      // Ctrl이나 Shift 키가 눌려있지 않으면 기존 선택 해제
+      if (!isCtrlPressed && !isShiftPressed) {
+        setSelectedItems([]);
+      }
+      
+      // 이벤트 기본 동작 방지
+      e.preventDefault();
+    }
+  }, [fileDisplayRef, isCtrlPressed, isShiftPressed]);
+
+  // 마우스 이동 이벤트 핸들러 - 드래그 선택 업데이트
+  const handleMouseMove = useCallback((e) => {
+    if (isDraggingSelection && fileDisplayRef.current) {
+      const rect = fileDisplayRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top + fileDisplayRef.current.scrollTop;
+      
+      setSelectionRect(prev => ({
+        ...prev,
+        endX: x,
+        endY: y
+      }));
+      
+      // 선택 영역 내 아이템 계산 - 이 부분이 중요!
+      updateItemsInSelectionRect();
+    }
+  }, [isDraggingSelection, fileDisplayRef, updateItemsInSelectionRect]);
+
+  // 마우스 업 이벤트 핸들러 - 드래그 선택 종료
+  const handleMouseUp = useCallback(() => {
+    if (isDraggingSelection) {
+      // 드래그 선택 완료 시 선택 영역 내의 항목 최종 계산
+      updateItemsInSelectionRect();
+      
+      setIsDraggingSelection(false);
+      setJustFinishedDragging(true);
+      
+      // 짧은 시간 후 드래그 직후 상태 초기화
+      setTimeout(() => {
+        setJustFinishedDragging(false);
+      }, 100); // 100ms 지연
+      
+      if (selectedItems.length > 0) {
+        setLastSelectedItem(selectedItems[selectedItems.length - 1]);
+      }
+    }
+  }, [isDraggingSelection, updateItemsInSelectionRect, selectedItems]);
+
   // 항목 선택 처리
   const handleItemSelect = (itemId) => {
-    // Ctrl 키가 눌려있는 경우 다중 선택
+    // 드래그 선택 중이거나 드래그 직후에는 처리하지 않음
+    if (isDraggingSelection || justFinishedDragging) return;
+    
+    // Ctrl 키가 눌려있는 경우 다중 선택 토글
     if (isCtrlPressed) {
       setSelectedItems(prevSelected => {
         if (prevSelected.includes(itemId)) {
@@ -70,8 +234,8 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
     // 일반 클릭은 단일 선택
     else {
       if (selectedItems.includes(itemId) && selectedItems.length === 1) {
-        // 이미 선택된 항목을 다시 클릭하면 선택 해제
-        setSelectedItems([]);
+        // 이미 선택된 항목을 다시 클릭하면 선택 유지 (원래는 선택 해제)
+        // setSelectedItems([]);
       } else {
         setSelectedItems([itemId]);
         setLastSelectedItem(itemId);
@@ -81,10 +245,22 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
 
   // 파일 영역 클릭 처리 (빈 공간 클릭시 선택 해제)
   const handleDisplayClick = (e) => {
+    // 드래그 직후 클릭은 무시
+    if (justFinishedDragging) return;
+    
     // 파일이나 폴더 항목 외의 영역 클릭 시 선택 해제
     if (e.target === fileDisplayRef.current || e.target.className === 'file-grid') {
       setSelectedItems([]);
     }
+  };
+
+  // 단일 항목 복사 처리
+  const handleItemCopy = (item) => {
+    setClipboard({ 
+      items: [item], 
+      operation: 'copy' 
+    });
+    showNotification(`"${item.name}" 복사됨`);
   };
 
   // 복사 처리
@@ -117,6 +293,7 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
     showNotification(message);
   }, [selectedItems, files]);
 
+  // 붙여넣기 처리 함수 수정
   const handlePasteItems = useCallback(async () => {
     if (clipboard.items.length === 0) return;
     
@@ -124,39 +301,47 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
       setIsLocalLoading(true);
       
       // 복사 또는 이동 작업 실행
-      for (const item of clipboard.items) {
-        // 이름 충돌 처리 - 같은 이름의 파일이 있는지 확인
+      const operationPromises = clipboard.items.map(async (item) => {
+        // 이름 충돌 확인
         const existingFile = files.find(file => file.name === item.name);
         
         if (existingFile && clipboard.operation === 'copy') {
-          // 사용자에게 확인 또는 자동으로 새 이름 생성
-          // 백엔드 연동 시 이름 충돌 처리를 위한 코드 (현재는 주석 처리)
-          // const nameParts = item.name.split('.');
-          // const ext = nameParts.length > 1 ? '.' + nameParts.pop() : '';
-          // const baseName = nameParts.join('.');
-          // const newFileName = `${baseName} - 복사본${ext}`;
+          // 사용자에게 확인
+          const useNewName = window.confirm(
+            `"${item.name}" 파일이 이미 존재합니다. 복사본을 만드시겠습니까?`
+          );
           
-          // 백엔드 연동 또는 새 이름 지정 로직은 향후 구현 예정
-          console.log('파일 이름 충돌 감지:', item.name);
+          if (!useNewName) {
+            // 사용자가 취소
+            return null;
+          }
         }
         
+        // 복사 또는 이동 작업 실행
         if (clipboard.operation === 'copy') {
-          // 복사 구현: 현재는 백엔드 API 연동이 필요하므로 실제 구현은 생략
-          // 알림 표시
-          showNotification('복사된 항목을 백엔드에 저장하는 기능은 아직 구현되지 않았습니다');
-        } else if (clipboard.operation === 'cut') {
-          // 이동 구현: onMoveItem 함수 호출
-          await onMoveItem(item.id, currentPath);
+          return onCopyItem(item.id, currentPath);
+        } else {
+          return onMoveItem(item.id, currentPath);
         }
-      }
+      });
       
-      // 붙여넣기 후 클립보드 초기화 (cut인 경우만)
+      // 모든 작업이 완료될 때까지 대기
+      await Promise.all(operationPromises.filter(p => p !== null));
+      
+      // 잘라내기였다면 클립보드 초기화
       if (clipboard.operation === 'cut') {
         setClipboard({ items: [], operation: null });
       }
       
       // 선택 해제
       setSelectedItems([]);
+      
+      // 성공 메시지
+      const message = clipboard.items.length === 1
+        ? `"${clipboard.items[0].name}" ${clipboard.operation === 'copy' ? '복사됨' : '이동됨'}`
+        : `${clipboard.items.length}개 항목 ${clipboard.operation === 'copy' ? '복사됨' : '이동됨'}`;
+      
+      showNotification(message);
       
       // 목록 갱신
       onRefresh();
@@ -166,7 +351,7 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
     } finally {
       setIsLocalLoading(false);
     }
-  }, [clipboard, files, currentPath, onMoveItem, onRefresh]);
+  }, [clipboard, files, currentPath, onCopyItem, onMoveItem, onRefresh]);
 
   // 선택된 항목 삭제 처리
   const handleDeleteSelectedItems = useCallback(async () => {
@@ -410,6 +595,33 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
     handleCutItems, 
     handlePasteItems, 
     handleDeleteSelectedItems
+  ]);
+
+  // 드래그 선택을 위한 이벤트 리스너 추가
+  useEffect(() => {
+    const fileDisplayEl = fileDisplayRef.current;
+    
+    if (fileDisplayEl) {
+      fileDisplayEl.addEventListener('mousedown', handleMouseDown);
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      
+      return () => {
+        fileDisplayEl.removeEventListener('mousedown', handleMouseDown);
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [
+    isDraggingSelection,
+    selectionRect,
+    isCtrlPressed,
+    isShiftPressed,
+    justFinishedDragging,
+    selectedItems,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp
   ]);
 
   // 컨텍스트 메뉴 외부 클릭 감지
@@ -1004,7 +1216,9 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
               onDelete={() => handleItemDelete(file.id)}
               onRename={(newName) => handleItemRename(file.id, newName)}
               onMove={handleItemMove}
+              onCopy={handleItemCopy} // 새로 추가
               isSelected={selectedItems.includes(file.id)}
+              data-file-id={file.id} // 선택 영역 탐지를 위해 ID 속성 추가
             />
           ))
         ) : (
@@ -1016,6 +1230,24 @@ const FileDisplay = ({ files, directories, currentPath, onAddFile, onCreateFolde
           </div>
         )}
       </div>
+
+      {/* 드래그 선택 영역 표시 */}
+      {isDraggingSelection && (
+        <div 
+          className="selection-rect"
+          style={{
+            position: 'absolute',
+            left: Math.min(selectionRect.startX, selectionRect.endX) + 'px',
+            top: Math.min(selectionRect.startY, selectionRect.endY) + 'px',
+            width: Math.abs(selectionRect.endX - selectionRect.startX) + 'px',
+            height: Math.abs(selectionRect.endY - selectionRect.startY) + 'px',
+            backgroundColor: 'rgba(65, 105, 225, 0.2)',
+            border: '1px solid rgba(65, 105, 225, 0.5)',
+            pointerEvents: 'none', // 선택 영역이 마우스 이벤트를 방해하지 않도록
+            zIndex: 1
+          }}
+        />
+      )}
 
       {isDragging && (
         <div className="drop-overlay">

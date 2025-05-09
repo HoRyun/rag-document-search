@@ -474,6 +474,12 @@
   transition: background-color 0.3s, color 0.3s, box-shadow 0.3s;
 }
 
+/* 드래그 선택 중일 때 선택된 항목 스타일 */
+.file-item[data-file-id][aria-selected="true"] {
+  background-color: rgba(65, 105, 225, 0.1);
+  border: 2px solid #4169e1;
+}
+
 @keyframes notification-fade-in {
   from {
     opacity: 0;
