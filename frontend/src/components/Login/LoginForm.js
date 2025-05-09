@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import "./LoginForm.css";
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000/fast_api";
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://3.37.45.205:8000/fast_api";
 
 const LoginForm = ({ onLoginSuccess, onShowRegister }) => {
   const [username, setUsername] = useState("");
