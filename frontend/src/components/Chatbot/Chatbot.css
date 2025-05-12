@@ -1,43 +1,53 @@
-.chatbot-toggle {
+/* EnhancedChatbot.css */
+/* 챗봇과 가이드를 함께 감싸는 컨테이너 */
+.chatbot-wrapper {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  width: 120px;
-  height: 40px;
-  background-color: var(--highlight-color);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 16px;
   z-index: 1000;
-  box-shadow: 0 2px 10px var(--shadow-color);
-  transition: background-color 0.3s, box-shadow 0.3s;
+  display: flex; /* flex-direction 기본값은 row */
+  align-items: flex-end;
+  gap: 20px; /* 챗봇과 가이드 사이 간격 */
 }
 
-.chatbot-toggle:hover {
-  background-color: var(--highlight-hover);
+/* 챗봇 가이드 패널 - 너비 조정 */
+.chatbot-guide-panel {
+  width: 800px; /* 너무 넓지 않게 조정 */
+  height: 600px; 
+  order: 1; /* 가이드를 먼저 표시 (왼쪽) */
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  animation: guide-appear 0.3s ease;
+  /* 가로 스크롤 방지 */
+  overflow: hidden;
 }
 
-.chatbot-container {
-  position: fixed;
-  top: 70px;
-  right: 20px;
+.enhanced-chatbot-container {
   width: 400px;
   height: 500px;
+  order: 2; /* 챗봇을 두 번째로 표시 (오른쪽) */
   background-color: var(--bg-primary);
   border-radius: 8px;
   box-shadow: 0 2px 10px var(--shadow-color);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  z-index: 1000;
   transition: transform 0.3s ease, opacity 0.3s ease, background-color 0.3s, box-shadow 0.3s;
 }
 
-.chatbot-container.open {
+.enhanced-chatbot-container.open {
   transform: translateY(0);
   opacity: 1;
+}
+
+@keyframes guide-appear {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .chatbot-header {
@@ -183,4 +193,316 @@
 
 @keyframes spin {
   to { transform: translateY(-50%) rotate(360deg); }
+}
+
+.chatbot-toggle {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 120px;
+  height: 40px;
+  background-color: var(--highlight-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  z-index: 1000;
+  box-shadow: 0 2px 10px var(--shadow-color);
+  transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.chatbot-toggle:hover {
+  background-color: var(--highlight-hover);
+}
+
+/* 명령 결과 모달 스타일 */
+.result-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--modal-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  transition: background-color 0.3s;
+}
+
+.result-modal {
+  width: 500px;
+  max-width: 90%;
+  max-height: 90vh;
+  background-color: var(--bg-primary);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px var(--shadow-color);
+  overflow: hidden;
+  animation: modal-appear 0.3s ease;
+  transition: background-color 0.3s, box-shadow 0.3s;
+  overflow-y: auto;
+}
+
+@keyframes modal-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 명령 결과 컴포넌트 스타일 */
+.command-result {
+  padding: 20px;
+}
+
+.command-result h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 18px;
+  color: var(--text-primary);
+  transition: color 0.3s;
+}
+
+.command-result h4 {
+  margin-top: 15px;
+  margin-bottom: 10px;
+  font-size: 16px;
+  color: var(--text-primary);
+  transition: color 0.3s;
+}
+
+/* 문서 검색 결과 스타일 */
+.document-search .result-list {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 15px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  transition: border-color 0.3s;
+}
+
+.document-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  border-bottom: 1px solid var(--border-color);
+  transition: border-color 0.3s;
+}
+
+.document-item:last-child {
+  border-bottom: none;
+}
+
+.document-item:hover {
+  background-color: var(--item-hover);
+}
+
+.document-icon {
+  width: 24px;
+  height: 24px;
+  margin-right: 10px;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="%234285F4" d="M14,2H6C4.9,2,4,2.9,4,4v16c0,1.1,0.9,2,2,2h12c1.1,0,2-0.9,2-2V8L14,2z M16,18H8v-2h8V18z M16,14H8v-2h8V14z M13,9V3.5L18.5,9H13z"/></svg>');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  flex-shrink: 0;
+}
+
+.document-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.document-name {
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.3s;
+}
+
+.document-path {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.3s;
+}
+
+/* 작업 미리보기 스타일 */
+.action-preview .preview-message {
+  margin-bottom: 15px;
+  padding: 10px 15px;
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-weight: 500;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.action-illustration {
+  margin-bottom: 15px;
+  padding: 15px;
+  background-color: var(--bg-secondary);
+  border-radius: 4px;
+  transition: background-color 0.3s;
+}
+
+.move-illustration,
+.copy-illustration {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+}
+
+.source-path,
+.target-path,
+.parent-path {
+  padding: 8px 12px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  flex: 1;
+  text-align: center;
+  transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+}
+
+.arrow {
+  margin: 0 15px;
+  font-size: 24px;
+  color: var(--text-tertiary);
+  transition: color 0.3s;
+}
+
+.folder-illustration {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.new-folder {
+  display: flex;
+  align-items: center;
+  margin-top: 15px;
+  padding: 8px 12px;
+  background-color: var(--folder-bg);
+  border-radius: 4px;
+  color: var(--text-primary);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.folder-icon {
+  width: 20px;
+  height: 16px;
+  margin-right: 8px;
+  background-color: var(--folder-color);
+  position: relative;
+  border-radius: 2px 2px 0 0;
+  transition: background-color 0.3s;
+}
+
+.folder-icon:before {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 3px;
+  background-color: var(--folder-color);
+  top: -3px;
+  left: 0;
+  border-radius: 2px 2px 0 0;
+  transition: background-color 0.3s;
+}
+
+/* 요약 결과 스타일 */
+.summarize-result .summary-content {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: var(--bg-secondary);
+  border-radius: 4px;
+  color: var(--text-primary);
+  max-height: 200px;
+  overflow-y: auto;
+  line-height: 1.6;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.save-options {
+  margin-bottom: 20px;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.option input {
+  margin-right: 8px;
+}
+
+.option label {
+  color: var(--text-primary);
+  transition: color 0.3s;
+}
+
+/* 버튼 스타일 */
+.action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.action-btn,
+.confirm-btn,
+.cancel-btn,
+.neutral-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.action-btn,
+.confirm-btn {
+  background-color: var(--highlight-color);
+  color: white;
+}
+
+.action-btn:hover,
+.confirm-btn:hover {
+  background-color: var(--highlight-hover);
+}
+
+.cancel-btn {
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.cancel-btn:hover {
+  background-color: var(--item-hover);
+}
+
+.neutral-btn {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+}
+
+.neutral-btn:hover {
+  background-color: var(--item-hover);
 }

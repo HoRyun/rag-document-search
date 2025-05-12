@@ -28,7 +28,7 @@ class Document(Base):
     upload_time = Column(DateTime, default=datetime.now)
     user_id = Column(Integer, ForeignKey("users.id"))
     
-    owner = relationship("User", back_populates="documents")
+    owner = relationship("User", back_populates="documents") # 이 코드 설명을 들어야 함.
     chunks = relationship("DocumentChunk", back_populates="document")
 
 class DocumentChunk(Base):
@@ -38,7 +38,6 @@ class DocumentChunk(Base):
     id = Column(Integer, primary_key=True, index=True)
     document_id = Column(Integer, ForeignKey("documents.id"))
     content = Column(String)
-    meta = Column(JSON)
     embedding = Column(Vector(1536))
     document = relationship("Document", back_populates="chunks") 
 

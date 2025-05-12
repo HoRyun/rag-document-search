@@ -68,7 +68,11 @@ async def process_document(
         
         # 문서 정보 저장 중 오류 발생 시 예외 처리
         try:
-            crud.add_documents(db, file_name, s3_key, datetime.now(), user_id)
+            if crud.get_file_info_by_filename(db, file_name):
+                # 만약 이 파일이 db에 이미 존재한다면 이 파일을 또 저장하지 않는다.
+                pass
+            else:
+                crud.add_documents(db, file_name, s3_key, datetime.now(), user_id)
         except Exception as e:
             print(f"Error adding documents: {str(e)}")
             print(traceback.format_exc())
@@ -97,7 +101,9 @@ async def process_document(
         # 5. 벡터 스토어에 청크들을 저장
         # 청크들을 임베딩하여 벡터 스토어에 저장한다.
         try:
-            document_id = save_to_vector_store(chunked_documents)
+            # chunked_documents를 db로 보낼때 비동기 처리를 하면 됨.
+            # chunked_documents는 문서에 따라 여러 개의 데이터가 들어가니까 비동기 처리를 해야 함.
+            document_id = await save_to_vector_store(db, chunked_documents, file_name, file_path)
             print(f"Document {file_name} uploaded and processed successfully")
         except Exception as ve:
             print(f"벡터 저장 중 오류 발생 {str(ve)}")
