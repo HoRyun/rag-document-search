@@ -51,3 +51,4 @@ class Directory(Base):
     is_directory = Column(Boolean)
     parent_id = Column(String)
     created_at = Column(DateTime, default=datetime.now)
+    owner_id = Column(Integer, ForeignKey("users.id"))

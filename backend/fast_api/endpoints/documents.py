@@ -100,10 +100,18 @@ def list_items(
     """지정된 경로의 파일 및 폴더 목록을 반환"""
 
     from sqlalchemy import text
+    from db import crud
     try:
         
         filtered_items = []
-        
+
+        user_id = current_user.id
+
+        # 루트 디렉토리가 존재하지 않으면 생성하고, 존재하면 아무 작업도 하지 않는다.
+        if not crud.get_directory_by_id(db, "root"):
+            # 루트 디렉토리 생성
+            crud.create_directory(db, "root", "/", True, None, datetime.now())
+
         # 프론트 엔드에서 선택한 경로
         selected_path = path
         # <db에서 디렉토리 정보와 파일 정보 가져오기>
@@ -117,8 +125,9 @@ def list_items(
                 WHERE path LIKE :selected_path || '/%' 
                 AND path NOT LIKE :selected_path || '/%/%' 
                 AND is_directory = FALSE
+                AND owner_id = :user_id
             """)
-            file_result = connection.execute(file_query, {"selected_path": selected_path}).mappings().fetchall()
+            file_result = connection.execute(file_query, {"selected_path": selected_path, "user_id": user_id}).mappings().fetchall()
             
             # 디렉토리 목록 쿼리
             dir_query = text("""
@@ -128,8 +137,9 @@ def list_items(
                 AND path NOT LIKE :selected_path || '/%/%' 
                 AND is_directory = TRUE
                 AND id <> 'root'
+                AND owner_id = :user_id
             """)
-            dir_result = connection.execute(dir_query, {"selected_path": selected_path}).mappings().fetchall()
+            dir_result = connection.execute(dir_query, {"selected_path": selected_path, "user_id": user_id}).mappings().fetchall()
         # </db에서 디렉토리 정보와 파일 정보 가져오기>
 
         # <가져온 정보를 filtered_items에 추가>
@@ -182,7 +192,7 @@ async def upload_document(
             else:
                 # 디렉토리 업로드인 경우
                 # 디렉토리 업로드 처리
-                directory_results = await process_directory_uploads(current_upload_path, directory_structure, db)
+                directory_results = await process_directory_uploads(current_upload_path, directory_structure, current_user, db)
                 results["items"].extend(directory_results)
 
                 # 파일 업로드 처리
@@ -215,8 +225,15 @@ async def get_filesystem_structure(
     # get_filesystem_structure 엔드포인트와 "/"엔드포인트가 프론트엔드 입장에서 어떤 차이를 가지는지 알아보기.
     from db import crud
     try:
+        user_id = current_user.id
+
+        # 루트 디렉토리가 존재하지 않으면 생성하고, 존재하면 아무 작업도 하지 않는다.
+        if not crud.get_directory_by_id(db, "root"):
+            # 루트 디렉토리 생성
+            crud.create_directory(db, "root", "/", True, None, datetime.now())
+
         # 디렉토리만 필터링. 디렉토리 구조만 보내면 됨.
-        directories = crud.get_only_directory(db)
+        directories = crud.get_only_directory(db, user_id)
 
         # <로직>
         # 1) 최상위 디렉토리 이름(root) 찾기
@@ -258,7 +275,7 @@ async def query_document(query: str = Form(...)):
 
 
 # 유틸 함수
-async def process_directory_uploads(current_upload_path, directory_structure, db):
+async def process_directory_uploads(current_upload_path, directory_structure, current_user, db):
     """디렉토리 업로드 처리"""
     # 라이브러리 임포트
     import json
@@ -267,6 +284,7 @@ async def process_directory_uploads(current_upload_path, directory_structure, db
 
     # 결과가 저장될 리스트를 미리 선언
     results = []
+    user_id = current_user.id
 
     # 1. 문자열로 받은 디렉토리 구조를 파이썬 dict로 변환
     tree: Dict[str, Any] = json.loads(directory_structure)
@@ -276,7 +294,7 @@ async def process_directory_uploads(current_upload_path, directory_structure, db
     top_dir_results, top_dir_children = process_top_directory(tree, current_upload_path, db)
  
     # Store DB : directories 테이블에 저장
-    results.append(store_directory_table(db, top_dir_results))
+    results.append(store_directory_table(db, top_dir_results, user_id))
 
     # 3. 재귀로 하위 디렉토리 및 파일 처리
     async def traverse(name: str, subtree: Dict[str, Any], parent_id: str, parent_path: str):
@@ -297,7 +315,7 @@ async def process_directory_uploads(current_upload_path, directory_structure, db
         }
         
         # Store DB : directories 테이블에 저장
-        results.append(store_directory_table(db, child_dir_value_dict))
+        results.append(store_directory_table(db, child_dir_value_dict, user_id))
         
 
         # 3-1. 하위 디렉토리 탐색
@@ -365,7 +383,7 @@ async def process_file_uploads(files, current_upload_path, current_user, db):
                 "created_at": datetime.now().isoformat()
             }
             # 디렉토리 테이블에 정보 저장
-            results.append(store_directory_table(db, directory_value_dict))
+            results.append(store_directory_table(db, directory_value_dict, user_id))
     except Exception as e:
         print(e)
     return results
@@ -420,7 +438,7 @@ async def process_directory_operations(operations, user_id: int, db):
                         "operation":op_type
                     }                    
                     # 디렉토리 정보 저장
-                    results.append(store_directory_table(db, directory_value_dict))                    
+                    results.append(store_directory_table(db, directory_value_dict, user_id))                    
                 else:
                     # 새 폴더를 생성하는 위치가 루트가 아닌 경우
                     # 새로운 path 설정
@@ -438,7 +456,7 @@ async def process_directory_operations(operations, user_id: int, db):
                         "operation":op_type
                     }                    
                     # 디렉토리 정보 저장
-                    results.append(store_directory_table(db, directory_value_dict))
+                    results.append(store_directory_table(db, directory_value_dict, user_id))
             
             # 항목 이동
             elif op_type == "move":
@@ -754,7 +772,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                     "operation":op_type
                                 }
                                 # 디렉토리 정보 저장
-                                results.append(store_directory_table(db, directory_value_dict))
+                                results.append(store_directory_table(db, directory_value_dict, user_id))
                                 #
                                 # 자식 디렉토리 처리
                                 # 자식 디렉토리 리스트
@@ -787,7 +805,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                         "operation":op_type
                                     }
                                     # 디렉토리 정보 저장
-                                    results.append(store_directory_table(db, directory_value_dict))                                
+                                    results.append(store_directory_table(db, directory_value_dict, user_id))                                
                                 # 자식 파일 처리
                                 # 자식 파일 리스트
                                 child_files = crud.get_child_file_ids(db, target_item_id)
@@ -852,7 +870,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                         "operation":op_type
                                     }                        
                                     # 디렉토리 정보 저장
-                                    results.append(store_directory_table(db, directory_value_dict))                                 
+                                    results.append(store_directory_table(db, directory_value_dict, user_id))                                 
                             else:# 목적지가 루트가 아니지만 아이템을 복사한 위치와 붙여넣기 하는 위치가 동일함.
                                 # target 처리
                                 # target의 새 아이디 설정
@@ -880,7 +898,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                     "operation":op_type
                                 }
                                 # 디렉토리 정보 저장
-                                results.append(store_directory_table(db, directory_value_dict))
+                                results.append(store_directory_table(db, directory_value_dict, user_id))
                                 #
                                 # 자식 디렉토리 처리
                                 # 자식 디렉토리 리스트
@@ -912,7 +930,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                         "operation":op_type
                                     }
                                     # 디렉토리 정보 저장
-                                    results.append(store_directory_table(db, directory_value_dict))                                
+                                    results.append(store_directory_table(db, directory_value_dict, user_id))                                
                                 # 자식 파일 처리
                                 # 자식 파일 리스트
                                 child_files = crud.get_child_file_ids(db, target_item_id)
@@ -976,7 +994,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                         "operation":op_type
                                     }                        
                                     # 디렉토리 정보 저장
-                                    results.append(store_directory_table(db, directory_value_dict))                                
+                                    results.append(store_directory_table(db, directory_value_dict, user_id))                                
                         elif (target_item_copied_path != '/') and (target_destination_path == "/"):# 목적지가 루트인 경우
 
                             # target의 부모의 기존 path. 
@@ -1008,7 +1026,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                 "operation":op_type
                             }
                             # 디렉토리 정보 저장
-                            results.append(store_directory_table(db, directory_value_dict))
+                            results.append(store_directory_table(db, directory_value_dict, user_id))
 
                             # 자식 디렉토리 처리
                             # 자식 디렉토리 리스트
@@ -1041,7 +1059,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                     "operation":op_type
                                 }
                                 # 디렉토리 정보 저장
-                                results.append(store_directory_table(db, directory_value_dict))
+                                results.append(store_directory_table(db, directory_value_dict, user_id))
                             
                             # 자식 파일 리스트
                             child_files = crud.get_child_file_ids(db, target_item_id)
@@ -1104,7 +1122,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                     "operation":op_type
                                 }                        
                                 # 디렉토리 정보 저장
-                                results.append(store_directory_table(db, directory_value_dict))
+                                results.append(store_directory_table(db, directory_value_dict, user_id))
                                 # 자식 파일 처리 끝.
                         else:# 목적지가 루트가 아닌 경우
                             # target의 부모의 기존 path. 
@@ -1136,7 +1154,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                 "operation":op_type
                             }
                             # 디렉토리 정보 저장
-                            results.append(store_directory_table(db, directory_value_dict))
+                            results.append(store_directory_table(db, directory_value_dict, user_id))
 
                             # 자식 디렉토리 처리
                             # 자식 디렉토리 리스트
@@ -1169,7 +1187,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                     "operation":op_type
                                 }
                                 # 디렉토리 정보 저장
-                                results.append(store_directory_table(db, directory_value_dict))
+                                results.append(store_directory_table(db, directory_value_dict, user_id))
                             
                             # 자식 파일 리스트
                             child_files = crud.get_child_file_ids(db, target_item_id)
@@ -1235,7 +1253,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                     "operation":op_type
                                 }                        
                                 # 디렉토리 정보 저장
-                                results.append(store_directory_table(db, directory_value_dict))
+                                results.append(store_directory_table(db, directory_value_dict, user_id))
                                 # 자식 파일 처리 끝.                            
                         # 데이터 처리 및 저장.
                     else:# 단일 디렉토리인 경우
@@ -1304,7 +1322,7 @@ async def process_directory_operations(operations, user_id: int, db):
                             "operation":op_type
                         }                    
                         # 저장 및 저장된 결과를 리턴.
-                        results.append(store_directory_table(db, directory_value_dict))
+                        results.append(store_directory_table(db, directory_value_dict, user_id))
                 else:# 파일인 경우
                     
                     # 파일 처리 함수.
@@ -1413,7 +1431,7 @@ async def process_directory_operations(operations, user_id: int, db):
                         "operation":op_type
                     }                        
                     # 디렉토리 정보 저장
-                    results.append(store_directory_table(db, directory_value_dict))
+                    results.append(store_directory_table(db, directory_value_dict, user_id))
             else:
                 results.append({
                     "operation": op_type,
@@ -1565,7 +1583,7 @@ def process_top_directory(tree, current_upload_path: str, db: Session):
     return top_dir_results, top_dir_children
 
 
-def store_directory_table(db: Session, value_dict: dict):
+def store_directory_table(db: Session, value_dict: dict, user_id: int):
     """디렉토리 테이블에 디렉토리 정보를 저장"""
     """모든 오퍼레이션 처리 후 디렉토리에 저장하는 기능을 여기서 처리하도록 수정하기."""
     from db import crud
@@ -1592,7 +1610,8 @@ def store_directory_table(db: Session, value_dict: dict):
                 path=value_dict["path"],
                 is_directory=value_dict["is_directory"],
                 parent_id=value_dict["parent_id"],
-                created_at=value_dict["created_at"]
+                created_at=value_dict["created_at"],
+                owner_id=user_id
             )
             return {
                 "type": type,
@@ -1611,7 +1630,8 @@ def store_directory_table(db: Session, value_dict: dict):
                     path=value_dict["path"],
                     is_directory=value_dict["is_directory"],
                     parent_id=value_dict["parent_id"],
-                    created_at=value_dict["created_at"]
+                    created_at=value_dict["created_at"],
+                    owner_id=user_id
                 )
                 return {
                     "operation": operation_value,
@@ -1629,7 +1649,8 @@ def store_directory_table(db: Session, value_dict: dict):
                     path=value_dict["path"],
                     is_directory=value_dict["is_directory"],
                     parent_id=value_dict["parent_id"],
-                    created_at=value_dict["created_at"]
+                    created_at=value_dict["created_at"],
+                    owner_id=user_id
                 )
                 return {
                     "operation": operation_value,
@@ -1647,7 +1668,8 @@ def store_directory_table(db: Session, value_dict: dict):
                     path=value_dict["path"],
                     is_directory=value_dict["is_directory"],
                     parent_id=value_dict["parent_id"],
-                    created_at=value_dict["created_at"]
+                    created_at=value_dict["created_at"],
+                    owner_id=user_id
                 )
                 return {
                     "operation": operation_value,
@@ -1665,7 +1687,8 @@ def store_directory_table(db: Session, value_dict: dict):
                     path=value_dict["path"],
                     is_directory=value_dict["is_directory"],
                     parent_id=value_dict["parent_id"],
-                    created_at=value_dict["created_at"]
+                    created_at=value_dict["created_at"],
+                    owner_id=user_id
                 )
                 return {
                     "operation": operation_value,
@@ -1683,7 +1706,8 @@ def store_directory_table(db: Session, value_dict: dict):
                     path=value_dict["path"],
                     is_directory=value_dict["is_directory"],
                     parent_id=value_dict["parent_id"],
-                    created_at=value_dict["created_at"]
+                    created_at=value_dict["created_at"],
+                    owner_id=user_id
                 )
                 return {
                     "operation": operation_value,
@@ -1922,7 +1946,7 @@ async def rename_and_reupload_document(db: Session, user_id: int, reserved_item_
         "operation":op_type
     }
     # 디렉토리 테이블에 저장
-    results.append(store_directory_table(db, directory_value_dict))
+    results.append(store_directory_table(db, directory_value_dict, user_id))
     return results
 
 # edit_path_and_reupload_document
@@ -1980,7 +2004,7 @@ async def edit_path_and_reupload_document(db: Session, user_id: int, file_id: st
         "operation":op_type
     }
     # 디렉토리 테이블에 저장
-    results.append(store_directory_table(db, directory_value_dict))
+    results.append(store_directory_table(db, directory_value_dict, user_id))
     return results
 
 
@@ -2102,7 +2126,7 @@ async def copy_file(db: Session, target_item_id: str, target_destination_path: s
         "operation":op_type
     }                        
     # 디렉토리 정보 저장
-    return store_directory_table(db, directory_value_dict)
+    return store_directory_table(db, directory_value_dict, user_id)
 
 def copy_directory(db: Session, target_item_id: str, target_destination_path: str, user_id: int, op_type: str):
     """단일 디렉토리 복사 프로세스를 함수로 만듦."""
@@ -2182,7 +2206,7 @@ def copy_directory(db: Session, target_item_id: str, target_destination_path: st
         "operation":op_type
     }                    
     # 저장 및 저장된 결과를 리턴.
-    return store_directory_table(db, directory_value_dict)
+    return store_directory_table(db, directory_value_dict, user_id)
 
 
 
