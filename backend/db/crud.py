@@ -4,6 +4,9 @@ from datetime import datetime
 from sqlalchemy import select, func, delete, text
 
 """인덱스
+아이템의 id로 해당 아이템 레코드에서 is_directory 필드의 값을 가져온다.
+(select 문은 이 코드 구조를 기반으로 수정하기.(안정적인 코드이기 때문이다.))
+get_file_is_directory_by_id
 
 특정 디렉토리의 모든 하위(재귀) 중 파일(is_directory=False)인 레코드의 id만 리스트로 반환
 get_child_file_ids
@@ -88,15 +91,18 @@ def get_document_chunks_by_document_id(db: Session, document_id: int):
     return db.query(models.DocumentChunk).filter(models.DocumentChunk.document_id == document_id).all()
 
 # 디렉토리 관련 CRUD
-def create_directory(db: Session, id: str, name: str, path: str, is_directory: bool, parent_id: str, created_at: datetime):
+def create_directory(db: Session, id: str, name: str, path: str, is_directory: bool, parent_id: str, created_at: datetime, owner_id: any=None):
     """새로운 정보로, directories 테이블에 새로운 레코드를 생성하고, 생성한 그 레코드를 반환한다."""
+    if owner_id is not None:
+        owner_id = int(owner_id)    
     db_directory = models.Directory(
         id=id, 
         name=name, 
         path=path, 
         is_directory=is_directory, 
         parent_id=parent_id,
-        created_at=created_at
+        created_at=created_at,
+        owner_id=owner_id
     )
     db.add(db_directory)
     db.commit()
@@ -104,8 +110,8 @@ def create_directory(db: Session, id: str, name: str, path: str, is_directory: b
     return db_directory
 
 # 디렉토리의 정보만 가져오는 함수
-def get_only_directory(db: Session):
-    stmt = select(models.Directory).where(models.Directory.is_directory == True)
+def get_only_directory(db: Session, user_id: any):
+    stmt = select(models.Directory).where(models.Directory.is_directory == True, models.Directory.owner_id == user_id)
     result = db.execute(stmt)
     directories = result.scalars().all()
     return [{"id": d.id, "name": d.name, "path": d.path, "parent_id": d.parent_id} for d in directories]
@@ -195,11 +201,15 @@ def get_file_name_by_id(db: Session, item_id: any):
         item_id = str(item_id)    
     return db.query(models.Directory).filter(models.Directory.id == item_id).first().name
 
+from sqlalchemy import select
+
 def get_file_is_directory_by_id(db: Session, item_id: any):
     """아이템의 id로 해당 아이템 레코드에서 is_directory 필드의 값을 가져온다."""
     if isinstance(item_id, int):
         item_id = str(item_id)
-    return db.query(models.Directory).filter(models.Directory.id == item_id).first().is_directory
+    stmt = select(models.Directory.is_directory).where(models.Directory.id == item_id)
+    result = db.execute(stmt).scalar_one_or_none()
+    return result
 
 
 def update_directory_path_and_parent(db: Session, item_id: str, target_new_path: str, target_new_parent_id: str):
@@ -466,3 +476,11 @@ def update_target_directory_path_parent_id_and_child_dirs(
 
     db.commit()
     return db.query(models.Directory).filter(models.Directory.id == target_id).first()
+
+def get_directory_by_id(db: Session, item_id: any):
+    """아이템의 id로 해당 아이템 레코드를 가져온다."""
+    if isinstance(item_id, int):
+        item_id = str(item_id)
+    stmt = select(models.Directory).where(models.Directory.id == item_id)
+    result = db.execute(stmt).scalar_one_or_none()
+    return result    
