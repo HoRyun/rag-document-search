@@ -10,7 +10,7 @@ import "./App.css";
 import "./Theme.css";
 
 // API 기본 URL 설정
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "rag-alb-547296323.ap-northeast-2.elb.amazonaws.com";
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://rag-alb-547296323.ap-northeast-2.elb.amazonaws.com/fast_api";
 
 function App() {
   const [files, setFiles] = useState([]);
