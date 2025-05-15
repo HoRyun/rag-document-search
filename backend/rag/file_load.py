@@ -77,35 +77,55 @@ async def load_docx(docx_content):
 
 
 
-def load_hwp(file_path, file_extension):
+async def load_hwp(file_content, file_extension="hwp"):
     """HWP/HWPX 문서 처리"""
     print(f"Loading {file_extension.upper()} file...")
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as temp:
-        temp_path = temp.name
+    
+    # 임시 파일 생성 (HWP/HWPX 파일용)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_extension}") as hwp_temp:
+        hwp_temp.write(file_content)
+        hwp_path = hwp_temp.name
+    
+    # 텍스트 출력용 임시 파일
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as txt_temp:
+        txt_path = txt_temp.name
     
     try:
-        print(f"Running hwp5txt on {file_path} with output to {temp_path}")
-        subprocess.run(['hwp5txt', file_path, '--output', temp_path], check=True)
+        print(f"Running hwp5txt on temporary file with output to {txt_path}")
+        subprocess.run(['hwp5txt', hwp_path, '--output', txt_path], check=True)
         
         # 텍스트 파일 읽기 및 정리
-        with open(temp_path, 'r', encoding='utf-8') as f:
+        with open(txt_path, 'r', encoding='utf-8') as f:
             text = f.read()
         
         # 텍스트 정리
         text = clean_text(text)
         
-        # 정리된 텍스트로 파일 다시 쓰기
-        with open(temp_path, 'w', encoding='utf-8') as f:
-            f.write(text)
+        # 페이지 구분 (빈 줄이 여러 개 있는 곳을 페이지 구분자로 간주)
+        # 일반적으로 HWP 문서는 페이지 구분이 명확하지 않아 휴리스틱하게 처리
+        page_delimiter = re.compile(r'\n{3,}')  # 3줄 이상의 빈 줄을 페이지 구분자로 간주
+        pages = page_delimiter.split(text)
         
-        loader = TextLoader(temp_path, encoding='utf-8')
-        documents = loader.load()
-        print(f"Created {len(documents)} document(s) from {file_extension.upper()}")
+        # 빈 페이지 제거 및 공백 정리
+        documents = [page.strip() for page in pages if page.strip()]
+        
+        # 페이지 분할이 제대로 되지 않은 경우 (페이지가 하나만 있는 경우)
+        if len(documents) <= 1:
+            # 약 1000자 단위로 페이지 분할
+            text = documents[0] if documents else text
+            page_size = 1000
+            documents = [text[i:i+page_size] for i in range(0, len(text), page_size)]
+        
+        print(f"HWP 문서를 {len(documents)}개의 페이지로 분할했습니다.")
         return documents
     except Exception as e:
-        print(f"Error processing {file_extension.upper()} file: {str(e)}")
+        print(f"{file_extension.upper()} 파일 처리 중 오류 발생: {str(e)}")
         import traceback
         print(traceback.format_exc())
         raise
     finally:
-        os.unlink(temp_path)  # 임시 파일 삭제
+        # 임시 파일 삭제
+        if os.path.exists(hwp_path):
+            os.unlink(hwp_path)
+        if os.path.exists(txt_path):
+            os.unlink(txt_path)

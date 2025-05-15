@@ -87,8 +87,7 @@ async def process_document(
         elif file_extension == 'docx':
             documents = await load_docx(file_content) # file 대신 file_content를 매개변수로 전달
         elif file_extension in ['hwp', 'hwpx']:
-            # documents = load_hwp(file, file_extension)
-            pass
+            documents = await load_hwp(file_content, file_extension)
 
 
 
