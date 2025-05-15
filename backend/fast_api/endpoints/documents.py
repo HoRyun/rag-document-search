@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+
 # 로거 설정
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -342,8 +343,8 @@ async def process_file_uploads(files, current_upload_path, current_user, db):
     try:
     # 3-2. 해당 디렉토리에 포함된 파일 처리
         for upload_file in files:
-            
-            # 파일 이름을 추출.
+
+            # 파일 이름을 추출 & 파일 이름 중복 처리.
             file_name = set_filename(upload_file, db)
 
             # s3 key 생성
@@ -358,6 +359,8 @@ async def process_file_uploads(files, current_upload_path, current_user, db):
             # 파일 업로드 처리 시작
             # <파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
             file_content = await upload_file.read()
+
+            # 문서
 
             # s3 업로드
             s3_upload_result = await upload_file_to_s3(upload_file, s3_key, file_name, file_path)
@@ -411,7 +414,7 @@ async def process_directory_operations(operations, user_id: int, db):
             # 새 폴더 생성
             if op_type == "create":
                 new_folder_id = str(uuid.uuid4())
-                
+                reserved_path = op.get("path", "/")
                 # # 경로 정규화
                 # if not reserved_path.endswith("/"):
                 #     reserved_path += "/"
@@ -436,7 +439,7 @@ async def process_directory_operations(operations, user_id: int, db):
                         "parent_id": parent_id,
                         "created_at": datetime.now().isoformat(),
                         "operation":op_type
-                    }                    
+                    }
                     # 디렉토리 정보 저장
                     results.append(store_directory_table(db, directory_value_dict, user_id))                    
                 else:
@@ -450,7 +453,7 @@ async def process_directory_operations(operations, user_id: int, db):
                         "id": new_folder_id,
                         "name": target_item_new_name,
                         "path": item_path,
-                        "is_directory": item_is_directory,
+                        "is_directory": True,
                         "parent_id": parent_id,
                         "created_at": datetime.now().isoformat(),
                         "operation":op_type
