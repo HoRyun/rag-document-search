@@ -228,6 +228,7 @@ async def get_filesystem_structure(
     try:
         user_id = current_user.id
 
+        # 루트 디렉토리 존재여부 확인 및 생성
         # 루트 디렉토리가 존재하지 않으면 생성하고, 존재하면 아무 작업도 하지 않는다.
         if not crud.get_directory_by_id(db, "root"):
             # 루트 디렉토리 생성
@@ -237,10 +238,7 @@ async def get_filesystem_structure(
         directories = crud.get_only_directory(db, user_id)
 
         # <로직>
-        # 1) 최상위 디렉토리 이름(root) 찾기
-        root = next((d['name'] for d in directories if d['parent_id'] == "root"), None)
-        if not root:
-            raise ValueError("최상위 디렉토리(parent_id='root')를 찾을 수 없습니다.")
+       
 
         # 2) 새 리스트에 수정된 객체 생성
         your_result = []
