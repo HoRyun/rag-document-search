@@ -1,0 +1,151 @@
+.sidebar {
+  width: 250px;
+  height: 100%;
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  overflow-y: auto;
+  transition: background-color 0.3s, border-color 0.3s;
+}
+
+.sidebar-header {
+  padding: 15px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: border-color 0.3s;
+}
+
+.sidebar-header h3 {
+  font-size: 16px;
+  color: var(--text-primary);
+  margin: 0;
+  transition: color 0.3s;
+}
+
+.refresh-sidebar-btn {
+  background-color: transparent;
+  border: none;
+  color: var(--highlight-color);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.refresh-sidebar-btn:hover {
+  background-color: rgba(var(--highlight-color-rgb), 0.1);
+}
+
+.directory-list {
+  padding: 10px 0;
+}
+
+.directory-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 15px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  color: var(--text-primary);
+}
+
+.directory-item:hover {
+  background-color: var(--item-hover);
+}
+
+.directory-item.active {
+  background-color: var(--bg-tertiary);
+  font-weight: bold;
+}
+
+/* 하위 디렉토리 컨테이너 */
+.subdirectory-container {
+  transition: max-height 0.3s ease-in-out;
+  overflow: hidden;
+}
+
+/* 토글 아이콘 스타일 */
+.directory-toggle {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-right: 5px;
+  flex-shrink: 0;
+}
+
+.toggle-icon {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: transform 0.2s, color 0.3s;
+}
+
+.toggle-icon:hover {
+  color: var(--text-primary);
+}
+
+.toggle-icon.expanded {
+  transform: rotate(0deg);
+}
+
+.toggle-icon.collapsed {
+  transform: rotate(-90deg);
+}
+
+.directory-icon {
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.folder-icon {
+  display: inline-block;
+  width: 20px;
+  height: 16px;
+  background-color: var(--folder-color);
+  position: relative;
+  border-radius: 2px 2px 0 0;
+  transition: background-color 0.3s;
+}
+
+.folder-icon:before {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 3px;
+  background-color: var(--folder-color);
+  top: -3px;
+  left: 0;
+  border-radius: 2px 2px 0 0;
+  transition: background-color 0.3s;
+}
+
+.directory-name {
+  font-size: 14px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-grow: 1;
+  transition: color 0.3s;
+}
+
+/* 홈 폴더(루트) 스타일 */
+.directory-item[style*="padding-left: 15px"] {
+  font-weight: 500;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 5px;
+  transition: border-color 0.3s;
+}

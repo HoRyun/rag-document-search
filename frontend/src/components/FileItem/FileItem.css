@@ -1,0 +1,153 @@
+.file-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+  position: relative;
+  color: var(--text-primary);
+}
+
+.file-item:hover {
+  background-color: var(--item-hover);
+}
+
+.file-item.directory-item {
+  background-color: var(--folder-bg);
+}
+
+.file-item.directory-item:hover {
+  background-color: var(--folder-hover);
+}
+
+.file-icon {
+  width: 60px;
+  height: 70px;
+  margin-bottom: 8px;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  transition: filter 0.3s;
+}
+
+/* Dark mode SVG 필터 추가 */
+[data-theme="dark"] .file-icon {
+  filter: brightness(0.8) saturate(0.9);
+}
+
+.document-icon {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="%234285F4" d="M14,2H6C4.9,2,4,2.9,4,4v16c0,1.1,0.9,2,2,2h12c1.1,0,2-0.9,2-2V8L14,2z M16,18H8v-2h8V18z M16,14H8v-2h8V14z M13,9V3.5L18.5,9H13z"/></svg>');
+}
+
+.spreadsheet-icon {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="%230F9D58" d="M14,2H6C4.9,2,4,2.9,4,4v16c0,1.1,0.9,2,2,2h12c1.1,0,2-0.9,2-2V8L14,2z M15,11h-2v2h2V11z M15,15h-2v2h2V15z M11,11H9v2h2V11z M11,15H9v2h2V15z M19,15h-2v2h2V15z M19,11h-2v2h2V11z"/></svg>');
+}
+
+.presentation-icon {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="%23F4B400" d="M19,3H5C3.89,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5C21,3.9,20.1,3,19,3z M6,7h5v5H6V7z M13,7h5v5h-5V7z M6,13h5v4H6V13z M13,13h5v4h-5V13z"/></svg>');
+}
+
+.image-icon {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="%23DB4437" d="M21,19V5c0-1.1-0.9-2-2-2H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14C20.1,21,21,20.1,21,19z M8.5,13.5l2.5,3l3.5-4.5l4.5,6H5L8.5,13.5z"/></svg>');
+}
+
+.blank-icon {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="%239E9E9E" d="M14,2H6C4.9,2,4,2.9,4,4v16c0,1.1,0.9,2,2,2h12c1.1,0,2-0.9,2-2V8L14,2z M6,20V4h7v5h5v11H6z"/></svg>');
+}
+
+.file-icon {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="%23607D8B" d="M6,2C4.9,2,4,2.9,4,4v16c0,1.1,0.9,2,2,2h12c1.1,0,2-0.9,2-2V8l-6-6H6z M13,9V3.5L18.5,9H13z"/></svg>');
+}
+
+.folder-icon {
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="%23FBBC05" d="M10,4H4C2.9,4,2,4.9,2,6v12c0,1.1,0.9,2,2,2h16c1.1,0,2-0.9,2-2V8c0-1.1-0.9-2-2-2h-8L10,4z"/></svg>');
+}
+
+.file-name {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-primary);
+  transition: color 0.3s;
+}
+
+/* 이름 변경 스타일 */
+.file-name-edit {
+  width: 100%;
+  margin-top: 2px;
+}
+
+.rename-input {
+  width: 100%;
+  padding: 3px 6px;
+  font-size: 12px;
+  border: 1px solid var(--highlight-color);
+  border-radius: 4px;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(var(--highlight-color-rgb), 0.2);
+  text-align: center;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: border-color 0.3s, box-shadow 0.3s, background-color 0.3s, color 0.3s;
+}
+
+/* 컨텍스트 메뉴 스타일 */
+.context-menu {
+  background-color: var(--bg-primary);
+  border-radius: 4px;
+  box-shadow: 0 2px 10px var(--shadow-color);
+  width: 150px;
+  z-index: 100;
+  overflow: hidden;
+  transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.context-menu-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary);
+  transition: background-color 0.2s, color 0.3s;
+}
+
+.context-menu-item:hover {
+  background-color: var(--item-hover);
+}
+
+.context-menu-item.delete-item {
+  color: #d32f2f;
+}
+
+.context-menu-item.delete-item:hover {
+  background-color: rgba(211, 47, 47, 0.1);
+}
+
+/* 선택된 항목 스타일 */
+.file-item.selected,
+.file-item[aria-selected="true"] {
+  background-color: rgba(var(--highlight-color-rgb), 0.1);
+  border: 2px solid var(--highlight-color);
+  padding: 8px; /* 테두리 추가로 패딩 감소 */
+}
+
+.file-item.selected:hover,
+.file-item[aria-selected="true"]:hover {
+  background-color: rgba(var(--highlight-color-rgb), 0.15);
+}
+
+/* 드래그 선택 중일 때 선택된 항목 스타일 */
+.file-item[data-file-id][aria-selected="true"] {
+  background-color: rgba(65, 105, 225, 0.1);
+  border: 2px solid #4169e1;
+}
+
+/* 사용자 선택 방지 */
+.file-item {
+  user-select: none; /* 텍스트 선택 방지 */
+  outline: none; /* 기본 포커스 아웃라인 제거 */
+}

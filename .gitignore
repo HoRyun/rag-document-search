@@ -1,3 +1,29 @@
+uploads/
+
+# 사용하지 않는 ollama 무시
+ollama/*
+ollama/
+
+
+#aws
+aws/
+
+#deploy
+package/
+
+#zip
+*.zip
+
+#cursor 파일
+.cursor/*
+
+#zip 파일
+*.zip
+
+#테스트 용 주피터 노트북
+*test.ipynb
+test*.ipynb
+
 # 업로드된 문서 파일
 data/uploads/
 *.pdf
@@ -10,8 +36,15 @@ data/uploads/
 *.xls
 *.xlsx
 
+# 테스트 파일
+test*.py
+*.ipynb
+
 # 데이터베이스 및 벡터 저장소
 data/chroma_db/
+data/faiss_db/
+*.pkl
+*.faiss
 
 # 환경 변수
 .env
@@ -27,6 +60,7 @@ logs/
 # 의존성 디렉토리
 node_modules/
 __pycache__/
+__pycache__
 .pytest_cache/
 .coverage
 htmlcov/
@@ -54,3 +88,20 @@ docker-volumes/
 *.tmp
 *.temp
 .cache/
+.pyc
+
+
+# 개인 메모 파일
+isu_*.txt
+
+# 백업파일
+*.bak
+*.bak2
+*.bak3
+*.bak4
+*.bak5
+*.bak6
+*.bak7
+
+#커서 룰 파일
+.cursor/*

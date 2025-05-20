@@ -1,0 +1,138 @@
+{
+    "taskDefinitionArn": "arn:aws:ecs:ap-northeast-2:286857866962:task-definition/rag-server:1",
+    "containerDefinitions": [
+        {
+            "name": "rag-document-management-backend",
+            "image": "286857866962.dkr.ecr.ap-northeast-2.amazonaws.com/rag-document-management@sha256:127cbec3449545cf5ab91b007119efa3b38e1d15410d6f4f31213887bc14571f",
+            "cpu": 0,
+            "portMappings": [
+                {
+                    "name": "rag-document-management-backend-8000-tcp",
+                    "containerPort": 8000,
+                    "hostPort": 8000,
+                    "protocol": "tcp",
+                    "appProtocol": "http"
+                }
+            ],
+            "essential": true,
+            "environment": [
+                {
+                    "name": "LANGCHAIN_PROJECT",
+                    "value": "${LANGCHAIN_PROJECT}"
+                },
+                {
+                    "name": "DATABASE_URL",
+                    "value": "${DATABASE_URL}"
+                },
+                {
+                    "name": "RDS_PASSWORD",
+                    "value": "${RDS_PASSWORD}"
+                },
+                {
+                    "name": "RDS_USER",
+                    "value": "${RDS_USER}"
+                },
+                {
+                    "name": "LANGCHAIN_API_KEY",
+                    "value": "${LANGCHAIN_API_KEY}"
+                },
+                {
+                    "name": "RDS_DB_NAME",
+                    "value": "${RDS_DB_NAME}"
+                },
+                {
+                    "name": "LANGCHAIN_ENDPOINT",
+                    "value": "${LANGCHAIN_ENDPOINT}"
+                },
+                {
+                    "name": "LANGCHAIN_TRACING_V2",
+                    "value": "${LANGCHAIN_TRACING_V2}"
+                },
+                {
+                    "name": "RDS_ENDPOINT",
+                    "value": "${RDS_ENDPOINT}"
+                },
+                {
+                    "name": "OPENAI_API_KEY",
+                    "value": "${OPENAI_API_KEY}"
+                },
+                {
+                    "name": "S3_BUCKET_NAME",
+                    "value": "${S3_BUCKET_NAME}"
+                }
+            ],
+            "environmentFiles": [],
+            "mountPoints": [],
+            "volumesFrom": [],
+            "ulimits": [],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/rag-server",
+                    "mode": "non-blocking",
+                    "awslogs-create-group": "true",
+                    "max-buffer-size": "25m",
+                    "awslogs-region": "ap-northeast-2",
+                    "awslogs-stream-prefix": "ecs"
+                },
+                "secretOptions": []
+            },
+            "systemControls": []
+        }
+    ],
+    "family": "rag-server",
+    "executionRoleArn": "arn:aws:iam::286857866962:role/ecsTaskExecutionRole",
+    "networkMode": "awsvpc",
+    "revision": 1,
+    "volumes": [],
+    "status": "ACTIVE",
+    "requiresAttributes": [
+        {
+            "name": "com.amazonaws.ecs.capability.logging-driver.awslogs"
+        },
+        {
+            "name": "ecs.capability.execution-role-awslogs"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.ecr-auth"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.19"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.28"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.21"
+        },
+        {
+            "name": "ecs.capability.execution-role-ecr-pull"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.18"
+        },
+        {
+            "name": "ecs.capability.task-eni"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.29"
+        }
+    ],
+    "placementConstraints": [],
+    "compatibilities": [
+        "EC2",
+        "FARGATE"
+    ],
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "cpu": "4096",
+    "memory": "8192",
+    "runtimePlatform": {
+        "cpuArchitecture": "X86_64",
+        "operatingSystemFamily": "LINUX"
+    },
+    "registeredAt": "2025-04-24T18:24:38.581Z",
+    "registeredBy": "arn:aws:iam::286857866962:root",
+    "tags": []
+}

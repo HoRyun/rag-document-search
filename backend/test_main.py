@@ -7,8 +7,11 @@ from unittest.mock import patch, MagicMock
 from datetime import datetime
 from fastapi import HTTPException, status
 
-# 테스트 모드 설정
+# 테스트 모드 설정(github actions 테스트 환경에서 사용)
 os.environ['TEST_MODE'] = 'True'
+
+# 테스트 환경에서 사용할 환경 변수 설정
+os.environ['S3_BUCKET_NAME'] = 'rag-document-management'
 
 # 모의 사용자 객체 생성 (Pydantic 호환)
 class MockUser:
@@ -57,15 +60,17 @@ def get_test_db():
 def get_test_current_user():
     return mock_user
 
-with patch('auth.verify_password', mock_verify_password), \
-     patch('auth.get_password_hash', mock_get_password_hash), \
-     patch('auth.authenticate_user', mock_authenticate_user), \
-     patch('auth.create_access_token', mock_create_access_token), \
+# 패치 경로 변경 및 모듈화된 구조에 맞게 수정
+with patch('fast_api.security.verify_password', mock_verify_password), \
+     patch('fast_api.security.get_password_hash', mock_get_password_hash), \
+     patch('fast_api.security.authenticate_user', mock_authenticate_user), \
+     patch('fast_api.security.create_access_token', mock_create_access_token), \
      patch('db.database.engine'), \
      patch('db.database.SessionLocal'):
 
-    from main import app, register_user
-    from auth import get_current_user
+    from main import app
+    from fast_api.endpoints.users import get_users
+    from fast_api.security import get_current_user
     from db.database import get_db
 
     app.dependency_overrides[get_db] = get_test_db
@@ -109,8 +114,9 @@ def test_register_endpoint_success():
     app.dependency_overrides[get_db] = get_test_db_for_register
 
     try:
+        # 엔드포인트 경로 수정
         response = client.post(
-            "/register",
+            "/fast_api/auth/register",
             json={
                 "username": f"testuser_{generate_random_string()}",
                 "email": f"test_{generate_random_string()}@example.com",
@@ -123,7 +129,7 @@ def test_register_endpoint_success():
 
         data = response.json()
         assert data["id"] == 1
-        assert "created_at" in data
+        assert "username" in data
 
     finally:
         # 테스트 후 원래 의존성으로 복원
@@ -139,11 +145,12 @@ def test_register_endpoint_duplicate():
         )
     
     original_overrides = app.dependency_overrides.copy()
-    app.dependency_overrides[register_user] = mock_duplicate_user
+    app.dependency_overrides[get_users] = mock_duplicate_user
     
     try:
+        # 엔드포인트 경로 수정
         response = client.post(
-            "/register",
+            "/fast_api/auth/register",
             json={
                 "username": "existing_user",
                 "email": "existing@example.com",
@@ -158,9 +165,10 @@ def test_register_endpoint_duplicate():
 
 
 def test_login_endpoint():
-    with patch('auth.authenticate_user', return_value=mock_user):
+    with patch('fast_api.security.authenticate_user', return_value=mock_user):
+        # 엔드포인트 경로 수정
         response = client.post(
-            "/token",
+            "/fast_api/auth/token",
             data={
                 "username": "testuser",
                 "password": "password"
@@ -177,9 +185,9 @@ def test_login_endpoint():
 
 
 def test_user_me_endpoint():
-    
+    # 엔드포인트 경로 수정
     response = client.get(
-        "/users/me",
+        "/fast_api/auth/me",
         headers={"Authorization": "Bearer fake_token"}
     )
     
