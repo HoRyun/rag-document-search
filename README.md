@@ -1,4 +1,5 @@
-[![RAG Document Search CI/CD Pipeline](https://github.com/HoRyun/rag-document-search/actions/workflows/rag-ci-cd.yml/badge.svg)](https://github.com/HoRyun/rag-document-search/actions/workflows/rag-ci-cd.yml)
+[![Frontend Deploy CI/CD Pipeline](https://github.com/HoRyun/rag-document-search/actions/workflows/frontend-ci-cd.yml/badge.svg)](https://github.com/HoRyun/rag-document-search/actions/workflows/frontend-ci-cd.yml)
+[![Backend Deploy to ECS with ALB (develop-cloud)](https://github.com/HoRyun/rag-document-search/actions/workflows/deploy.yml/badge.svg)](https://github.com/HoRyun/rag-document-search/actions/workflows/deploy.yml)
 
 # RAG Document Search
 
