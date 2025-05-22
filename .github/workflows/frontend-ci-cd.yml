@@ -50,7 +50,15 @@ jobs:
           cd frontend
           npm ci
       
+      - name: Set up environment variables
+        run: |
+          cd frontend
+          echo "REACT_APP_API_BASE_URL=${{ secrets.REACT_APP_API_BASE_URL }}" > .env
+          cat .env
+      
       - name: Build frontend
+        env:
+          REACT_APP_API_BASE_URL: ${{ secrets.REACT_APP_API_BASE_URL }}
         run: |
           cd frontend
           npm run build
@@ -71,6 +79,31 @@ jobs:
       #  if: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID != '' }}
       #  run: |
       #    aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
+      
+      - name: Verify deployment
+        run: |
+          echo "Verifying S3 website deployment..."
+          S3_WEBSITE_URL="http://${{ secrets.S3_BUCKET_NAME }}.s3-website.${{ secrets.AWS_REGION }}.amazonaws.com"
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $S3_WEBSITE_URL || echo "Failed")
+          if [[ "$HTTP_STATUS" == "200" ]]; then
+            echo "✅ Website is accessible (HTTP 200)"
+          else
+            echo "⚠️ Website returned HTTP status: $HTTP_STATUS"
+          fi
+
+      - name: Send Discord notification
+        if: always()
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          status: ${{ job.status }}
+          title: "Frontend Deployment to S3"
+          description: |
+            Repository: ${{ github.repository }}
+            Commit: ${{ github.sha }}
+            Ref: ${{ github.ref }}
+            Triggered by: ${{ github.actor }}
+            Website URL: http://${{ secrets.S3_BUCKET_NAME }}.s3-website.${{ secrets.AWS_REGION }}.amazonaws.com
 
   build-docker-image:
     needs: test-frontend
@@ -111,6 +144,8 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/rag-document-frontend:${{ github.sha }}
             ${{ secrets.DOCKER_USERNAME }}/rag-document-frontend:${{ steps.prep.outputs.docker_tag }}
             ${{ secrets.DOCKER_USERNAME }}/rag-document-frontend:latest
+          build-args: |
+            REACT_APP_API_BASE_URL=${{ secrets.REACT_APP_API_BASE_URL }}
           cache-from: type=local,src=/tmp/.buildx-cache-frontend
           cache-to: type=local,dest=/tmp/.buildx-cache-new-frontend,mode=max
 
@@ -118,3 +153,17 @@ jobs:
         run: |
           rm -rf /tmp/.buildx-cache-frontend
           mv /tmp/.buildx-cache-new-frontend /tmp/.buildx-cache-frontend
+          
+      - name: Send Discord notification
+        if: always()
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          status: ${{ job.status }}
+          title: "Frontend Docker Image Build"
+          description: |
+            Repository: ${{ github.repository }}
+            Commit: ${{ github.sha }}
+            Ref: ${{ github.ref }}
+            Triggered by: ${{ github.actor }}
+            Docker Image: ${{ secrets.DOCKER_USERNAME }}/rag-document-frontend:${{ steps.prep.outputs.docker_tag }}
