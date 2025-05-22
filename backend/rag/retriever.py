@@ -3,7 +3,7 @@ from langchain_core.documents import Document
 import numpy as np
 from sqlalchemy import text
 
-def search_similarity(embed_query_data, engine):
+def search_similarity(user_id, embed_query_data, engine):
     """db에서 유사도 검색 수행"""
 # <SQL 쿼리를 날려 사용자 쿼리와 유사한 임베딩 청크 가져오기>
     try:
@@ -25,19 +25,23 @@ def search_similarity(embed_query_data, engine):
             # PostgreSQL에서는 쿼리 매개변수를 직접 쿼리에 포함
             similarity_query = text(    
             f"""SELECT
-                    id,
-                    document_id,
-                    content,
+                    dc.id,
+                    dc.document_id,
+                    dc.content,
                     meta,
-                    embedding,
-                    1 - (embedding <=> CAST('{query_embedding_str}' AS vector)) AS similarity
+                    dc.embedding,
+                    1 - (dc.embedding <=> CAST(:query_embedding_str AS vector)) AS similarity
                 FROM 
                     document_chunks
+                JOIN
+                    documents d ON dc.document_id = d.id
+                    
                 WHERE 
-                    embedding IS NOT NULL
-                    AND vector_dims(embedding) > 0
+                    d.user_id = :user_id
+                    AND dc.embedding IS NOT NULL
+                    AND vector_dims(dc.embedding) > 0
                 ORDER BY 
-                    embedding <=> CAST('{query_embedding_str}' AS vector)
+                    dc.embedding <=> CAST(:query_embedding_str AS vector)
                 LIMIT :top_n
                 """)           
             # 쿼리 실행 (top_n만 파라미터로 전달)
