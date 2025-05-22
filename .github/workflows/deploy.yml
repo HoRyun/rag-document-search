@@ -1,8 +1,8 @@
-name: Backend Deploy to ECS (develop-cloud)
+name: Backend Deploy to ECS with ALB (develop-backend)
 
 on:
   push:
-    branches: [ develop-cloud ]
+    branches: [ develop-backend ]
 
 jobs:
   build-and-deploy-backend:
@@ -30,7 +30,9 @@ jobs:
         with:
           context: ./backend
           push: true
-          tags: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+          tags: |
+            ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+            ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
           build-args: |
             RDS_USER=${{ secrets.RDS_USER }}
             RDS_PASSWORD=${{ secrets.RDS_PASSWORD }}
@@ -43,6 +45,8 @@ jobs:
             LANGCHAIN_TRACING_V2=${{ secrets.LANGCHAIN_TRACING_V2 }}
             S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
             DATABASE_URL=postgresql+psycopg://${{ secrets.RDS_USER }}:${{ secrets.RDS_PASSWORD }}@${{ secrets.RDS_ENDPOINT }}:5432/${{ secrets.RDS_DB_NAME }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Render new ECS task definition
         id: task-def
@@ -71,3 +75,15 @@ jobs:
           service: ${{ secrets.ECS_SERVICE }}
           cluster: ${{ secrets.ECS_CLUSTER }}
           wait-for-service-stability: true
+          
+      - name: Verify deployment
+        run: |
+          echo "Waiting for service to stabilize..."
+          sleep 30
+          ALB_DNS="${{ secrets.ALB_DNS }}"
+          if [ -n "$ALB_DNS" ]; then
+            echo "Testing connection to ALB at $ALB_DNS"
+            curl -s -o /dev/null -w "%{http_code}" "http://$ALB_DNS/fast_api/health" | grep -q "200" && echo "✅ Health check passed" || echo "❌ Health check failed"
+          else
+            echo "ALB_DNS secret not set, skipping verification"
+          fi

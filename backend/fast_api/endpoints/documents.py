@@ -261,12 +261,15 @@ async def get_filesystem_structure(
         raise HTTPException(status_code=500, detail=f"Error fetching filesystem structure: {str(e)}")
 
 @router.post("/query")
-async def query_document(query: str = Form(...)):
+async def query_document(query: str = Form(...), 
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """문서 질의응답 엔드포인트"""
     from db.database import engine  # 기존 엔진을 임포트
-
-    docs = process_query(query,engine)
-
+    user_id = current_user.id
+    docs = process_query(user_id,query,engine)
+    
     answer = get_llms_answer(docs, query)
 
     return {"answer": answer} 
@@ -341,7 +344,6 @@ async def process_file_uploads(files, current_upload_path, current_user, db):
     try:
     # 3-2. 해당 디렉토리에 포함된 파일 처리
         for upload_file in files:
-
             # 파일 이름을 추출 & 파일 이름 중복 처리.
             file_name = set_filename(upload_file, db)
 
@@ -357,9 +359,9 @@ async def process_file_uploads(files, current_upload_path, current_user, db):
             # 파일 업로드 처리 시작
             # <파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
             file_content = await upload_file.read()
-
+            
             # 문서
-
+            
             # s3 업로드
             s3_upload_result = await upload_file_to_s3(upload_file, s3_key, file_name, file_path)
             results.append(s3_upload_result)
@@ -451,7 +453,7 @@ async def process_directory_operations(operations, user_id: int, db):
                         "id": new_folder_id,
                         "name": target_item_new_name,
                         "path": item_path,
-                        "is_directory": True,
+                        "is_directory": item_is_directory,
                         "parent_id": parent_id,
                         "created_at": datetime.now().isoformat(),
                         "operation":op_type

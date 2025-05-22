@@ -119,14 +119,14 @@ async def process_document(
         raise HTTPException(status_code=500, detail=f"Error processing document: {str(e)}")
 
 
-def process_query(query: str, engine) -> str:
+def process_query(user_id, query: str, engine) -> str:
     """사용자의 쿼리를 처리"""
     try:
         # 쿼리 임베딩
         embed_query_data = embed_query(query)
 
         # 검색 결과 가져오기
-        search_similarity_result = search_similarity(embed_query_data, engine)
+        search_similarity_result = search_similarity(user_id, embed_query_data, engine)
 
         # MMR 알고리즘 수행
         docs = do_mmr(search_similarity_result)

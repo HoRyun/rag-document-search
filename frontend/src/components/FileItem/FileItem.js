@@ -1,7 +1,17 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './FileItem.css';
 
-const FileItem = ({ file, onClick, onDoubleClick, onDelete, onRename, onMove, onCopy, isSelected }) => {
+const FileItem = ({ 
+  file, 
+  onClick, 
+  onDoubleClick, 
+  onDelete, 
+  onRename, 
+  onMove, 
+  onCopy, 
+  isSelected,
+  isMobile = false // 모바일 환경 여부 프롭스 추가
+}) => {
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState('');
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -36,6 +46,44 @@ const FileItem = ({ file, onClick, onDoubleClick, onDelete, onRename, onMove, on
       document.removeEventListener('click', handleDocumentClick);
     };
   }, [showContextMenu]);
+  
+  // 모바일 꾹 누르기(long press) 감지
+  const pressTimer = useRef(null);
+  const [isPressing, setIsPressing] = useState(false);
+
+  const handleTouchStart = (e) => {
+    // 모바일에서만 처리
+    if (!isMobile) return;
+    
+    setIsPressing(true);
+    pressTimer.current = setTimeout(() => {
+      // 꾹 누르기 감지 - 컨텍스트 메뉴 표시
+      const touch = e.touches[0];
+      setContextMenuPos({ 
+        x: touch.clientX, 
+        y: touch.clientY 
+      });
+      setShowContextMenu(true);
+      setIsPressing(false);
+      
+      // 브라우저 기본 컨텍스트 메뉴 방지
+      e.preventDefault();
+    }, 500); // 500ms 동안 꾹 누르면 컨텍스트 메뉴 표시
+  };
+
+  const handleTouchEnd = () => {
+    if (!isMobile) return;
+    
+    clearTimeout(pressTimer.current);
+    setIsPressing(false);
+  };
+
+  const handleTouchMove = () => {
+    if (!isMobile) return;
+    
+    clearTimeout(pressTimer.current);
+    setIsPressing(false);
+  };
   
   // Get icon based on file type
   const getFileIcon = () => {
@@ -77,14 +125,31 @@ const FileItem = ({ file, onClick, onDoubleClick, onDelete, onRename, onMove, on
     }
   };
 
+  // 데스크톱에서는 더블클릭, 모바일에서는 일반 클릭으로 처리
   const handleDoubleClick = (e) => {
     if (!isRenaming && onDoubleClick) {
-      onDoubleClick(e);
+      // 모바일 환경에서는 일반 클릭으로 폴더를 열도록 하지 않음
+      // FileDisplay에서 onClick 이벤트에서 처리
+      if (!isMobile) {
+        onDoubleClick(e);
+      }
+    }
+  };
+  
+  // 모바일 환경에서는 일반 클릭으로 폴더를 열도록 처리
+  const handleItemTap = (e) => {
+    if (isMobile && (file.isDirectory || file.type === 'folder')) {
+      if (!isRenaming && onDoubleClick) {
+        onDoubleClick(e);
+      }
     }
   };
   
   // 컨텍스트 메뉴 표시
   const handleContextMenu = (e) => {
+    // 모바일에서는 컨텍스트 메뉴 처리 방식이 다름 (꾹 누르기로 대체)
+    if (isMobile) return;
+    
     e.preventDefault();
     setContextMenuPos({ x: e.clientX, y: e.clientY });
     setShowContextMenu(true);
@@ -150,16 +215,65 @@ const FileItem = ({ file, onClick, onDoubleClick, onDelete, onRename, onMove, on
     }
     setShowContextMenu(false);
   };
+  
+  // 복사 처리
+  const handleCopy = () => {
+    if (onCopy) {
+      onCopy(file);
+    }
+    setShowContextMenu(false);
+  };
+
+  const getItemStyle = () => {
+    let style = {};
+    
+    // 꾹 누르기 시각적 피드백
+    if (isPressing && isMobile) {
+      style.opacity = 0.7;
+      style.transform = 'scale(0.95)';
+    }
+    
+    return style;
+  };
+
+  // 모바일에서는 컨텍스트 메뉴 스타일 조정
+  const getContextMenuStyle = () => {
+    if (isMobile) {
+      // 모바일에서는 화면 하단에 고정 표시하는 바텀시트 형태
+      return {
+        position: 'fixed',
+        left: '0',
+        bottom: '0',
+        width: '100%',
+        borderRadius: '12px 12px 0 0',
+        boxShadow: '0 -2px 10px var(--shadow-color)'
+      };
+    } else {
+      // 데스크톱에서는 마우스 위치에 표시
+      return {
+        position: 'fixed',
+        left: `${contextMenuPos.x}px`,
+        top: `${contextMenuPos.y}px`
+      };
+    }
+  };
 
   return (
     <div 
       ref={itemRef}
-      className={`file-item ${file.isDirectory || file.type === 'folder' ? 'directory-item' : ''} ${isSelected ? 'selected' : ''}`}
-      onClick={handleClick}
+      className={`file-item ${file.isDirectory || file.type === 'folder' ? 'directory-item' : ''} ${isSelected ? 'selected' : ''} ${isMobile ? 'mobile-item' : ''}`}
+      onClick={(e) => {
+        handleClick(e);
+        if (isMobile) handleItemTap(e);
+      }}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchMove={handleTouchMove}
       data-file-id={file.id}
       aria-selected={isSelected ? 'true' : 'false'}
+      style={getItemStyle()}
     >
       <div className={`file-icon ${getFileIcon()}`}></div>
       
@@ -182,20 +296,28 @@ const FileItem = ({ file, onClick, onDoubleClick, onDelete, onRename, onMove, on
       {/* 컨텍스트 메뉴 */}
       {showContextMenu && (
         <div 
-          className="context-menu" 
-          style={{ 
-            position: 'fixed',
-            left: `${contextMenuPos.x}px`,
-            top: `${contextMenuPos.y}px`
-          }}
+          className={`context-menu ${isMobile ? 'mobile-context-menu' : ''}`} 
+          style={getContextMenuStyle()}
         >
+          {isMobile && (
+            <div className="context-menu-header">
+              <div className="context-menu-title">{file.name}</div>
+              <button 
+                className="close-context-menu" 
+                onClick={() => setShowContextMenu(false)}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+          
           <div className="context-menu-item" onClick={handleRenameStart}>
             이름 변경
           </div>
           <div className="context-menu-item" onClick={handleCopyPath}>
             경로 복사
           </div>
-          <div className="context-menu-item" onClick={() => onCopy && onCopy(file)}>
+          <div className="context-menu-item" onClick={handleCopy}>
             복사
           </div>
           <div className="context-menu-item" onClick={handleMove}>
@@ -204,6 +326,15 @@ const FileItem = ({ file, onClick, onDoubleClick, onDelete, onRename, onMove, on
           <div className="context-menu-item delete-item" onClick={handleDelete}>
             삭제
           </div>
+          
+          {isMobile && (
+            <div 
+              className="context-menu-item cancel-item" 
+              onClick={() => setShowContextMenu(false)}
+            >
+              취소
+            </div>
+          )}
         </div>
       )}
     </div>
