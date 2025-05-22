@@ -45,7 +45,7 @@ router = APIRouter()
 ''' 함수 인덱스
 
 # 디버깅 stop 시 다음 코드 강제 실행 불가하도록 하는 함수.
-stop_debugger()
+#stop_debugger()
 
 get("/")
 list_items
@@ -165,7 +165,7 @@ async def upload_document(
     """통합 문서 / 디렉토리 관리"""
     from typing import Dict, Any
 
-    #stop_debugger()
+
 
     # API 테스트 용 코드.
     # if current_upload_path == '':
@@ -266,6 +266,7 @@ async def get_filesystem_structure(
 async def query_document(
     query: str = Form(...), 
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
 
     """문서 질의응답 엔드포인트"""
