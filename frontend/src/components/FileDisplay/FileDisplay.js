@@ -12,7 +12,7 @@ const FileDisplay = ({
   onDeleteItem, 
   onRenameItem, 
   onFolderOpen, 
-  onCopyItem, // 새로 추가된 props
+  onCopyItem, 
   onRefresh, 
   isLoading 
 }) => {
@@ -22,6 +22,7 @@ const FileDisplay = ({
   const [newFolderName, setNewFolderName] = useState("");
   const [showUploadTypeMenu, setShowUploadTypeMenu] = useState(false);
   const [isLocalLoading, setIsLocalLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // 파일 선택 및 클립보드 관련 상태 추가
   const [selectedItems, setSelectedItems] = useState([]);
@@ -49,6 +50,20 @@ const FileDisplay = ({
   // 컨텍스트 메뉴 및 알림 상태
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, type: null });
   const [notification, setNotification] = useState({ visible: false, message: '' });
+
+  // 모바일 환경 감지 - 새로 추가
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, []);
 
   const fileInputRef = useRef(null);
   const folderInputRef = useRef(null);
@@ -136,6 +151,9 @@ const FileDisplay = ({
 
   // 마우스 다운 이벤트 핸들러 - 드래그 선택 시작
   const handleMouseDown = useCallback((e) => {
+    // 모바일에서는 드래그 선택 비활성화
+    if (isMobile) return;
+    
     // 파일이나 폴더가 아닌 빈 영역을 클릭했을 때만 드래그 선택 시작
     if (e.target === fileDisplayRef.current || e.target.className === 'file-grid') {
       // 마우스 우클릭이면 건너뛰기 (컨텍스트 메뉴용)
@@ -158,7 +176,7 @@ const FileDisplay = ({
       // 이벤트 기본 동작 방지
       e.preventDefault();
     }
-  }, [fileDisplayRef, isCtrlPressed, isShiftPressed]);
+  }, [fileDisplayRef, isCtrlPressed, isShiftPressed, isMobile]);
 
   // 마우스 이동 이벤트 핸들러 - 드래그 선택 업데이트
   const handleMouseMove = useCallback((e) => {
@@ -173,7 +191,7 @@ const FileDisplay = ({
         endY: y
       }));
       
-      // 선택 영역 내 아이템 계산 - 이 부분이 중요!
+      // 선택 영역 내 아이템 계산
       updateItemsInSelectionRect();
     }
   }, [isDraggingSelection, fileDisplayRef, updateItemsInSelectionRect]);
@@ -235,7 +253,6 @@ const FileDisplay = ({
     else {
       if (selectedItems.includes(itemId) && selectedItems.length === 1) {
         // 이미 선택된 항목을 다시 클릭하면 선택 유지 (원래는 선택 해제)
-        // setSelectedItems([]);
       } else {
         setSelectedItems([itemId]);
         setLastSelectedItem(itemId);
@@ -478,6 +495,9 @@ const FileDisplay = ({
   const handleContextMenu = (e) => {
     e.preventDefault();
     
+    // 모바일에서는 컨텍스트 메뉴 처리 방식 변경
+    if (isMobile) return;
+    
     // 파일이나 폴더가 아닌 빈 영역에서 컨텍스트 메뉴 표시
     if (e.target === fileDisplayRef.current || e.target.className === 'file-grid') {
       setContextMenu({
@@ -488,6 +508,13 @@ const FileDisplay = ({
       });
     }
   };
+
+  // 터치 시작 이벤트 처리 - 모바일용 (새로 추가)
+  const handleTouchStart = useCallback((e) => {
+    if (!isMobile) return;
+    
+    // 모바일에서 꾹 누르기에 대한 처리는 FileItem 컴포넌트에서 담당
+  }, [isMobile]);
 
   // 알림 표시 함수
   const showNotification = (message) => {
@@ -599,6 +626,9 @@ const FileDisplay = ({
 
   // 드래그 선택을 위한 이벤트 리스너 추가
   useEffect(() => {
+    // 모바일에서는 드래그 선택 이벤트를 등록하지 않음
+    if (isMobile) return;
+    
     const fileDisplayEl = fileDisplayRef.current;
     
     if (fileDisplayEl) {
@@ -621,7 +651,8 @@ const FileDisplay = ({
     selectedItems,
     handleMouseDown,
     handleMouseMove,
-    handleMouseUp
+    handleMouseUp,
+    isMobile
   ]);
 
   // 컨텍스트 메뉴 외부 클릭 감지
@@ -649,24 +680,30 @@ const FileDisplay = ({
   };
 
   const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
+      e.preventDefault();
+      setIsDragging(false);
 
-    // 드롭된 항목에 폴더가 포함되어 있는지 확인
-    // webkitGetAsEntry API 사용
-    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
-      const items = Array.from(e.dataTransfer.items);
-      
-      // 각 항목이 파일인지 폴더인지 확인
-      const entries = items.map(item => item.webkitGetAsEntry());
-      
-      // 엔트리 처리
-      handleEntries(entries);
-    } else if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      // 일반 파일 처리 (폴더 구조 없음)
-      handleFiles(e.dataTransfer.files);
-    }
-  };
+      // 모바일에서는 지원하지 않음 (새로 추가)
+      if (isMobile) {
+        showNotification('모바일에서는 파일 드래그 앤 드롭이 지원되지 않습니다. 업로드 버튼을 사용해주세요.');
+        return;
+      }
+
+      // 드롭된 항목에 폴더가 포함되어 있는지 확인
+      // webkitGetAsEntry API 사용
+      if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+        const items = Array.from(e.dataTransfer.items);
+        
+        // 각 항목이 파일인지 폴더인지 확인
+        const entries = items.map(item => item.webkitGetAsEntry());
+        
+        // 엔트리 처리
+        handleEntries(entries);
+      } else if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        // 일반 파일 처리 (폴더 구조 없음)
+        handleFiles(e.dataTransfer.files);
+      }
+    };
 
   // 드롭된 엔트리(파일/폴더) 처리
   const handleEntries = async (entries) => {
@@ -926,6 +963,11 @@ const FileDisplay = ({
         folderInputRef.current.value = "";
         console.log('폴더 입력 필드 초기화 완료');
       }
+      
+      // 성공 알림 표시 (새로 추가)
+      const fileCount = fileList.length;
+      showNotification(`${fileCount}개 파일을 성공적으로 업로드했습니다.`);
+      
     } catch (error) {
       console.error("Error handling files:", error);
       showNotification('파일 업로드 중 오류가 발생했습니다');
@@ -949,6 +991,11 @@ const FileDisplay = ({
   // 폴더 업로드 선택
   const handleFolderUploadClick = () => {
     setShowUploadTypeMenu(false);
+    // 모바일에서 폴더 업로드 지원 확인 (새로 추가)
+    if (isMobile && !('webkitdirectory' in document.createElement('input'))) {
+      showNotification('현재 브라우저에서는 폴더 업로드가 지원되지 않습니다.');
+      return;
+    }
     folderInputRef.current.click();
   };
 
@@ -1026,15 +1073,33 @@ const FileDisplay = ({
     }
   };
 
-  // Handle file or folder click
+  // Handle file or folder click - 수정된 부분
   const handleItemClick = (file) => {
+    // 모바일에서 폴더인 경우의 특별 처리
+    if (isMobile && (file.isDirectory || file.type === 'folder')) {
+      // 이미 선택된 폴더를 다시 클릭한 경우 폴더로 들어가기
+      if (selectedItems.includes(file.id) && selectedItems.length === 1) {
+        // 선택된 폴더를 다시 클릭하면 폴더로 들어가기
+        const newPath = currentPath === "/" 
+          ? `/${file.name}` 
+          : `${currentPath}/${file.name}`;
+        
+        onFolderOpen(newPath);
+        
+        // 선택 해제
+        setSelectedItems([]);
+        return;
+      }
+    }
+    
     // 항목 선택 처리
     handleItemSelect(file.id);
   };
 
-  // Handle file or folder double click
+  // Handle file or folder double click - 수정된 부분
   const handleItemDoubleClick = (file) => {
-    if (file.isDirectory || file.type === 'folder') {
+    // 데스크톱에서만 더블클릭으로 폴더 열기
+    if (!isMobile && (file.isDirectory || file.type === 'folder')) {
       // 현재 경로에 폴더명을 추가
       const newPath = currentPath === "/" 
         ? `/${file.name}` 
@@ -1052,6 +1117,32 @@ const FileDisplay = ({
     }
 
     const paths = currentPath.split('/').filter(Boolean);
+    
+    // 모바일 환경에서는 경로가 길어질 경우 생략 처리 (새로 추가)
+    if (isMobile && paths.length > 2) {
+      return (
+        <>
+          <span 
+            className="breadcrumb-item" 
+            onClick={() => onFolderOpen("/")}
+          >
+            홈
+          </span>
+          {paths.length > 2 && (
+            <>
+              <span className="breadcrumb-separator">/</span>
+              <span className="breadcrumb-item ellipsis">...</span>
+            </>
+          )}
+          <span className="breadcrumb-separator">/</span>
+          <span className="breadcrumb-item active">
+            {paths[paths.length - 1]}
+          </span>
+        </>
+      );
+    }
+
+    // 데스크톱 환경에서는 모든 경로 표시
     return (
       <>
         <span 
@@ -1067,7 +1158,7 @@ const FileDisplay = ({
             <span key={path}>
               <span className="breadcrumb-separator">/</span>
               <span 
-                className={`breadcrumb-item ${isLast ? 'active' : ''}`}
+                className={`breadcrumb-item ${isLast ? 'active' : ''} ${isMobile ? 'truncate-on-mobile' : ''}`}
                 onClick={() => !isLast && onFolderOpen(path)}
               >
                 {folder}
@@ -1079,14 +1170,61 @@ const FileDisplay = ({
     );
   };
 
+  // 모바일 파일 액션 메뉴 렌더링 (새로 추가)
+  const renderMobileActionMenu = () => {
+    if (!isMobile) return null;
+    
+    return (
+      <div className="mobile-action-menu">
+        <button 
+          className="mobile-action-btn new-folder-btn" 
+          onClick={handleNewFolderClick}
+          disabled={isLoading || isLocalLoading}
+          aria-label="새 폴더"
+        >
+          <span className="mobile-action-icon">📁+</span>
+        </button>
+        <button 
+          className="mobile-action-btn refresh-btn" 
+          onClick={handleRefresh}
+          disabled={isLoading || isLocalLoading}
+          aria-label="새로고침"
+        >
+          <span className="mobile-action-icon">🔄</span>
+        </button>
+        <div className="mobile-upload-dropdown" ref={uploadButtonRef}>
+          <button
+            className="mobile-action-btn upload-btn"
+            onClick={handleUploadButtonClick}
+            disabled={isUploading || isLoading || isLocalLoading}
+            aria-label="업로드"
+          >
+            <span className="mobile-action-icon">📤</span>
+          </button>
+          {showUploadTypeMenu && (
+            <div className="mobile-upload-menu">
+              <div className="mobile-upload-menu-item" onClick={handleFileUploadClick}>
+                파일 업로드
+              </div>
+              <div className="mobile-upload-menu-item" onClick={handleFolderUploadClick}>
+                폴더 업로드
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div
-      className={`file-display ${isDragging ? "dragging" : ""} ${(isLoading || isLocalLoading) ? "loading" : ""}`}
+      className={`file-display ${isDragging ? "dragging" : ""} ${(isLoading || isLocalLoading) ? "loading" : ""} ${isMobile ? "mobile-view" : ""}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onContextMenu={handleContextMenu}
       onClick={handleDisplayClick}
+      onTouchStart={handleTouchStart}
       ref={fileDisplayRef}
     >
       <div className="file-display-header">
@@ -1094,94 +1232,110 @@ const FileDisplay = ({
           {renderBreadcrumbs()}
         </div>
         
-        {/* 도구 모음 추가 */}
-        <div className="toolbar">
-          <button 
-            className="toolbar-btn"
-            onClick={handleCopyItems}
-            disabled={selectedItems.length === 0 || isLoading || isLocalLoading}
-            title="복사 (Ctrl+C)"
-          >
-            복사
-          </button>
-          <button 
-            className="toolbar-btn"
-            onClick={handleCutItems}
-            disabled={selectedItems.length === 0 || isLoading || isLocalLoading}
-            title="잘라내기 (Ctrl+X)"
-          >
-            잘라내기
-          </button>
-          <button 
-            className="toolbar-btn"
-            onClick={handlePasteItems}
-            disabled={clipboard.items.length === 0 || isLoading || isLocalLoading}
-            title="붙여넣기 (Ctrl+V)"
-          >
-            붙여넣기
-          </button>
-          <div className="toolbar-separator"></div>
-          <button 
-            className="toolbar-btn"
-            onClick={() => selectedItems.length === 1 && startRenameItem(files.find(f => f.id === selectedItems[0]))}
-            disabled={selectedItems.length !== 1 || isLoading || isLocalLoading}
-            title="이름 변경 (F2)"
-          >
-            이름 변경
-          </button>
-          <button 
-            className="toolbar-btn"
-            onClick={openMoveDialog}
-            disabled={selectedItems.length === 0 || isLoading || isLocalLoading}
-            title="이동"
-          >
-            이동
-          </button>
-          <button 
-            className="toolbar-btn delete-btn"
-            onClick={handleDeleteSelectedItems}
-            disabled={selectedItems.length === 0 || isLoading || isLocalLoading}
-            title="삭제 (Delete)"
-          >
-            삭제
-          </button>
-        </div>
-        
-        <div className="file-actions">
-          <button 
-            className="new-folder-btn" 
-            onClick={handleNewFolderClick}
-            disabled={isLoading || isLocalLoading}
-          >
-            새 폴더
-          </button>
-          <button 
-            className="refresh-btn" 
-            onClick={handleRefresh}
-            disabled={isLoading || isLocalLoading}
-          >
-            새로고침
-          </button>
-          <div className="upload-dropdown" ref={uploadButtonRef}>
-            <button
-              className="upload-btn"
-              onClick={handleUploadButtonClick}
-              disabled={isUploading || isLoading || isLocalLoading}
-            >
-              {isUploading ? "업로드 중..." : "업로드"}
-            </button>
-            {showUploadTypeMenu && (
-              <div className="upload-menu">
-                <div className="upload-menu-item" onClick={handleFileUploadClick}>
-                  파일 업로드
-                </div>
-                <div className="upload-menu-item" onClick={handleFolderUploadClick}>
-                  폴더 업로드
-                </div>
-              </div>
-            )}
+        {/* 모바일 환경에서 꾹 누르기 힌트 표시 (새로 추가) */}
+        {isMobile && (
+          <div className="mobile-context-hint">
+            항목을 길게 누르면 옵션 메뉴가 표시됩니다
           </div>
-        </div>
+        )}
+        
+        {/* 도구 모음 추가 - 모바일에서는 숨김 */}
+        {!isMobile && (
+          <div className="toolbar">
+            <button 
+              className="toolbar-btn"
+              onClick={handleCopyItems}
+              disabled={selectedItems.length === 0 || isLoading || isLocalLoading}
+              title="복사 (Ctrl+C)"
+            >
+              복사
+            </button>
+            <button 
+              className="toolbar-btn"
+              onClick={handleCutItems}
+              disabled={selectedItems.length === 0 || isLoading || isLocalLoading}
+              title="잘라내기 (Ctrl+X)"
+            >
+              잘라내기
+            </button>
+            <button 
+              className="toolbar-btn"
+              onClick={handlePasteItems}
+              disabled={clipboard.items.length === 0 || isLoading || isLocalLoading}
+              title="붙여넣기 (Ctrl+V)"
+            >
+              붙여넣기
+            </button>
+            <div className="toolbar-separator"></div>
+            <button 
+              className="toolbar-btn"
+              onClick={() => selectedItems.length === 1 && startRenameItem(files.find(f => f.id === selectedItems[0]))}
+              disabled={selectedItems.length !== 1 || isLoading || isLocalLoading}
+              title="이름 변경 (F2)"
+            >
+              이름 변경
+            </button>
+            <button 
+              className="toolbar-btn"
+              onClick={openMoveDialog}
+              disabled={selectedItems.length === 0 || isLoading || isLocalLoading}
+              title="이동"
+            >
+              이동
+            </button>
+            <button 
+              className="toolbar-btn delete-btn"
+              onClick={handleDeleteSelectedItems}
+              disabled={selectedItems.length === 0 || isLoading || isLocalLoading}
+              title="삭제 (Delete)"
+            >
+              삭제
+            </button>
+          </div>
+        )}
+        
+        {/* 데스크톱 파일 액션 버튼 - 모바일에서는 숨김 */}
+        {!isMobile ? (
+          <div className="file-actions">
+            <button 
+              className="new-folder-btn" 
+              onClick={handleNewFolderClick}
+              disabled={isLoading || isLocalLoading}
+            >
+              새 폴더
+            </button>
+            <button 
+              className="refresh-btn" 
+              onClick={handleRefresh}
+              disabled={isLoading || isLocalLoading}
+            >
+              새로고침
+            </button>
+            <div className="upload-dropdown" ref={uploadButtonRef}>
+              <button
+                className="upload-btn"
+                onClick={handleUploadButtonClick}
+                disabled={isUploading || isLoading || isLocalLoading}
+              >
+                {isUploading ? "업로드 중..." : "업로드"}
+              </button>
+              {showUploadTypeMenu && (
+                <div className="upload-menu">
+                  <div className="upload-menu-item" onClick={handleFileUploadClick}>
+                    파일 업로드
+                  </div>
+                  <div className="upload-menu-item" onClick={handleFolderUploadClick}>
+                    폴더 업로드
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          // 모바일 파일 액션 메뉴 (아이콘 버튼 형태)
+          renderMobileActionMenu()
+        )}
+        
         <input
           type="file"
           ref={fileInputRef}
@@ -1216,23 +1370,26 @@ const FileDisplay = ({
               onDelete={() => handleItemDelete(file.id)}
               onRename={(newName) => handleItemRename(file.id, newName)}
               onMove={handleItemMove}
-              onCopy={handleItemCopy} // 새로 추가
+              onCopy={handleItemCopy}
               isSelected={selectedItems.includes(file.id)}
-              data-file-id={file.id} // 선택 영역 탐지를 위해 ID 속성 추가
+              data-file-id={file.id}
+              isMobile={isMobile} // isMobile 프롭스 전달 (새로 추가)
             />
           ))
         ) : (
           <div className="empty-message">
             <p>이 폴더에 파일이 없습니다</p>
             <p className="drop-message">
-              여기에 파일이나 폴더를 끌어서 놓거나 업로드 버튼을 사용하세요
+              {isMobile 
+                ? '업로드 버튼을 사용하여 파일을 추가하세요'
+                : '여기에 파일이나 폴더를 끌어서 놓거나 업로드 버튼을 사용하세요'}
             </p>
           </div>
         )}
       </div>
 
-      {/* 드래그 선택 영역 표시 */}
-      {isDraggingSelection && (
+      {/* 드래그 선택 영역 표시 - 모바일에서는 비활성화 */}
+      {!isMobile && isDraggingSelection && (
         <div 
           className="selection-rect"
           style={{
@@ -1243,13 +1400,14 @@ const FileDisplay = ({
             height: Math.abs(selectionRect.endY - selectionRect.startY) + 'px',
             backgroundColor: 'rgba(65, 105, 225, 0.2)',
             border: '1px solid rgba(65, 105, 225, 0.5)',
-            pointerEvents: 'none', // 선택 영역이 마우스 이벤트를 방해하지 않도록
+            pointerEvents: 'none',
             zIndex: 1
           }}
         />
       )}
 
-      {isDragging && (
+      {/* 드롭 오버레이 - 모바일에서는 비활성화 */}
+      {!isMobile && isDragging && (
         <div className="drop-overlay">
           <div className="drop-message">
             <p>파일 또는 폴더를 여기에 놓아 업로드</p>
@@ -1260,7 +1418,7 @@ const FileDisplay = ({
       {/* 새 폴더 생성 모달 */}
       {showNewFolderModal && (
         <div className="folder-modal-overlay" onClick={handleModalOutsideClick}>
-          <div className="folder-modal">
+          <div className={`folder-modal ${isMobile ? 'mobile-modal' : ''}`}>
             <div className="folder-modal-header">
               <h3>새 폴더 만들기</h3>
             </div>
@@ -1305,7 +1463,7 @@ const FileDisplay = ({
             setShowRenameModal(false);
           }
         }}>
-          <div className="folder-modal">
+          <div className={`folder-modal ${isMobile ? 'mobile-modal' : ''}`}>
             <div className="folder-modal-header">
               <h3>이름 변경</h3>
             </div>
@@ -1350,7 +1508,7 @@ const FileDisplay = ({
             setShowMoveModal(false);
           }
         }}>
-          <div className="folder-modal">
+          <div className={`folder-modal ${isMobile ? 'mobile-modal' : ''}`}>
             <div className="folder-modal-header">
               <h3>항목 이동</h3>
             </div>
@@ -1437,8 +1595,52 @@ const FileDisplay = ({
 
       {/* 알림 */}
       {notification.visible && (
-        <div className="notification">
+        <div className={`notification ${isMobile ? 'mobile-notification' : ''}`}>
           {notification.message}
+        </div>
+      )}
+      
+      {/* 모바일 하단 액션 바 - 파일만 선택된 경우에만 표시 (폴더 제외) */}
+      {isMobile && selectedItems.length > 0 && !selectedItems.some(id => {
+        const file = files.find(f => f.id === id);
+        return file && (file.isDirectory || file.type === 'folder');
+      }) && (
+        <div className="mobile-action-bar">
+          <button 
+            className="mobile-action-bar-btn"
+            onClick={handleCopyItems}
+            disabled={isLoading || isLocalLoading}
+          >
+            복사
+          </button>
+          <button 
+            className="mobile-action-bar-btn"
+            onClick={handleCutItems}
+            disabled={isLoading || isLocalLoading}
+          >
+            잘라내기
+          </button>
+          <button 
+            className="mobile-action-bar-btn"
+            onClick={openMoveDialog}
+            disabled={isLoading || isLocalLoading}
+          >
+            이동
+          </button>
+          <button 
+            className="mobile-action-bar-btn delete-btn"
+            onClick={handleDeleteSelectedItems}
+            disabled={isLoading || isLocalLoading}
+          >
+            삭제
+          </button>
+        </div>
+      )}
+      
+      {/* 모바일 바텀 시트 메뉴 - 파일 옵션 (새로 추가) */}
+      {isMobile && clipboard.items.length > 0 && (
+        <div className="mobile-paste-button" onClick={handlePasteItems}>
+          붙여넣기 ({clipboard.items.length})
         </div>
       )}
     </div>

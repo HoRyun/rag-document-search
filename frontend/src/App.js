@@ -10,7 +10,7 @@ import "./App.css";
 import "./Theme.css";
 
 // API 기본 URL 설정
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000/fast_api";
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://rag-alb-547296323.ap-northeast-2.elb.amazonaws.com/fast_api";
 
 function App() {
   const [files, setFiles] = useState([]);
@@ -33,6 +33,9 @@ function App() {
 
   // 테마 상태 (다크 모드)
   const [isDarkMode, setIsDarkMode] = useState(false);
+  
+  // 사이드바 표시 상태 (모바일용)
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // 컴포넌트 마운트 시 로그인 상태 확인 및 테마 설정 불러오기
   useEffect(() => {
@@ -63,6 +66,16 @@ function App() {
     
     // 테마 설정 저장
     localStorage.setItem("theme", newTheme ? "dark" : "light");
+  };
+
+  // 사이드바 토글 핸들러
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  // 사이드바 닫기 핸들러
+  const closeSidebar = () => {
+    setSidebarOpen(false);
   };
 
   // 컴포넌트 마운트 시 로그인 상태 확인
@@ -733,6 +746,10 @@ function App() {
   const handleFolderOpen = (folderPath) => {
     console.log(`폴더 열기: ${folderPath}`);
     setCurrentPath(folderPath);
+    // 모바일에서 폴더 이동 시 사이드바 닫기
+    if (window.innerWidth <= 768) {
+      setSidebarOpen(false);
+    }
   };
 
   // 질문 처리
@@ -823,12 +840,20 @@ function App() {
   return (
     <div className="app">
       <Header onLogout={handleLogout} username={user?.username} isDarkMode={isDarkMode} toggleTheme={toggleTheme}/>
+      {/* 사이드바 토글 버튼 */}
+      <button className="sidebar-toggle-btn" onClick={toggleSidebar}>
+        ☰
+      </button>
+      {/* 사이드바 오버레이 - 모바일에서 사이드바 열릴 때 배경 어둡게 처리 */}
+      {sidebarOpen && <div className="sidebar-overlay active" onClick={closeSidebar}></div>}
       <div className="main-container">
         <Sidebar
+          className={sidebarOpen ? 'active' : ''}
           directories={directories}
           currentPath={currentPath}
           setCurrentPath={setCurrentPath}
           onRefresh={fetchDirectories}
+          closeSidebar={closeSidebar}
         />
         <FileDisplay
           files={files}
@@ -837,7 +862,7 @@ function App() {
           onAddFile={handleAddFile}
           onCreateFolder={handleCreateFolder}
           onMoveItem={handleMoveItem}
-          onCopyItem={handleCopyItem} // 새로 추가된 props
+          onCopyItem={handleCopyItem}
           onDeleteItem={handleDeleteItem}
           onRenameItem={handleRenameItem}
           onFolderOpen={handleFolderOpen}

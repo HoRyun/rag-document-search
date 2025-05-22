@@ -152,9 +152,6 @@ def get_file_info_by_filename(db: Session, filename: str):
     stmt = select(models.Document).where(models.Document.filename == filename)
     result = db.execute(stmt).scalar_one_or_none()
     return result
-    
-
-
 
 # 동일한 디렉토리 이름이 존재하는 지 확인
 def get_directory_info_by_name(db: Session, directory_name: str):
