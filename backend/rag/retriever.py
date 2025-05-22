@@ -30,7 +30,7 @@ def search_similarity(user_id, embed_query_data, engine):
                     dc.embedding,
                     1 - (dc.embedding <=> CAST(:query_embedding_str AS vector)) AS similarity
                 FROM 
-                    document_chunks
+                    document_chunks dc
                 JOIN
                     documents d ON dc.document_id = d.id
                     
