@@ -20,6 +20,7 @@ def search_similarity(user_id, embed_query_data, engine):
             # 2. 코사인 유사도 계산: 1 - (벡터1 <=> 벡터2)
             # 3. 유사도 기준으로 정렬하여 상위 N개 가져오기
             top_n = 20  # 후보 문서 수
+
             
             # PostgreSQL에서는 쿼리 매개변수를 직접 쿼리에 포함
             similarity_query = text(    
@@ -30,7 +31,7 @@ def search_similarity(user_id, embed_query_data, engine):
                     dc.embedding,
                     1 - (dc.embedding <=> CAST(:query_embedding_str AS vector)) AS similarity
                 FROM 
-                    document_chunks
+                    document_chunks dc
                 JOIN
                     documents d ON dc.document_id = d.id
                     
@@ -87,7 +88,6 @@ def search_similarity(user_id, embed_query_data, engine):
                     "id": row['id'],
                     "document_id": row['document_id'],
                     "content": row['content'],
-                    "meta": row['meta'],
                     "embedding": doc_embedding,
                     "similarity": row['similarity']
                 })
@@ -191,12 +191,8 @@ def do_mmr(embed_query_data, candidate_docs):
     docs = []
     for doc in selected_docs:
         try:
-            # metadata가 None인 경우 빈 딕셔너리로 대체
-            metadata = doc["meta"] if doc["meta"] is not None else {}
-            
             doc_obj = Document(
                 page_content=doc["content"] or "",  # content가 None인 경우 빈 문자열로 대체
-                metadata=metadata
             )
             docs.append(doc_obj)
         except Exception as e:
