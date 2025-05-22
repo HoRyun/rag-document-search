@@ -191,12 +191,8 @@ def do_mmr(embed_query_data, candidate_docs):
     docs = []
     for doc in selected_docs:
         try:
-            # metadata가 None인 경우 빈 딕셔너리로 대체
-            metadata = doc["meta"] if doc["meta"] is not None else {}
-            
             doc_obj = Document(
                 page_content=doc["content"] or "",  # content가 None인 경우 빈 문자열로 대체
-                metadata=metadata
             )
             docs.append(doc_obj)
         except Exception as e:
