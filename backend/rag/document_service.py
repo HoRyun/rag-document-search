@@ -20,6 +20,8 @@ from rag.file_load import (
 )
 from rag.chunking import chunk_documents
 
+from fast_api.endpoints.documents import stop_debugger
+
 
 
 
@@ -124,12 +126,13 @@ def process_query(user_id, query: str, engine) -> str:
     try:
         # 쿼리 임베딩
         embed_query_data = embed_query(query)
-
         # 검색 결과 가져오기
         search_similarity_result = search_similarity(user_id, embed_query_data, engine)
+        # stop_debugger()
+
 
         # MMR 알고리즘 수행
-        docs = do_mmr(search_similarity_result)
+        docs = do_mmr(embed_query_data, search_similarity_result)
 
         return docs
     except Exception as e:

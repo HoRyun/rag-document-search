@@ -93,7 +93,7 @@ upload_file_to_s3
 
 
 @router.get("/")
-def list_items(
+async def list_items(
     path: str = Query("/", description="현재 경로"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -165,6 +165,8 @@ async def upload_document(
     """통합 문서 / 디렉토리 관리"""
     from typing import Dict, Any
 
+    stop_debugger()
+
     # API 테스트 용 코드.
     # if current_upload_path == '':
     #     current_upload_path = None
@@ -228,6 +230,7 @@ async def get_filesystem_structure(
     try:
         user_id = current_user.id
 
+        # 루트 디렉토리 존재여부 확인 및 생성
         # 루트 디렉토리가 존재하지 않으면 생성하고, 존재하면 아무 작업도 하지 않는다.
         if not crud.get_directory_by_id(db, "root"):
             # 루트 디렉토리 생성
@@ -237,10 +240,7 @@ async def get_filesystem_structure(
         directories = crud.get_only_directory(db, user_id)
 
         # <로직>
-        # 1) 최상위 디렉토리 이름(root) 찾기
-        root = next((d['name'] for d in directories if d['parent_id'] == "root"), None)
-        if not root:
-            raise ValueError("최상위 디렉토리(parent_id='root')를 찾을 수 없습니다.")
+       
 
         # 2) 새 리스트에 수정된 객체 생성
         your_result = []
@@ -263,19 +263,30 @@ async def get_filesystem_structure(
         raise HTTPException(status_code=500, detail=f"Error fetching filesystem structure: {str(e)}")
 
 @router.post("/query")
-async def query_document(query: str = Form(...), 
+async def query_document(
+    query: str = Form(...), 
     current_user: User = Depends(get_current_user),
 ):
+
     """문서 질의응답 엔드포인트"""
     from db.database import engine  # 기존 엔진을 임포트
+    
     user_id = current_user.id
+
     docs = process_query(user_id,query,engine)
     
     answer = get_llms_answer(docs, query)
 
+
     return {"answer": answer} 
 
 
+# -----------------------------------------
+# -----------------------------------------
+# -----------------------------------------
+# -----------------------------------------
+# -----------------------------------------
+# -----------------------------------------
 
 # 유틸 함수
 async def process_directory_uploads(current_upload_path, directory_structure, current_user, db):

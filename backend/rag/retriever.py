@@ -27,7 +27,6 @@ def search_similarity(user_id, embed_query_data, engine):
                     dc.id,
                     dc.document_id,
                     dc.content,
-                    meta,
                     dc.embedding,
                     1 - (dc.embedding <=> CAST(:query_embedding_str AS vector)) AS similarity
                 FROM 
@@ -46,9 +45,10 @@ def search_similarity(user_id, embed_query_data, engine):
             # 쿼리 실행 (query_embedding_str, user_id, top_n 파라미터로 전달)
             result = connection.execute(
                 similarity_query, 
-                {"query_embedding_str": query_embedding_str,
+                {"top_n": top_n,
                  "user_id": user_id,
-                 "top_n": top_n
+                 "query_embedding_str": query_embedding_str
+
                 }
             )
 

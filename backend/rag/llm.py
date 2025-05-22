@@ -34,11 +34,15 @@ def get_llms_answer(docs: list[Document], query: str) -> str:
     # 프롬프트를 생성합니다.
     prompt = PromptTemplate.from_template(
         """
+        
+        
+        <Instructions>
         You are an assistant for question-answering tasks. 
         Use the following pieces of retrieved context to answer the question. 
         If you don't know the answer, just say that you don't know.
         Please provide the user with the file path information corresponding to the file they are requesting. Write the information after inserting one line break.
         Answer in Korean.
+        </Instructions>
 
     <Question> {question} </Question>
     <Context> {context} </Context>
