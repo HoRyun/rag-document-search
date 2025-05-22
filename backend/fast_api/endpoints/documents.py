@@ -165,7 +165,7 @@ async def upload_document(
     """통합 문서 / 디렉토리 관리"""
     from typing import Dict, Any
 
-    stop_debugger()
+    #stop_debugger()
 
     # API 테스트 용 코드.
     # if current_upload_path == '':
