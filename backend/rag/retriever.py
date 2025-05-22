@@ -15,7 +15,6 @@ def search_similarity(user_id, embed_query_data, engine):
             # 쿼리 임베딩을 문자열로 변환
             query_embedding_str = str(embed_query_data)
             query_embedding_str = query_embedding_str.replace("'", "\"")  # 잠재적인 SQL 인젝션 방지
-            
             # 상위 유사도 문서 검색 쿼리
             # 1. 유효한 임베딩 벡터만 고려 (NULL 아님)
             # 2. 코사인 유사도 계산: 1 - (벡터1 <=> 벡터2)
@@ -102,7 +101,7 @@ def search_similarity(user_id, embed_query_data, engine):
         return (docs)                 # 쿼리의 결과는 candidates 리스트에 저장된다.
 
 
-def do_mmr(candidate_docs):
+def do_mmr(embed_query_data, candidate_docs):
     """MMR 알고리즘 구현"""
     import numpy as np
 

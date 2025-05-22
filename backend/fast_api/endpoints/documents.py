@@ -265,7 +265,6 @@ async def get_filesystem_structure(
 @router.post("/query")
 async def query_document(query: str = Form(...), 
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
 ):
     """문서 질의응답 엔드포인트"""
     from db.database import engine  # 기존 엔진을 임포트
