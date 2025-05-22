@@ -1,4 +1,4 @@
-[![RAG Document Search CI/CD Pipeline](https://github.com/HoRyun/rag-document-search/actions/workflows/rag-ci-cd.yml/badge.svg)](https://github.com/HoRyun/rag-document-search/actions/workflows/rag-ci-cd.yml)
+[![RAG Document Search Frontend CI/CD Pipeline](https://github.com/HoRyun/rag-document-search/actions/workflows/frontend-ci-cd.yml/badge.svg)](https://github.com/HoRyun/rag-document-search/actions/workflows/frontend-ci-cd.yml)
 
 # RAG Document Search
 
