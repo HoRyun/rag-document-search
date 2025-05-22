@@ -263,12 +263,15 @@ async def get_filesystem_structure(
         raise HTTPException(status_code=500, detail=f"Error fetching filesystem structure: {str(e)}")
 
 @router.post("/query")
-async def query_document(query: str = Form(...)):
+async def query_document(query: str = Form(...), 
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """문서 질의응답 엔드포인트"""
     from db.database import engine  # 기존 엔진을 임포트
-
-    docs = process_query(query,engine)
-
+    user_id = current_user.id
+    docs = process_query(user_id,query,engine)
+    
     answer = get_llms_answer(docs, query)
 
     return {"answer": answer} 
