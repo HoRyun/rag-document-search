@@ -93,7 +93,7 @@ upload_file_to_s3
 
 
 @router.get("/")
-def list_items(
+async def list_items(
     path: str = Query("/", description="현재 경로"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -164,6 +164,8 @@ async def upload_document(
 ):
     """통합 문서 / 디렉토리 관리"""
     from typing import Dict, Any
+
+    stop_debugger()
 
     # API 테스트 용 코드.
     # if current_upload_path == '':
@@ -261,20 +263,31 @@ async def get_filesystem_structure(
         raise HTTPException(status_code=500, detail=f"Error fetching filesystem structure: {str(e)}")
 
 @router.post("/query")
-async def query_document(query: str = Form(...), 
+async def query_document(
+    query: str = Form(...), 
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+
     """문서 질의응답 엔드포인트"""
     from db.database import engine  # 기존 엔진을 임포트
+    
     user_id = current_user.id
+
     docs = process_query(user_id,query,engine)
     
     answer = get_llms_answer(docs, query)
 
+
     return {"answer": answer} 
 
 
+# -----------------------------------------
+# -----------------------------------------
+# -----------------------------------------
+# -----------------------------------------
+# -----------------------------------------
+# -----------------------------------------
 
 # 유틸 함수
 async def process_directory_uploads(current_upload_path, directory_structure, current_user, db):

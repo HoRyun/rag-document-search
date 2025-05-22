@@ -2,6 +2,7 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+# from starlette.middleware.sessions import SessionMiddleware
 
 def setup_middlewares(app: FastAPI):
     """애플리케이션 미들웨어 설정"""

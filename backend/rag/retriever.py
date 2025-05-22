@@ -28,7 +28,6 @@ def search_similarity(user_id, embed_query_data, engine):
                     dc.id,
                     dc.document_id,
                     dc.content,
-                    meta,
                     dc.embedding,
                     1 - (dc.embedding <=> CAST(:query_embedding_str AS vector)) AS similarity
                 FROM 
@@ -47,7 +46,10 @@ def search_similarity(user_id, embed_query_data, engine):
             # 쿼리 실행 (top_n만 파라미터로 전달)
             result = connection.execute(
                 similarity_query, 
-                {"top_n": top_n}
+                {"top_n": top_n,
+                 "user_id": user_id,
+                 "query_embedding_str": query_embedding_str
+                }
             )
 
             candidates = [dict(row._mapping) for row in result]
@@ -102,7 +104,7 @@ def search_similarity(user_id, embed_query_data, engine):
         return (docs)                 # 쿼리의 결과는 candidates 리스트에 저장된다.
 
 
-def do_mmr(candidate_docs):
+def do_mmr(embed_query_data, candidate_docs):
     """MMR 알고리즘 구현"""
     import numpy as np
 
