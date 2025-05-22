@@ -1,8 +1,8 @@
-name: Backend Deploy to ECS with ALB (develop-cloud)
+name: Backend Deploy to ECS with ALB (develop-backend)
 
 on:
   push:
-    branches: [ develop-cloud ]
+    branches: [ develop-backend ]
 
 jobs:
   build-and-deploy-backend:
