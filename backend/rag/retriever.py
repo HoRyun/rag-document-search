@@ -15,7 +15,6 @@ def search_similarity(user_id, embed_query_data, engine):
             # 쿼리 임베딩을 문자열로 변환
             query_embedding_str = str(embed_query_data)
             query_embedding_str = query_embedding_str.replace("'", "\"")  # 잠재적인 SQL 인젝션 방지
-            
             # 상위 유사도 문서 검색 쿼리
             # 1. 유효한 임베딩 벡터만 고려 (NULL 아님)
             # 2. 코사인 유사도 계산: 1 - (벡터1 <=> 벡터2)
@@ -43,12 +42,13 @@ def search_similarity(user_id, embed_query_data, engine):
                     dc.embedding <=> CAST(:query_embedding_str AS vector)
                 LIMIT :top_n
                 """)           
-            # 쿼리 실행 (top_n만 파라미터로 전달)
+            # 쿼리 실행 (query_embedding_str, user_id, top_n 파라미터로 전달)
             result = connection.execute(
                 similarity_query, 
                 {"top_n": top_n,
                  "user_id": user_id,
                  "query_embedding_str": query_embedding_str
+
                 }
             )
 
@@ -107,7 +107,7 @@ def search_similarity(user_id, embed_query_data, engine):
 def do_mmr(embed_query_data, candidate_docs):
     """MMR 알고리즘 구현"""
     import numpy as np
-
+    
     selected_docs = []
     lambda_val = 0.5  # MMR 가중치 - 관련성과 다양성 균형
     max_documents = 3  # 최종 반환 문서 수

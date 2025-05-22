@@ -266,7 +266,6 @@ async def get_filesystem_structure(
 async def query_document(
     query: str = Form(...), 
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
 ):
 
     """문서 질의응답 엔드포인트"""
