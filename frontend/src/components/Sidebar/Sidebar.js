@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './Sidebar.css';
 
-const Sidebar = ({ directories, currentPath, setCurrentPath, onRefresh }) => {
+const Sidebar = ({ className, directories, currentPath, setCurrentPath, onRefresh, closeSidebar }) => {
   // 폴더 접기/펼치기 상태 관리 (기본값: 루트만 펼침)
   const [expandedFolders, setExpandedFolders] = useState({ '/': true });
   // 이전 열린 상태 기억용 저장소
@@ -42,6 +42,10 @@ const Sidebar = ({ directories, currentPath, setCurrentPath, onRefresh }) => {
 
   const handleDirectoryClick = (path) => {
     setCurrentPath(path);
+    // 모바일 환경에서 디렉토리 클릭시 사이드바 닫기
+    if (window.innerWidth <= 768) {
+      closeSidebar();
+    }
   };
 
   const handleRefresh = () => {
@@ -208,12 +212,17 @@ const Sidebar = ({ directories, currentPath, setCurrentPath, onRefresh }) => {
   const rootDirectory = organizeDirectories();
 
   return (
-    <div className="sidebar">
+    <div className={`sidebar ${className || ''}`}>
       <div className="sidebar-header">
         <h3>디렉토리</h3>
-        <button className="refresh-sidebar-btn" onClick={handleRefresh}>
-          새로고침
-        </button>
+        <div className="sidebar-actions">
+          <button className="refresh-sidebar-btn" onClick={handleRefresh}>
+            새로고침
+          </button>
+          <button className="close-sidebar-btn" onClick={closeSidebar}>
+            ✕
+          </button>
+        </div>
       </div>
       <div className="directory-list">
         {renderDirectoryTree(rootDirectory)}

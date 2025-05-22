@@ -2,13 +2,12 @@ from rag.embeddings import get_embeddings
 
 
 
-async def save_to_vector_store(documents):
+async def save_to_vector_store(db, documents, file_name, file_path):
     """문서를 PostgreSQL 벡터 스토어에 저장합니다."""
     from db.database import SessionLocal
-    from db import models
+    from db import crud
     import asyncio
     
-    db = SessionLocal()
     try:
         # 임베딩 모델
         embeddings = get_embeddings()
@@ -18,21 +17,19 @@ async def save_to_vector_store(documents):
         for chunk in documents:
             # 해당 문서 찾기
             content = chunk.page_content
-            metadata = chunk.metadata
-            document_name = metadata.get("document_name", "")
+            
             
             # 문서 ID 찾기. 문서 이름이 db에 존재하면 해당 문서의 레코드 반환. # 더 효율적인 방법으로 수정하기.
-            document = db.query(models.Document).filter(models.Document.filename == document_name).first()
+            document = crud.get_file_info_by_filename(db, file_name)
             
             if document:
                 # 메타데이터에서 필요한 정보 추출
-                metadata_text = f"<The name of this document>{metadata.get('document_name', '')}</The name of this document> <The path of this document>{metadata.get('document_path', '')}</The path of this document>"
-                
+                metadata_text = f"<The name of this document>{file_name}</The name of this document> <The path of this document>{file_path}</The path of this document>"
                 # 콘텐츠와 메타데이터 결합
-                combined_text = f"{content} {metadata_text}"
+                combined_text = f"{metadata_text} {content}"
                 
                 # 임베딩 비동기 처리
-                tasks.append(start_embedding(db, embeddings, combined_text, document, content, metadata))
+                tasks.append(start_embedding(db, embeddings, combined_text, document, content))
         await asyncio.gather(*tasks)
 
         print(f"총 {len(documents)}개의 청크가 PostgreSQL에 저장되었습니다.")
@@ -43,7 +40,7 @@ async def save_to_vector_store(documents):
     finally:
         db.close()
 
-async def start_embedding(db, embeddings, combined_text, document, content, metadata):
+async def start_embedding(db, embeddings, combined_text, document, content):
     from db import crud
 
     embedding_vector = embeddings.embed_query(combined_text)
@@ -53,7 +50,6 @@ async def start_embedding(db, embeddings, combined_text, document, content, meta
         db=db,
         document_id=document.id,
         content=content,
-        meta=metadata,
         embedding=embedding_vector
     )    
 
