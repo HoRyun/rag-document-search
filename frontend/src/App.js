@@ -37,6 +37,8 @@ function App() {
   // 사이드바 표시 상태 (모바일용)
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const [notification, setNotification] = useState({ visible: false, message: '' });
+
   // 컴포넌트 마운트 시 로그인 상태 확인 및 테마 설정 불러오기
   useEffect(() => {
     // 토큰이 있으면 사용자 정보 가져오기
@@ -76,6 +78,13 @@ function App() {
   // 사이드바 닫기 핸들러
   const closeSidebar = () => {
     setSidebarOpen(false);
+  };
+
+  const showNotification = (message) => {
+    setNotification({ visible: true, message });
+    setTimeout(() => {
+      setNotification({ visible: false, message: '' });
+    }, 3000);
   };
 
   // 컴포넌트 마운트 시 로그인 상태 확인
@@ -875,7 +884,19 @@ function App() {
         toggleChatbot={toggleChatbot}
         onQuery={handleQuery}
         isQuerying={isQuerying}
+        files={files}
+        directories={directories}
+        selectedItems={[]} // 나중에 FileDisplay와 연동 예정
+        currentPath={currentPath}
+        onRefreshFiles={fetchDocuments}
+        onShowNotification={showNotification}
       />
+
+      {notification.visible && (
+        <div className="notification">
+          {notification.message}
+        </div>
+      )}
     </div>
   );
 }

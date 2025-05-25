@@ -708,3 +708,198 @@
     border-radius: 8px;
   }
 }
+
+/* 헤더 상태 표시 */
+.header-status {
+  display: flex;
+  align-items: center;
+}
+
+.selected-count {
+  background-color: rgba(255, 255, 255, 0.2);
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 12px;
+  margin-left: 10px;
+}
+
+/* 메시지 타임스탬프 */
+.message-timestamp {
+  font-size: 10px;
+  opacity: 0.7;
+  text-align: right;
+  margin-top: 4px;
+}
+
+/* 되돌리기 버튼 */
+.undo-btn {
+  margin-top: 8px;
+  padding: 4px 8px;
+  background-color: #ffc107;
+  color: #212529;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.undo-btn:hover {
+  background-color: #e0a800;
+}
+
+.undo-btn:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+/* 최근 작업 되돌리기 패널 */
+.recent-operations {
+  padding: 10px 15px;
+  background-color: var(--bg-tertiary);
+  border-top: 1px solid var(--border-color);
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.recent-operations h4 {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.undo-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.undo-item:last-child {
+  border-bottom: none;
+}
+
+.operation-desc {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-primary);
+  margin-right: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.undo-btn-small {
+  padding: 3px 6px;
+  background-color: #ffc107;
+  color: #212529;
+  border: none;
+  border-radius: 3px;
+  font-size: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.undo-btn-small:hover {
+  background-color: #e0a800;
+}
+
+.undo-btn-small:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+/* 타이핑 인디케이터 */
+.typing-indicator {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.typing-indicator span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--text-secondary);
+  animation: typing 1.4s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(1) { 
+  animation-delay: -0.32s; 
+}
+
+.typing-indicator span:nth-child(2) { 
+  animation-delay: -0.16s; 
+}
+
+@keyframes typing {
+  0%, 80%, 100% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 메시지 컨텐츠 개선 */
+.message-content {
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+/* 다크 모드에서 되돌리기 버튼 */
+[data-theme="dark"] .undo-btn,
+[data-theme="dark"] .undo-btn-small {
+  background-color: #f39c12;
+}
+
+[data-theme="dark"] .undo-btn:hover,
+[data-theme="dark"] .undo-btn-small:hover {
+  background-color: #e67e22;
+}
+
+/* 반응형 스타일 */
+@media (max-width: 768px) {
+  .header-status {
+    display: none; /* 모바일에서는 상태 숨김 */
+  }
+  
+  .recent-operations {
+    max-height: 100px;
+    padding: 8px 12px;
+  }
+  
+  .recent-operations h4 {
+    font-size: 11px;
+  }
+  
+  .operation-desc {
+    font-size: 11px;
+  }
+  
+  .undo-btn-small {
+    font-size: 9px;
+    padding: 2px 5px;
+  }
+}
+
+@media (max-width: 480px) {
+  .undo-btn {
+    margin-top: 6px;
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+  
+  .message-timestamp {
+    font-size: 9px;
+  }
+  
+  .recent-operations {
+    max-height: 80px;
+    padding: 6px 10px;
+  }
+}
