@@ -1,146 +1,41 @@
+// ===== 개선된 Chatbot.js (기존 구조 유지하며 기능 추가) =====
+
 import React, { useState, useEffect, useRef } from 'react';
 import './Chatbot.css';
 import ChatbotGuide from './ChatbotGuide';
 
-// CommandProcessor 임포트
-import { CommandProcessor, COMMAND_TYPES } from './CommandProcessor';
+// 새로 추가할 서비스들
+import { CommandProcessor, OPERATION_TYPES, RISK_LEVELS } from './CommandProcessor';
 
-// 명령 결과를 UI에 표시하기 위한 컴포넌트
-const CommandResultView = ({ result, onConfirm, onCancel }) => {
-  if (!result) return null;
-  
-  switch (result.type) {
-    case 'DOCUMENT_SEARCH':
-      return (
-        <div className="command-result document-search">
-          <h3>검색 결과: "{result.query}"</h3>
-          <div className="result-list">
-            {result.results.map((doc) => (
-              <div key={doc.id} className="document-item">
-                <div className="document-icon"></div>
-                <div className="document-info">
-                  <div className="document-name">{doc.name}</div>
-                  <div className="document-path">{doc.path}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="action-buttons">
-            <button className="action-btn" onClick={onConfirm}>
-              확인
-            </button>
-          </div>
-        </div>
-      );
-      
-    case 'MOVE_DOCUMENT':
-    case 'COPY_DOCUMENT':
-    case 'DELETE_DOCUMENT':
-    case 'CREATE_FOLDER':
-      return (
-        <div className="command-result action-preview">
-          <h3>작업 확인</h3>
-          <div className="preview-message">
-            {result.previewAction}
-          </div>
-          <div className="action-illustration">
-            {result.type === 'MOVE_DOCUMENT' && (
-              <div className="move-illustration">
-                <div className="source-path">{result.document.path}</div>
-                <div className="arrow">→</div>
-                <div className="target-path">{result.targetPath}</div>
-              </div>
-            )}
-            {result.type === 'COPY_DOCUMENT' && (
-              <div className="copy-illustration">
-                <div className="source-path">{result.document.path}</div>
-                <div className="arrow">⟹</div>
-                <div className="target-path">{result.targetPath}</div>
-              </div>
-            )}
-            {result.type === 'CREATE_FOLDER' && (
-              <div className="folder-illustration">
-                <div className="parent-path">{result.parentPath}</div>
-                <div className="new-folder">
-                  <div className="folder-icon"></div>
-                  <div>{result.folderName}</div>
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="action-buttons">
-            <button className="cancel-btn" onClick={onCancel}>
-              취소
-            </button>
-            <button className="confirm-btn" onClick={onConfirm}>
-              확인
-            </button>
-          </div>
-        </div>
-      );
-      
-    case 'SUMMARIZE_DOCUMENT':
-      return (
-        <div className="command-result summarize-result">
-          <h3>문서 요약: {result.document.name}</h3>
-          <div className="summary-content">
-            {result.summary}
-          </div>
-          <div className="save-options">
-            <h4>요약본 저장</h4>
-            <div className="option">
-              <input type="radio" id="save-with-original" name="save-option" defaultChecked />
-              <label htmlFor="save-with-original">원본 문서와 같은 위치에 저장</label>
-            </div>
-            <div className="option">
-              <input type="radio" id="save-custom" name="save-option" />
-              <label htmlFor="save-custom">다른 위치에 저장</label>
-            </div>
-            <div className="option">
-              <input type="checkbox" id="replace-if-exists" />
-              <label htmlFor="replace-if-exists">같은 이름의 파일이 있으면 대체</label>
-            </div>
-          </div>
-          <div className="action-buttons">
-            <button className="cancel-btn" onClick={onCancel}>
-              취소
-            </button>
-            <button className="confirm-btn" onClick={onConfirm}>
-              저장
-            </button>
-            <button className="neutral-btn" onClick={() => onConfirm(false)}>
-              저장 안 함
-            </button>
-          </div>
-        </div>
-      );
-      
-    default:
-      return null;
-  }
-};
+// 새로 추가할 컴포넌트
+import OperationPreviewModal from './OperationPreviewModal';
 
 const Chatbot = ({ 
   isOpen, 
   toggleChatbot, 
   onQuery, 
   isQuerying,
+  // 새로 추가되는 props들 (기존 App.js에서 전달)
   files = [],
   directories = [],
-  onMoveItem,
-  onCopyItem,
-  onDeleteItem,
-  onCreateFolder,
-  onFileSummarize 
+  selectedItems = [],
+  currentPath = '/',
+  onRefreshFiles,
+  onShowNotification
 }) => {
   const [messages, setMessages] = useState([
     { id: 1, text: '안녕하세요! 파일 관리 도우미입니다. 파일 검색, 이동, 복사, 삭제 등 다양한 작업을 도와드릴 수 있습니다. 명령어 예시가 필요하시면 "도움말"이라고 입력해보세요.', sender: 'bot' },
   ]);
   
   const [newMessage, setNewMessage] = useState('');
-  const [commandResult, setCommandResult] = useState(null);
-  const [showResultModal, setShowResultModal] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  
+  // ===== 새로 추가되는 상태들 =====
+  const [currentOperation, setCurrentOperation] = useState(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [isProcessingCommand, setIsProcessingCommand] = useState(false);
+  const [recentOperations, setRecentOperations] = useState([]);
+  
   const messagesEndRef = useRef(null);
   
   // 챗봇이 닫히면 가이드도 함께 닫기
@@ -159,225 +54,295 @@ const Chatbot = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
   
+  // 메시지 추가 헬퍼 함수 (새로 추가)
+  const addMessage = (text, sender = 'bot', data = null) => {
+    const newMsg = {
+      id: Date.now(),
+      text,
+      sender,
+      timestamp: new Date(),
+      data
+    };
+    setMessages(prev => [...prev, newMsg]);
+    return newMsg;
+  };
+  
   const handleInputChange = (e) => {
     setNewMessage(e.target.value);
   };
   
+  // ===== 개선된 handleSubmit 함수 =====
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (newMessage.trim() === '' || isQuerying) return;
+    if (newMessage.trim() === '' || isQuerying || isProcessingCommand) return;
     
     // 사용자 메시지 추가
-    const userMessage = {
-      id: messages.length + 1,
-      text: newMessage,
-      sender: 'user'
-    };
+    addMessage(newMessage, 'user');
+    const userCommand = newMessage;
+    setNewMessage('');
     
-    setMessages(prev => [...prev, userMessage]);
-    
-    // 도움말 명령어 처리
-    if (newMessage.toLowerCase().includes('도움말') || 
-        newMessage.toLowerCase().includes('도와줘') || 
-        newMessage.toLowerCase().includes('명령어') || 
-        newMessage.toLowerCase().includes('사용법')) {
-      // 도움말 보여주기
+    // 도움말 명령어 처리 (기존 로직 유지)
+    if (userCommand.toLowerCase().includes('도움말') || 
+        userCommand.toLowerCase().includes('도와줘') || 
+        userCommand.toLowerCase().includes('명령어') || 
+        userCommand.toLowerCase().includes('사용법')) {
       setShowGuide(true);
-      setNewMessage('');
-      
-      // 봇 응답 추가
-      const botMessage = {
-        id: messages.length + 2,
-        text: '명령어 가이드를 표시합니다. 여기서 다양한 명령어 예시를 확인하실 수 있습니다.',
-        sender: 'bot'
-      };
-      
-      setMessages(prev => [...prev, botMessage]);
+      addMessage('명령어 가이드를 표시합니다. 여기서 다양한 명령어 예시를 확인하실 수 있습니다.');
       return;
     }
     
-    // 명령어 처리 시도
-    const commandResult = CommandProcessor.processMessage(newMessage, files, directories);
+    // ===== 새로운 자연어 명령 처리 로직 =====
+    setIsProcessingCommand(true);
     
-    if (commandResult && commandResult.success) {
-      // 봇 응답 메시지 추가
-      let responseText = '명령을 처리합니다.';
-      
-      switch (commandResult.type) {
-        case COMMAND_TYPES.DOCUMENT_SEARCH:
-          responseText = `"${commandResult.query}"에 대한 검색 결과를 찾았습니다.`;
-          break;
-        case COMMAND_TYPES.MOVE_DOCUMENT:
-          responseText = `"${commandResult.document.name}" 파일을 "${commandResult.targetPath}" 경로로 이동하시겠습니까?`;
-          break;
-        case COMMAND_TYPES.COPY_DOCUMENT:
-          responseText = `"${commandResult.document.name}" 파일을 "${commandResult.targetPath}" 경로로 복사하시겠습니까?`;
-          break;
-        case COMMAND_TYPES.DELETE_DOCUMENT:
-          responseText = `"${commandResult.document.name}" 파일을 삭제하시겠습니까?`;
-          break;
-        case COMMAND_TYPES.CREATE_FOLDER:
-          responseText = `"${commandResult.parentPath}" 경로에 "${commandResult.folderName}" 폴더를 생성하시겠습니까?`;
-          break;
-        case COMMAND_TYPES.SUMMARIZE_DOCUMENT:
-          responseText = `"${commandResult.document.name}" 문서의 요약을 생성했습니다.`;
-          break;
-        default:
-          responseText = '명령을 처리합니다.';
-          break;
-      }
-      
-      const botMessage = {
-        id: messages.length + 2,
-        text: responseText,
-        sender: 'bot'
+    try {
+      // 컨텍스트 정보 준비
+      const context = {
+        currentPath,
+        selectedFiles: selectedItems.map(id => files.find(f => f.id === id)).filter(Boolean),
+        availableFolders: directories,
+        allFiles: files
       };
       
-      setMessages(prev => [...prev, botMessage]);
-      setNewMessage('');
-      
-      // 명령 결과를 저장하고 모달 표시
-      setCommandResult(commandResult);
-      setShowResultModal(true);
-    } else {
-      // 'bot is typing' 메시지 추가
-      const typingMessage = {
-        id: 'typing',
-        text: '검색 중...',
-        sender: 'bot',
-        isTyping: true
-      };
-      
-      setMessages(prev => [...prev, typingMessage]);
-      setNewMessage('');
-      
-      // RAG 질의 처리
+      // 1단계: 명령 분석 시도
+      let analysisResult;
       try {
-        const answer = await onQuery(newMessage);
-        
-        // 'typing' 메시지 제거
-        setMessages(prev => prev.filter(msg => msg.id !== 'typing'));
-        
-        // 봇 응답 추가
-        const botMessage = {
-          id: messages.length + 2,
-          text: answer || '죄송합니다, 답변을 찾을 수 없습니다.',
-          sender: 'bot'
-        };
-        
-        setMessages(prev => [...prev, botMessage]);
+        analysisResult = await CommandProcessor.analyzeCommand(userCommand, context);
       } catch (error) {
-        // 오류 처리
-        setMessages(prev => prev.filter(msg => msg.id !== 'typing'));
+        // 명령 분석 실패 시 null로 설정
+        analysisResult = { success: false };
+      }
+      
+      if (analysisResult && analysisResult.success) {
+        // ===== 자연어 명령으로 인식된 경우 =====
+        let responseText = '명령을 처리합니다.';
         
-        const errorMessage = {
-          id: messages.length + 2,
-          text: '죄송합니다, 오류가 발생했습니다.',
-          sender: 'bot'
+        switch (analysisResult.operation?.type) {
+          case OPERATION_TYPES.MOVE:
+            responseText = `파일을 "${analysisResult.operation.destination}" 경로로 이동하시겠습니까?`;
+            break;
+          case OPERATION_TYPES.COPY:
+            responseText = `파일을 "${analysisResult.operation.destination}" 경로로 복사하시겠습니까?`;
+            break;
+          case OPERATION_TYPES.DELETE:
+            responseText = `선택한 파일을 삭제하시겠습니까?`;
+            break;
+          case OPERATION_TYPES.CREATE_FOLDER:
+            responseText = `"${analysisResult.operation.folderName}" 폴더를 생성하시겠습니까?`;
+            break;
+          case OPERATION_TYPES.SEARCH:
+            responseText = `"${analysisResult.operation.searchTerm}"에 대한 검색 결과입니다.`;
+            break;
+          case OPERATION_TYPES.RENAME:
+            responseText = `파일 이름을 "${analysisResult.operation.newName}"으로 변경하시겠습니까?`;
+            break;
+          default:
+            responseText = '명령을 처리합니다.';
+            break;
+        }
+        
+        addMessage(responseText);
+        
+        // 확인이 필요한 작업인 경우 미리보기 모달 표시
+        if (analysisResult.requiresConfirmation) {
+          setCurrentOperation(analysisResult);
+          setShowPreviewModal(true);
+        } else {
+          // 확인이 필요없는 작업은 바로 실행 (예: 검색)
+          await executeOperation(analysisResult.operationId, {});
+        }
+        
+      } else {
+        // ===== 일반 RAG 질의로 처리 (기존 로직 유지) =====
+        const typingMessage = {
+          id: 'typing',
+          text: '검색 중...',
+          sender: 'bot',
+          isTyping: true
         };
         
-        setMessages(prev => [...prev, errorMessage]);
-      }
-    }
-  };
-  
-  // 명령 확인 핸들러
-  const handleCommandConfirm = (saveOption = true) => {
-    if (!commandResult) return;
-    
-    // 백엔드에 실제 작업 요청 (여기서는 모의 구현)
-    let successMessage = '';
-    
-    switch (commandResult.type) {
-      case 'DOCUMENT_SEARCH':
-        successMessage = '검색 결과를 확인하셨습니다.';
-        break;
-      case 'MOVE_DOCUMENT':
-        // 실제로는 onMoveItem(commandResult.document.id, commandResult.targetPath) 호출
-        successMessage = `"${commandResult.document.name}" 문서를 "${commandResult.targetPath}" 경로로 이동했습니다.`;
-        break;
-      case 'COPY_DOCUMENT':
-        // 실제로는 onCopyItem(commandResult.document.id, commandResult.targetPath) 호출
-        successMessage = `"${commandResult.document.name}" 문서를 "${commandResult.targetPath}" 경로로 복사했습니다.`;
-        break;
-      case 'DELETE_DOCUMENT':
-        // 실제로는 onDeleteItem(commandResult.document.id) 호출
-        successMessage = `"${commandResult.document.name}" 문서를 삭제했습니다.`;
-        break;
-      case 'CREATE_FOLDER':
-        // 실제로는 onCreateFolder(commandResult.folderName, commandResult.parentPath) 호출
-        successMessage = `"${commandResult.parentPath}" 경로에 "${commandResult.folderName}" 폴더를 생성했습니다.`;
-        break;
-      case 'SUMMARIZE_DOCUMENT':
-        if (saveOption) {
-          // 실제로는 요약본 저장 API 호출
-          successMessage = `"${commandResult.document.name}" 문서의 요약본을 저장했습니다.`;
-        } else {
-          successMessage = `요약본을 저장하지 않았습니다.`;
+        setMessages(prev => [...prev, typingMessage]);
+        
+        try {
+          const answer = await onQuery(userCommand);
+          
+          // 'typing' 메시지 제거
+          setMessages(prev => prev.filter(msg => msg.id !== 'typing'));
+          
+          // 봇 응답 추가
+          addMessage(answer || '죄송합니다, 답변을 찾을 수 없습니다.');
+          
+        } catch (error) {
+          // 오류 처리
+          setMessages(prev => prev.filter(msg => msg.id !== 'typing'));
+          addMessage('죄송합니다, 오류가 발생했습니다.');
         }
-        break;
-      default:
-        successMessage = '작업이 완료되었습니다.';
-        break;
+      }
+      
+    } catch (error) {
+      console.error('명령 처리 중 오류:', error);
+      addMessage('명령 처리 중 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsProcessingCommand(false);
     }
-    
-    // 성공 메시지 추가
-    const botMessage = {
-      id: messages.length + 1,
-      text: successMessage,
-      sender: 'bot'
-    };
-    
-    setMessages(prev => [...prev, botMessage]);
-    
-    // 모달 닫기
-    setShowResultModal(false);
-    setCommandResult(null);
   };
   
-  // 명령 취소 핸들러
-  const handleCommandCancel = () => {
-    if (!commandResult) return;
-    
-    // 취소 메시지 추가
-    const cancelMessage = {
-      id: messages.length + 1,
-      text: '명령이 취소되었습니다.',
-      sender: 'bot'
-    };
-    
-    setMessages(prev => [...prev, cancelMessage]);
-    
-    // 모달 닫기
-    setShowResultModal(false);
-    setCommandResult(null);
+  // ===== 새로 추가되는 작업 실행 함수들 =====
+  
+  const executeOperation = async (operationId, userOptions = {}) => {
+    try {
+      setIsProcessingCommand(true);
+      
+      const executionResult = await CommandProcessor.executeOperation(operationId, userOptions);
+      
+      if (executionResult.success) {
+        const result = executionResult.result;
+        
+        // 성공 메시지 추가
+        addMessage(result.message || '작업이 성공적으로 완료되었습니다.', 'bot', {
+          operationId,
+          canUndo: result.undoAvailable,
+          undoDeadline: result.undoDeadline
+        });
+
+        // 실행된 작업 기록
+        setRecentOperations(prev => [
+          {
+            id: operationId,
+            timestamp: new Date(),
+            canUndo: result.undoAvailable,
+            undoDeadline: result.undoDeadline,
+            description: result.message
+          },
+          ...prev.slice(0, 4) // 최근 5개만 유지
+        ]);
+
+        // FileDisplay 새로고침
+        if (onRefreshFiles) {
+          onRefreshFiles();
+        }
+
+        // 성공 알림
+        if (onShowNotification) {
+          onShowNotification(result.message || '작업이 완료되었습니다.');
+        }
+
+        // 되돌리기 가능한 작업의 경우 안내 메시지
+        if (result.undoAvailable) {
+          setTimeout(() => {
+            addMessage(
+              `💡 이 작업은 ${new Date(result.undoDeadline).toLocaleTimeString()}까지 되돌릴 수 있습니다. "방금 작업 되돌리기"라고 말씀해보세요.`, 
+              'bot'
+            );
+          }, 1000);
+        }
+
+      } else {
+        addMessage(`작업 실행 실패: ${executionResult.error}`);
+      }
+
+    } catch (error) {
+      console.error('작업 실행 오류:', error);
+      addMessage('작업 실행 중 오류가 발생했습니다.');
+    } finally {
+      setIsProcessingCommand(false);
+    }
+  };
+
+  // 미리보기 모달 확인
+  const handlePreviewConfirm = async (userOptions) => {
+    if (!currentOperation) return;
+
+    setShowPreviewModal(false);
+    addMessage('작업을 실행합니다...');
+
+    await executeOperation(currentOperation.operationId, userOptions);
+    setCurrentOperation(null);
+  };
+
+  // 미리보기 모달 취소
+  const handlePreviewCancel = async () => {
+    if (!currentOperation) return;
+
+    try {
+      await CommandProcessor.cancelOperation(currentOperation.operationId);
+      addMessage('작업이 취소되었습니다.');
+    } catch (error) {
+      addMessage('작업 취소 중 오류가 발생했습니다.');
+    } finally {
+      setShowPreviewModal(false);
+      setCurrentOperation(null);
+    }
+  };
+
+  // 작업 되돌리기
+  const handleUndoOperation = async (operationId) => {
+    try {
+      setIsProcessingCommand(true);
+      addMessage('작업을 되돌리고 있습니다...');
+
+      const undoResult = await CommandProcessor.undoOperation(operationId, '사용자 요청');
+
+      if (undoResult.success) {
+        addMessage('작업이 성공적으로 되돌려졌습니다.');
+        
+        // 되돌린 작업을 기록에서 제거
+        setRecentOperations(prev => prev.filter(op => op.id !== operationId));
+        
+        // FileDisplay 새로고침
+        if (onRefreshFiles) {
+          onRefreshFiles();
+        }
+      } else {
+        addMessage(`작업 되돌리기 실패: ${undoResult.error}`);
+      }
+
+    } catch (error) {
+      console.error('작업 되돌리기 오류:', error);
+      addMessage('작업 되돌리기 중 오류가 발생했습니다.');
+    } finally {
+      setIsProcessingCommand(false);
+    }
   };
   
-  // 가이드 닫기 핸들러
+  // ===== 기존 가이드 관련 함수들 유지 =====
+  
   const handleGuideClose = () => {
     setShowGuide(false);
   };
   
-  // 예시 명령어 시도 핸들러
   const handleTryExample = (exampleCommand) => {
     setNewMessage(exampleCommand);
     setShowGuide(false);
   };
 
-  // 챗봇 토글 핸들러 수정 - 가이드도 함께 제어
-  const handleToggleChatbot = () => {
-    // 챗봇을 끄면 가이드도 자동으로 꺼지도록 처리
-    if (isOpen) {
-      toggleChatbot(); // 챗봇 끄기
-      // 가이드는 useEffect에서 자동으로 처리됨
-    } else {
-      toggleChatbot(); // 챗봇 켜기
-    }
+  // ===== 메시지 렌더링 (되돌리기 버튼 포함) =====
+  const renderMessage = (message) => {
+    return (
+      <div key={message.id} className={`message ${message.sender === 'bot' ? 'bot' : 'user'} ${message.isTyping ? 'typing' : ''}`}>
+        <div className="message-content">{message.text}</div>
+        {message.timestamp && (
+          <div className="message-timestamp">
+            {message.timestamp.toLocaleTimeString()}
+          </div>
+        )}
+        
+        {/* 되돌리기 가능한 작업에 대한 버튼 */}
+        {message.data?.canUndo && new Date() < new Date(message.data.undoDeadline) && (
+          <button 
+            className="undo-btn"
+            onClick={() => handleUndoOperation(message.data.operationId)}
+            disabled={isProcessingCommand}
+          >
+            작업 되돌리기
+          </button>
+        )}
+      </div>
+    );
   };
 
   return (
     <div className="chatbot-wrapper">
-      {/* 명령어 가이드 */}
+      {/* 명령어 가이드 (기존 로직 유지) */}
       {isOpen && showGuide && (
         <div className="chatbot-guide-panel">
           <ChatbotGuide
@@ -390,55 +355,82 @@ const Chatbot = ({
       {isOpen ? (
         <div className="enhanced-chatbot-container open">
           <div className="chatbot-header">
-            <h3>문서 관리 도우미</h3>
-            <button className="close-btn" onClick={handleToggleChatbot}>×</button>
+            <h3>🤖 스마트 파일 관리 도우미</h3>
+            <div className="header-status">
+              {selectedItems.length > 0 && (
+                <span className="selected-count">{selectedItems.length}개 선택됨</span>
+              )}
+            </div>
+            <button className="close-btn" onClick={toggleChatbot}>×</button>
           </div>
+          
           <div className="chatbot-messages">
-            {messages.map(message => (
-              <div 
-                key={message.id} 
-                className={`message ${message.sender === 'bot' ? 'bot' : 'user'} ${message.isTyping ? 'typing' : ''}`}
-              >
-                {message.text}
+            {messages.map(renderMessage)}
+            {(isQuerying || isProcessingCommand) && (
+              <div className="message bot typing">
+                <div className="typing-indicator">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
               </div>
-            ))}
+            )}
             <div ref={messagesEndRef} />
           </div>
+          
           <form className="chatbot-input" onSubmit={handleSubmit}>
             <input
               type="text"
-              placeholder="명령어나 질문을 입력하세요..."
+              placeholder="파일 작업을 자연어로 명령하거나 문서에 대해 질문해보세요..."
               value={newMessage}
               onChange={handleInputChange}
-              disabled={isQuerying}
+              disabled={isQuerying || isProcessingCommand}
             />
             <button 
               type="submit" 
-              disabled={newMessage.trim() === '' || isQuerying}
-              className={isQuerying ? 'loading' : ''}
+              disabled={newMessage.trim() === '' || isQuerying || isProcessingCommand}
+              className={(isQuerying || isProcessingCommand) ? 'loading' : ''}
             >
-              {isQuerying ? '처리 중...' : '전송'}
+              {(isQuerying || isProcessingCommand) ? '처리 중...' : '전송'}
             </button>
           </form>
-          
-          {/* 명령 결과 모달 */}
-          {showResultModal && (
-            <div className="result-modal-overlay">
-              <div className="result-modal">
-                <CommandResultView 
-                  result={commandResult}
-                  onConfirm={handleCommandConfirm}
-                  onCancel={handleCommandCancel}
-                />
-              </div>
+
+          {/* 최근 작업 되돌리기 패널 */}
+          {recentOperations.filter(op => op.canUndo && new Date() < new Date(op.undoDeadline)).length > 0 && (
+            <div className="recent-operations">
+              <h4>되돌리기 가능한 작업:</h4>
+              {recentOperations
+                .filter(op => op.canUndo && new Date() < new Date(op.undoDeadline))
+                .map(operation => (
+                  <div key={operation.id} className="undo-item">
+                    <span className="operation-desc">{operation.description}</span>
+                    <button 
+                      className="undo-btn-small"
+                      onClick={() => handleUndoOperation(operation.id)}
+                      disabled={isProcessingCommand}
+                    >
+                      되돌리기
+                    </button>
+                  </div>
+                ))
+              }
             </div>
           )}
         </div>
       ) : (
-        <button className="chatbot-toggle" onClick={handleToggleChatbot}>
-          문서 도우미
+        <button className="chatbot-toggle" onClick={toggleChatbot}>
+          🤖 파일 도우미
         </button>
       )}
+
+      {/* 작업 미리보기 모달 */}
+      <OperationPreviewModal
+        operationData={currentOperation}
+        onConfirm={handlePreviewConfirm}
+        onCancel={handlePreviewCancel}
+        onClose={() => setShowPreviewModal(false)}
+        isVisible={showPreviewModal}
+      />
     </div>
   );
 };
