@@ -195,7 +195,7 @@ ${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => 
               break;
           }
         }
-        
+
         addMessage(responseText);
         
         // 확인이 필요한 작업인 경우 미리보기 모달 표시
@@ -402,7 +402,7 @@ ${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => 
   };
   
   // ===== 기존 가이드 관련 함수들 유지 =====
-  
+
   const handleGuideClose = () => {
     setShowGuide(false);
   };

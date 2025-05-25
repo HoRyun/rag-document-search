@@ -663,7 +663,9 @@ export const CommandProcessor = {
     switch (commandType) {
       case COMMAND_TYPES.DOCUMENT_SEARCH: {
 
+
         const fileName = extractors.extractFileName(message, selectedFiles);
+
 
         const searchTerm = fileName || message.replace(/찾아|검색|어디에|있어|있나|위치|경로/g, '').trim();
         
