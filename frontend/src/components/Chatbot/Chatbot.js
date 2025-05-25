@@ -5,7 +5,7 @@ import './Chatbot.css';
 import ChatbotGuide from './ChatbotGuide';
 
 // 새로 추가할 서비스들
-import { CommandProcessor, OPERATION_TYPES, RISK_LEVELS } from './CommandProcessor';
+import { CommandProcessor, OPERATION_TYPES } from './CommandProcessor';
 
 // 새로 추가할 컴포넌트
 import OperationPreviewModal from './OperationPreviewModal';
