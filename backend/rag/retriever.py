@@ -28,9 +28,9 @@ def search_similarity(user_id, embed_query_data, engine):
                     dc.document_id,
                     dc.content,
                     dc.embedding,
-                    1 - (dc.embedding <=> CAST(:query_embedding_str AS vector)) AS similarity
+                    1 - (dc.embedding <=> CAST('{query_embedding_str}' AS vector)) AS similarity
                 FROM 
-                    document_chunks
+                    document_chunks dc
                 JOIN
                     documents d ON dc.document_id = d.id
                     
@@ -39,16 +39,14 @@ def search_similarity(user_id, embed_query_data, engine):
                     AND dc.embedding IS NOT NULL
                     AND vector_dims(dc.embedding) > 0
                 ORDER BY 
-                    dc.embedding <=> CAST(:query_embedding_str AS vector)
+                    dc.embedding <=> CAST('{query_embedding_str}' AS vector)
                 LIMIT :top_n
                 """)           
-            # 쿼리 실행 (query_embedding_str, user_id, top_n 파라미터로 전달)
+            # 쿼리 실행 (user_id, top_n을 파라미터로 전달)
             result = connection.execute(
                 similarity_query, 
                 {"top_n": top_n,
-                 "user_id": user_id,
-                 "query_embedding_str": query_embedding_str
-
+                 "user_id": user_id
                 }
             )
 
@@ -87,7 +85,6 @@ def search_similarity(user_id, embed_query_data, engine):
                     "id": row['id'],
                     "document_id": row['document_id'],
                     "content": row['content'],
-                    "meta": row['meta'],
                     "embedding": doc_embedding,
                     "similarity": row['similarity']
                 })
