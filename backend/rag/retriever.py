@@ -20,6 +20,7 @@ def search_similarity(user_id, embed_query_data, engine):
             # 2. 코사인 유사도 계산: 1 - (벡터1 <=> 벡터2)
             # 3. 유사도 기준으로 정렬하여 상위 N개 가져오기
             top_n = 20  # 후보 문서 수
+
             
             # PostgreSQL에서는 쿼리 매개변수를 직접 쿼리에 포함
             similarity_query = text(    
@@ -223,7 +224,6 @@ def do_mmr(embed_query_data, candidate_docs):
             
             doc_obj = Document(
                 page_content=doc["content"] or "",  # content가 None인 경우 빈 문자열로 대체
-                metadata=metadata
             )
             docs.append(doc_obj)
         except Exception as e:
