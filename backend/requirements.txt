@@ -21,4 +21,4 @@ sqlmodel==0.0.24
 python-multipart==0.0.6
 psycopg==3.2.6
 boto3
-
+itsdangerous==2.2.0

@@ -128,11 +128,10 @@ def process_query(user_id, query: str, engine) -> str:
         embed_query_data = embed_query(query)
         # 검색 결과 가져오기
         search_similarity_result = search_similarity(user_id, embed_query_data, engine)
-        # stop_debugger()
-
-
+        
         # MMR 알고리즘 수행
         docs = do_mmr(embed_query_data, search_similarity_result)
+        # stop_debugger()
 
         return docs
     except Exception as e:
@@ -140,3 +139,16 @@ def process_query(user_id, query: str, engine) -> str:
         print(traceback.format_exc())
         # 오류 발생 시 사용자 친화적인 메시지 반환
         return f"처리 중 오류가 발생했습니다. 관리자에게 문의하세요. 오류 정보: {str(e)[:100]}..." 
+    
+
+# 디버깅 stop 시 다음 코드 강제 실행 불가하도록 하는 함수.
+def stop_debugger():
+    """q누르면 루프를 강제 종료한다."""
+    while 1:
+        # 키 입력 받기
+        key = input("프로그램이 중단되었습니다. 끝내려면 'q', 계속하려면 'g'.")
+        # q 키를 누르면 예외를 발생시켜 프로그램을 강제 종료
+        if key.lower() == 'q':
+            raise Exception("사용자에 의해 강제 종료되었습니다.")
+        elif key.lower() == 'g':
+            break
