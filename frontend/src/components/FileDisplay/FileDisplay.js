@@ -14,7 +14,9 @@ const FileDisplay = ({
   onFolderOpen, 
   onCopyItem, 
   onRefresh, 
-  isLoading 
+  isLoading,
+  selectedItems: parentSelectedItems = [], // 부모로부터 받은 선택 상태
+  onSelectedItemsChange // 선택 변경을 부모에게 알리는 함수
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -25,7 +27,8 @@ const FileDisplay = ({
   const [isMobile, setIsMobile] = useState(false);
 
   // 파일 선택 및 클립보드 관련 상태 추가
-  const [selectedItems, setSelectedItems] = useState([]);
+  const [selectedItems, setSelectedItems] = useState(parentSelectedItems);
+
   const [clipboard, setClipboard] = useState({ items: [], operation: null }); // operation: 'copy' 또는 'cut'
   const [isCtrlPressed, setIsCtrlPressed] = useState(false);
   const [isShiftPressed, setIsShiftPressed] = useState(false);
@@ -64,6 +67,18 @@ const FileDisplay = ({
       window.removeEventListener('resize', checkMobile);
     };
   }, []);
+
+  // 부모의 selectedItems가 변경될 때 로컬 상태 업데이트
+  useEffect(() => {
+    setSelectedItems(parentSelectedItems);
+  }, [parentSelectedItems]);
+
+  // 로컬 selectedItems가 변경될 때 부모에게 알림
+  useEffect(() => {
+    if (onSelectedItemsChange && JSON.stringify(selectedItems) !== JSON.stringify(parentSelectedItems)) {
+      onSelectedItemsChange(selectedItems);
+    }
+  }, [selectedItems, onSelectedItemsChange, parentSelectedItems]);
 
   const fileInputRef = useRef(null);
   const folderInputRef = useRef(null);
@@ -1232,10 +1247,57 @@ const FileDisplay = ({
           {renderBreadcrumbs()}
         </div>
         
-        {/* 모바일 환경에서 꾹 누르기 힌트 표시 (새로 추가) */}
+        {/* 모바일 환경에서 꾹 누르기 힌트 표시 */}
         {isMobile && (
           <div className="mobile-context-hint">
             항목을 길게 누르면 옵션 메뉴가 표시됩니다
+          </div>
+        )}
+        
+        {/* 선택된 아이템 수 표시 (디버깅용) */}
+        {selectedItems.length > 0 && (
+          <div style={{ 
+            padding: '5px 10px', 
+            backgroundColor: 'var(--highlight-color)', 
+            color: 'white', 
+            borderRadius: '4px', 
+            fontSize: '12px',
+            marginBottom: '10px'
+          }}>
+            선택된 파일: {selectedItems.length}개
+            {selectedItems.length <= 3 && (
+              <div style={{ fontSize: '11px', marginTop: '2px', opacity: 0.9 }}>
+                {selectedItems.map(id => {
+                  const file = files.find(f => f.id === id);
+                  return file ? file.name : `[ID:${id}]`;
+                }).join(', ')}
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* 디버깅용 정보 패널 (개발 환경에서만 표시) */}
+        {process.env.NODE_ENV === 'development' && (
+          <div style={{ 
+            padding: '8px 12px', 
+            backgroundColor: 'var(--bg-tertiary)', 
+            borderRadius: '4px', 
+            fontSize: '11px',
+            marginBottom: '10px',
+            border: '1px dashed var(--border-color)'
+          }}>
+            <strong>🐛 디버깅 정보:</strong><br/>
+            현재 경로: {currentPath} | 
+            전체 파일: {files.length}개 | 
+            선택된 파일: {selectedItems.length}개
+            {selectedItems.length > 0 && (
+              <div style={{ marginTop: '4px' }}>
+                선택된 파일들: {selectedItems.map(id => {
+                  const file = files.find(f => f.id === id);
+                  return file ? file.name : `[ID:${id}]`;
+                }).join(', ')}
+              </div>
+            )}
           </div>
         )}
         
@@ -1373,7 +1435,7 @@ const FileDisplay = ({
               onCopy={handleItemCopy}
               isSelected={selectedItems.includes(file.id)}
               data-file-id={file.id}
-              isMobile={isMobile} // isMobile 프롭스 전달 (새로 추가)
+              isMobile={isMobile}
             />
           ))
         ) : (
@@ -1637,7 +1699,7 @@ const FileDisplay = ({
         </div>
       )}
       
-      {/* 모바일 바텀 시트 메뉴 - 파일 옵션 (새로 추가) */}
+      {/* 모바일 바텀 시트 메뉴 - 파일 옵션 */}
       {isMobile && clipboard.items.length > 0 && (
         <div className="mobile-paste-button" onClick={handlePasteItems}>
           붙여넣기 ({clipboard.items.length})
