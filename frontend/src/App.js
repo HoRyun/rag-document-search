@@ -20,6 +20,8 @@ function App() {
   const [currentPath, setCurrentPath] = useState("/");
   const [chatbotOpen, setChatbotOpen] = useState(false);
 
+  const [selectedItems, setSelectedItems] = useState([]);
+
   // 인증 관련 상태
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
@@ -54,6 +56,11 @@ function App() {
       document.documentElement.setAttribute("data-theme", "dark");
     }
   }, []);
+
+  const handleSelectedItemsChange = (newSelectedItems) => {
+    setSelectedItems(newSelectedItems);
+    console.log('App.js에서 선택된 아이템 업데이트:', newSelectedItems);
+  };
 
   // 테마 토글 핸들러
   const toggleTheme = () => {
@@ -849,12 +856,13 @@ function App() {
   return (
     <div className="app">
       <Header onLogout={handleLogout} username={user?.username} isDarkMode={isDarkMode} toggleTheme={toggleTheme}/>
-      {/* 사이드바 토글 버튼 */}
+      
       <button className="sidebar-toggle-btn" onClick={toggleSidebar}>
         ☰
       </button>
-      {/* 사이드바 오버레이 - 모바일에서 사이드바 열릴 때 배경 어둡게 처리 */}
+      
       {sidebarOpen && <div className="sidebar-overlay active" onClick={closeSidebar}></div>}
+      
       <div className="main-container">
         <Sidebar
           className={sidebarOpen ? 'active' : ''}
@@ -864,6 +872,8 @@ function App() {
           onRefresh={fetchDirectories}
           closeSidebar={closeSidebar}
         />
+        
+        {/* ===== FileDisplay에 선택 상태 관련 props 추가 ===== */}
         <FileDisplay
           files={files}
           directories={directories}
@@ -877,8 +887,13 @@ function App() {
           onFolderOpen={handleFolderOpen}
           onRefresh={fetchDocuments}
           isLoading={isLoading}
+          // ===== 새로 추가되는 props =====
+          selectedItems={selectedItems}
+          onSelectedItemsChange={handleSelectedItemsChange}
         />
       </div>
+      
+      {/* ===== Chatbot에 실제 selectedItems 전달 ===== */}
       <Chatbot
         isOpen={chatbotOpen}
         toggleChatbot={toggleChatbot}
@@ -886,7 +901,7 @@ function App() {
         isQuerying={isQuerying}
         files={files}
         directories={directories}
-        selectedItems={[]} // 나중에 FileDisplay와 연동 예정
+        selectedItems={selectedItems} // ← 실제 상태 전달
         currentPath={currentPath}
         onRefreshFiles={fetchDocuments}
         onShowNotification={showNotification}

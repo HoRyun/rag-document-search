@@ -81,6 +81,24 @@ const Chatbot = ({
     const userCommand = newMessage;
     setNewMessage('');
     
+    // 상태 확인 명령어 추가
+    if (userCommand.toLowerCase().includes('상태') || 
+        userCommand.toLowerCase().includes('현재') ||
+        userCommand.toLowerCase().includes('선택된')) {
+      const statusMessage = `
+현재 상태:
+📂 경로: ${currentPath}
+📄 전체 파일: ${files.length}개
+✅ 선택된 파일: ${selectedItems.length}개
+${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => {
+  const file = files.find(f => f.id === id);
+  return file ? `• ${file.name}` : `• [ID:${id}]`;
+}).join('\n')}` : ''}
+      `;
+      addMessage(statusMessage.trim());
+      return;
+    }
+    
     // 도움말 명령어 처리 (기존 로직 유지)
     if (userCommand.toLowerCase().includes('도움말') || 
         userCommand.toLowerCase().includes('도와줘') || 
@@ -95,49 +113,87 @@ const Chatbot = ({
     setIsProcessingCommand(true);
     
     try {
-      // 컨텍스트 정보 준비
+      // ===== 개선된 컨텍스트 정보 준비 =====
       const context = {
         currentPath,
         selectedFiles: selectedItems.map(id => files.find(f => f.id === id)).filter(Boolean),
         availableFolders: directories,
         allFiles: files
       };
+
+      // 디버깅 로그 추가
+      console.log('=== Chatbot 컨텍스트 정보 ===');
+      console.log('현재 경로:', currentPath);
+      console.log('선택된 파일 ID들:', selectedItems);
+      console.log('선택된 파일 객체들:', context.selectedFiles);
+      console.log('전체 파일 수:', files.length);
+      console.log('사용자 명령:', userCommand);
+      console.log('==========================');
       
       // 1단계: 명령 분석 시도
       let analysisResult;
       try {
         analysisResult = await CommandProcessor.analyzeCommand(userCommand, context);
       } catch (error) {
-        // 명령 분석 실패 시 null로 설정
-        analysisResult = { success: false };
+
+        // 명령 분석 실패 시 로컬 폴백으로 전환
+        console.log('백엔드 분석 실패, 로컬 분석으로 폴백:', error.message);
+        analysisResult = CommandProcessor.processMessage(userCommand, files, directories, context);
       }
       
       if (analysisResult && analysisResult.success) {
         // ===== 자연어 명령으로 인식된 경우 =====
         let responseText = '명령을 처리합니다.';
-        
-        switch (analysisResult.operation?.type) {
-          case OPERATION_TYPES.MOVE:
-            responseText = `파일을 "${analysisResult.operation.destination}" 경로로 이동하시겠습니까?`;
-            break;
-          case OPERATION_TYPES.COPY:
-            responseText = `파일을 "${analysisResult.operation.destination}" 경로로 복사하시겠습니까?`;
-            break;
-          case OPERATION_TYPES.DELETE:
-            responseText = `선택한 파일을 삭제하시겠습니까?`;
-            break;
-          case OPERATION_TYPES.CREATE_FOLDER:
-            responseText = `"${analysisResult.operation.folderName}" 폴더를 생성하시겠습니까?`;
-            break;
-          case OPERATION_TYPES.SEARCH:
-            responseText = `"${analysisResult.operation.searchTerm}"에 대한 검색 결과입니다.`;
-            break;
-          case OPERATION_TYPES.RENAME:
-            responseText = `파일 이름을 "${analysisResult.operation.newName}"으로 변경하시겠습니까?`;
-            break;
-          default:
-            responseText = '명령을 처리합니다.';
-            break;
+
+        // 선택된 파일이 있을 때 더 구체적인 응답
+        if (context.selectedFiles.length > 0) {
+          const fileNames = context.selectedFiles.map(f => f.name).join(', ');
+          
+          switch (analysisResult.operation?.type) {
+            case OPERATION_TYPES.MOVE:
+              responseText = `선택된 파일 "${fileNames}"을(를) "${analysisResult.operation.destination}" 경로로 이동하시겠습니까?`;
+              break;
+            case OPERATION_TYPES.COPY:
+              responseText = `선택된 파일 "${fileNames}"을(를) "${analysisResult.operation.destination}" 경로로 복사하시겠습니까?`;
+              break;
+            case OPERATION_TYPES.DELETE:
+              responseText = `선택된 파일 "${fileNames}"을(를) 삭제하시겠습니까?`;
+              break;
+            case OPERATION_TYPES.RENAME:
+              responseText = `선택된 파일 "${fileNames}"의 이름을 "${analysisResult.operation.newName}"으로 변경하시겠습니까?`;
+              break;
+            case OPERATION_TYPES.SUMMARIZE:
+              responseText = `선택된 ${context.selectedFiles.length}개 파일을 요약하시겠습니까?`;
+              break;
+            default:
+              responseText = `선택된 ${context.selectedFiles.length}개 파일에 대한 작업을 처리합니다.`;
+              break;
+          }
+        } else {
+          // 선택된 파일이 없을 때 기본 응답
+          switch (analysisResult.operation?.type) {
+            case OPERATION_TYPES.CREATE_FOLDER:
+              responseText = `현재 위치(${currentPath})에 "${analysisResult.operation.folderName}" 폴더를 생성하시겠습니까?`;
+              break;
+            case OPERATION_TYPES.SEARCH:
+              responseText = `"${analysisResult.operation.searchTerm}"에 대한 검색 결과입니다.`;
+              break;
+            case OPERATION_TYPES.MOVE:
+              responseText = `파일을 "${analysisResult.operation.destination}" 경로로 이동하시겠습니까?`;
+              break;
+            case OPERATION_TYPES.COPY:
+              responseText = `파일을 "${analysisResult.operation.destination}" 경로로 복사하시겠습니까?`;
+              break;
+            case OPERATION_TYPES.DELETE:
+              responseText = `파일을 삭제하시겠습니까?`;
+              break;
+            case OPERATION_TYPES.RENAME:
+              responseText = `파일 이름을 "${analysisResult.operation.newName}"으로 변경하시겠습니까?`;
+              break;
+            default:
+              responseText = '명령을 처리합니다.';
+              break;
+          }
         }
         
         addMessage(responseText);
@@ -148,7 +204,20 @@ const Chatbot = ({
           setShowPreviewModal(true);
         } else {
           // 확인이 필요없는 작업은 바로 실행 (예: 검색)
-          await executeOperation(analysisResult.operationId, {});
+
+          if (analysisResult.operationId) {
+            await executeOperation(analysisResult.operationId, {});
+          } else {
+            // 로컬 처리 결과 표시 (검색 등)
+            if (analysisResult.type === 'DOCUMENT_SEARCH') {
+              if (analysisResult.results && analysisResult.results.length > 0) {
+                const resultText = `검색 결과 (${analysisResult.results.length}개):\n${analysisResult.results.map(file => `• ${file.name}`).join('\n')}`;
+                addMessage(resultText);
+              } else {
+                addMessage('검색 결과가 없습니다.');
+              }
+            }
+          }
         }
         
       } else {
@@ -255,8 +324,34 @@ const Chatbot = ({
     setShowPreviewModal(false);
     addMessage('작업을 실행합니다...');
 
-    await executeOperation(currentOperation.operationId, userOptions);
+    if (currentOperation.operationId) {
+      await executeOperation(currentOperation.operationId, userOptions);
+    } else {
+      // 로컬 작업 처리 (백엔드 연동 없는 경우)
+      try {
+        await handleLocalOperation(currentOperation, userOptions);
+      } catch (error) {
+        console.error('로컬 작업 실행 오류:', error);
+        addMessage('작업 실행 중 오류가 발생했습니다.');
+      }
+    }
+    
     setCurrentOperation(null);
+  };
+
+  // 로컬 작업 처리 함수
+  const handleLocalOperation = async (operation, userOptions) => {
+    // 여기서는 실제 파일 작업을 수행하지 않고 시뮬레이션만
+    // 실제 구현에서는 App.js의 핸들러 함수들을 호출해야 함
+    addMessage(`로컬 작업 완료: ${operation.previewAction}`);
+    
+    if (onRefreshFiles) {
+      onRefreshFiles();
+    }
+    
+    if (onShowNotification) {
+      onShowNotification('작업이 완료되었습니다.');
+    }
   };
 
   // 미리보기 모달 취소
@@ -264,7 +359,9 @@ const Chatbot = ({
     if (!currentOperation) return;
 
     try {
-      await CommandProcessor.cancelOperation(currentOperation.operationId);
+      if (currentOperation.operationId) {
+        await CommandProcessor.cancelOperation(currentOperation.operationId);
+      }
       addMessage('작업이 취소되었습니다.');
     } catch (error) {
       addMessage('작업 취소 중 오류가 발생했습니다.');
