@@ -145,6 +145,7 @@ ${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => 
         // ===== 자연어 명령으로 인식된 경우 =====
         let responseText = '명령을 처리합니다.';
 
+        
         // 선택된 파일이 있을 때 더 구체적인 응답
         if (context.selectedFiles.length > 0) {
           const fileNames = context.selectedFiles.map(f => f.name).join(', ');

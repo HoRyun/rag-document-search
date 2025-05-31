@@ -350,8 +350,6 @@ const extractors = {
     return null;
   },
 
-  
-
   // ===== 개선된 경로 추출 함수 =====
   extractPath: (message, currentPath = '/') => {
     debugLog('stage', '🔍 경로 추출 시도', { message, currentPath });
@@ -663,7 +661,6 @@ export const CommandProcessor = {
     switch (commandType) {
       case COMMAND_TYPES.DOCUMENT_SEARCH: {
         const fileName = extractors.extractFileName(message, selectedFiles);
-
         const searchTerm = fileName || message.replace(/찾아|검색|어디에|있어|있나|위치|경로/g, '').trim();
         
         const searchResults = files
