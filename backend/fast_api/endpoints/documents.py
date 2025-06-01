@@ -8,6 +8,8 @@ import uuid
 import json
 import boto3
 
+# 메서드 import
+from debug import debugging
 from db.database import get_db, engine
 from db.models import User
 from fast_api.security import get_current_user
@@ -19,6 +21,7 @@ import logging
 
 from dotenv import load_dotenv
 load_dotenv()
+
 
 
 
@@ -2226,14 +2229,3 @@ def copy_directory(db: Session, target_item_id: str, target_destination_path: st
 
 
 
-# 디버깅 stop 시 다음 코드 강제 실행 불가하도록 하는 함수.
-def stop_debugger():
-    """q누르면 루프를 강제 종료한다."""
-    while 1:
-        # 키 입력 받기
-        key = input("프로그램이 중단되었습니다. 끝내려면 'q', 계속하려면 'g'.")
-        # q 키를 누르면 예외를 발생시켜 프로그램을 강제 종료
-        if key.lower() == 'q':
-            raise Exception("사용자에 의해 강제 종료되었습니다.")
-        elif key.lower() == 'g':
-            break
