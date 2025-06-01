@@ -72,9 +72,8 @@ async def stage_operation(
     elif operation_type == "summarize":
         result = process_summarize(command, context)
 
-
-    # TODO: 실제 로직 구현
-    pass
+    # 결과 반환
+    return result
 
 @router.post("/{operation_id}/execute", response_model=op_schemas.ExecutionResponse)
 async def execute_operation(
@@ -96,6 +95,7 @@ async def execute_operation(
         ExecutionResponse: 실행 결과 정보
     """
     logger.info(f"Execute operation {operation_id} for user {current_user.id}")
+    # debugging.stop_debugger()
     
     # TODO: 실제 로직 구현
     pass
@@ -161,14 +161,13 @@ async def process_move(command, context):
         작업 결과 정보
     """
     # 명령 분석
-    # destination, description = await invoke.analyze_move_command(command, context)
-    test = await invoke.analyze_move_command(command, context)
+    destination, description = await invoke.analyze_move_command(command, context)
 
 
     # 데이터 준비
     operationId = "op-"+str(uuid.uuid4())
-    destination = None
-    description = None
+    destination = destination
+    description = description
     warnings = [] 
     
     # 리턴 객체 준비
@@ -179,7 +178,7 @@ async def process_move(command, context):
     "destination": destination # "/업무/마케팅"
   },
   "requiresConfirmation": True,
-  "riskLevel": "low",
+  "riskLevel": "medium",
   "operationId": operationId,
   "preview": {
     "description": description,
@@ -187,7 +186,7 @@ async def process_move(command, context):
   }
 }
 
-    pass
+    return result
 
 def process_copy(command, context):
     """

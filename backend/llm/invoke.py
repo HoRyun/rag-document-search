@@ -109,7 +109,7 @@ async def analyze_move_command(command: str, context: op_schemas.OperationContex
         """
 <!-- 역할 -->
 당신은 사용자의 파일 이동 요청을 해석하여
-정해진 출력 형식(<destination>, <preview>)을 생성합니다.
+정해진 출력 형식(<destination>, <description>)을 생성합니다.
 
 <!-- 입력 -->
 <context>
@@ -124,15 +124,15 @@ async def analyze_move_command(command: str, context: op_schemas.OperationContex
         → 해당 항목의 path 값을 <destination>에 기록합니다.  
    1-2. 일치 항목이 없으면  
         → 사용자가 입력한 목적지 이름(‘폴더’ 단어 제외)을 그대로 <destination>에 기록합니다.  
-        → 이 경우 새 폴더를 생성해야 함을 preview에 명시합니다.  
+        → 이 경우 새 폴더를 생성해야 함을 <description>에 명시합니다.  
 
-2. <preview> 작성  
+2. <description> 작성  
    기본 형식: “<selectedFiles>을 <destination>으로 이동합니다.”  
    규칙 1-2 상황이면 문장 끝에  
    “<destination> 폴더를 새로 생성합니다.” 를 추가합니다.  
 
 <!-- 출력 -->
-<destination>…</destination>,<preview>…</preview>
+<destination>…</destination>,<description>…</description>
 
         """
     )
@@ -155,12 +155,16 @@ async def analyze_move_command(command: str, context: op_schemas.OperationContex
     try:
         result = chain.invoke({"command": command, "selectedFiles": selectedFiles, "availableFolders": availableFolders})
         print(f"Operation type: {result}")
-        # debugging.stop_debugger()
-        # 모델 출력 제어 성공했으므로 result를 파싱하여 값을 뽑아내고, 두 개의 변수를 리턴하는 로직 작성하기.
-        return result
+        
     except Exception as e:
         print(f"Error in get_operation_type: {e}")
         return "error"
+    
+    # 모델 출력 제어 성공했으므로 result를 파싱하여 값을 뽑아내고, 두 개의 변수를 리턴하는 로직 작성하기.
+    destination = result.split("<destination>")[1].split("</destination>")[0]
+    description = result.split("<description>")[1].split("</description>")[0]
+    # debugging.stop_debugger()
+    return (destination, description)
 
 
 def convert_selected_files_to_string(selected_files: list) -> str:
