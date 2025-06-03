@@ -418,22 +418,21 @@ async def process_directory_operations(operations, user_id: int, db):
         op_type = op.get("operation_type")
         reserved_item_id = op.get("item_id", None)
         reserved_item_name = op.get("name", None)
-        reserved_path = op.get("target_path", "/")
+        if op.get("target_path", None) or op.get("path", None) == "":
+            reserved_path = '/'
+        else:
+            reserved_path = op.get("target_path", None) or op.get("path", None)
+
+        
         if reserved_item_id:
             # 아이템의 디렉토리 여부
             item_is_directory = crud.get_file_is_directory_by_id(db, reserved_item_id)
 
-        if op.get("target_path", "/") == "":
-            reserved_path = "/"
 
         try:
             # 새 폴더 생성
             if op_type == "create":
                 new_folder_id = str(uuid.uuid4())
-                reserved_path = op.get("path", "/")
-                # # 경로 정규화
-                # if not reserved_path.endswith("/"):
-                #     reserved_path += "/"
                  
                 target_item_original_name = reserved_item_name
                 # 이름 중복 확인
@@ -456,6 +455,7 @@ async def process_directory_operations(operations, user_id: int, db):
                         "created_at": datetime.now().isoformat(),
                         "operation":op_type
                     }
+                    # debugging.stop_debugger()
                     # 디렉토리 정보 저장
                     results.append(store_directory_table(db, directory_value_dict, user_id))                    
                 else:
@@ -469,11 +469,12 @@ async def process_directory_operations(operations, user_id: int, db):
                         "id": new_folder_id,
                         "name": target_item_new_name,
                         "path": item_path,
-                        "is_directory": item_is_directory,
+                        "is_directory": True,
                         "parent_id": parent_id,
                         "created_at": datetime.now().isoformat(),
                         "operation":op_type
                     }                    
+                    # debugging.stop_debugger()
                     # 디렉토리 정보 저장
                     results.append(store_directory_table(db, directory_value_dict, user_id))
             
