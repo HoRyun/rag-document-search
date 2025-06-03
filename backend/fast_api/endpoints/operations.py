@@ -41,7 +41,7 @@ async def stage_operation(
         OperationResponse: 준비된 작업 정보
     """
     logger.info(f"Stage operation request from user {current_user.id}: {request.command}")
-    # debugging.stop_debugger()
+    debugging.stop_debugger()
     # command 값 접근
     command = request.command
 
@@ -487,7 +487,41 @@ def process_create_folder(command, context):
     Returns:
         작업 결과 정보
     """
-    pass
+    # 데이터 준비
+    operationId = "op-"+str(uuid.uuid4())
+    folder_name = get_new_folder_name(command)
+    parent_Path = get_parent_path(command, context)
+    description = generate_create_folder_description(folder_name, parent_Path)
+
+    # parent_Path 파싱. 만약 'create_folder'가 존재하는 경우,
+    # parent_Path에서 'create_folder' 문자열이 있으면 제거
+    if parent_Path.startswith('create_folder'):
+        code_remove_ver = parent_Path.replace('create_folder', '', 1)
+
+        # parent_Path에 코드를 제거한 경로 데이터 저장.
+        parent_Path = code_remove_ver
+
+        additional_desc = folder_name + " 폴더를 생성합니다."
+        # 추가 설명 문장 추가.
+        description += " " + additional_desc
+
+    # 리턴 객체 준비
+    result = {
+  "operation": {
+    "type": "create_folder",
+    "folderName": folder_name,
+    "parentPath": parent_Path
+  },
+  "requiresConfirmation": True,
+  "riskLevel": "low",
+  "operationId": operationId,
+  "preview": {
+    "description": description
+  }
+}
+
+
+    return result
 
 def process_search(command, context):
     """
@@ -822,3 +856,176 @@ def generate_rename_description(context, new_name):
         desc_result = f"아이템 이름을 {new_name}(으)로 변경합니다."
     
     return desc_result
+
+def get_new_folder_name(command):
+    """
+    새 폴더 이름을 추출하는 함수
+    
+    Args:
+        command: 사용자의 자연어 명령
+    """
+    # 1. 사용자 명령에서 새 폴더 이름 추출
+    new_dir_name = None
+    
+    # 다양한 패턴으로 새 폴더 이름 추출 시도
+    patterns = [
+        # 기본 생성 패턴
+        r'(\w+)\s*폴더를\s*생성',  # "신규프로젝트 폴더를 생성"
+        r'(\w+)\s*폴더\s*생성',   # "신규프로젝트 폴더 생성"
+        r'(\w+)\s*디렉토리를\s*생성',  # "신규프로젝트 디렉토리를 생성"
+        r'(\w+)\s*디렉토리\s*생성',   # "신규프로젝트 디렉토리 생성"
+        
+        # 만들기 패턴
+        r'(\w+)\s*폴더를\s*만들',  # "신규프로젝트 폴더를 만들"
+        r'(\w+)\s*폴더\s*만들',   # "신규프로젝트 폴더 만들"
+        r'(\w+)\s*디렉토리를\s*만들',  # "신규프로젝트 디렉토리를 만들"
+        r'(\w+)\s*디렉토리\s*만들',   # "신규프로젝트 디렉토리 만들"
+        r'(\w+)를\s*만들어',  # "신규프로젝트를 만들어"
+        r'(\w+)\s*만들어',   # "신규프로젝트 만들어"
+        
+        # 추가 패턴
+        r'새\s*(\w+)를\s*추가',  # "새 프로젝트를 추가"
+        r'새\s*(\w+)\s*추가',   # "새 프로젝트 추가"
+        r'(\w+)를\s*추가',  # "신규프로젝트를 추가"
+        r'(\w+)\s*추가',   # "신규프로젝트 추가"
+        r'(\w+)\s*폴더를\s*추가',  # "신규프로젝트 폴더를 추가"
+        r'(\w+)\s*디렉토리를\s*추가',  # "신규프로젝트 디렉토리를 추가"
+        
+        # 기본 생성 패턴 (간단한 형태)
+        r'(\w+)를\s*생성',  # "신규프로젝트를 생성"
+        r'(\w+)\s*생성',   # "신규프로젝트 생성"
+        r'새\s*(\w+)를\s*생성',  # "새 프로젝트를 생성"
+        r'새\s*(\w+)\s*생성',   # "새 프로젝트 생성"
+        
+        # '라는/이라는' 패턴
+        r'(\w+)라는\s*폴더를\s*생성',  # "프로젝트라는 폴더를 생성"
+        r'(\w+)라는\s*폴더\s*생성',   # "프로젝트라는 폴더 생성"
+        r'(\w+)라는\s*디렉토리를\s*생성',  # "프로젝트라는 디렉토리를 생성"
+        r'(\w+)라는\s*디렉토리\s*생성',   # "프로젝트라는 디렉토리 생성"
+        r'(\w+)이라는\s*폴더를\s*생성',  # "프로젝트이라는 폴더를 생성"
+        r'(\w+)이라는\s*폴더\s*생성',   # "프로젝트이라는 폴더 생성"
+        
+        # 새로운/신규 패턴
+        r'새로운\s*(\w+)를\s*생성',  # "새로운 프로젝트를 생성"
+        r'새로운\s*(\w+)\s*생성',   # "새로운 프로젝트 생성"
+        r'신규\s*(\w+)를\s*생성',  # "신규 프로젝트를 생성"
+        r'신규\s*(\w+)\s*생성',   # "신규 프로젝트 생성"
+        
+        # 영어 혼용 패턴
+        r'new\s*(\w+)를\s*생성',  # "new 프로젝트를 생성"
+        r'new\s*(\w+)\s*생성',   # "new 프로젝트 생성"
+        r'(\w+)\s*create',  # "프로젝트 create"
+        r'create\s*(\w+)',  # "create 프로젝트"
+        
+        # 위치 표현과 함께
+        r'여기에\s*(\w+)를\s*생성',  # "여기에 프로젝트를 생성"
+        r'이곳에\s*(\w+)를\s*생성',  # "이곳에 프로젝트를 생성"
+        r'(\w+)를\s*여기에\s*생성',  # "프로젝트를 여기에 생성"
+        
+        # 기타 표현
+        r'(\w+)\s*폴더를\s*구성',  # "프로젝트 폴더를 구성"
+        r'(\w+)\s*디렉토리를\s*구성',  # "프로젝트 디렉토리를 구성"
+        r'(\w+)\s*이름의\s*폴더를\s*생성',  # "프로젝트 이름의 폴더를 생성"
+        r'(\w+)\s*이름으로\s*폴더를\s*생성',  # "프로젝트 이름으로 폴더를 생성"
+    ]
+    
+    # 각 패턴을 순서대로 시도하여 새 폴더 이름 추출
+    for pattern in patterns:
+        match = re.search(pattern, command)
+        if match:
+            new_dir_name = match.group(1)
+            break  # 첫 번째 매칭되는 패턴에서 중단
+    
+    return new_dir_name
+
+
+def get_parent_path(command, context):
+    """
+    새 폴더의 부모 경로를 추출하는 함수
+    
+    Args:
+        command: 사용자의 자연어 명령
+        context: 작업 컨텍스트 정보
+        folder_name: 생성할 폴더 이름(A)
+    
+    Returns:
+        str: 부모 경로 (기존 경로 또는 'create_folder/B' 형태)
+    """
+    # 1. 현재 위치 관련 패턴 확인 (최우선)
+    current_location_patterns = [
+        r'현재\s*디렉토리',      # "현재 디렉토리에"
+        r'현재\s*위치',         # "현재 위치에" 
+        r'현재\s*폴더',         # "현재 폴더에"
+        r'이\s*위치',          # "이 위치에"
+        r'이\s*폴더',          # "이 폴더에"
+        r'여기',              # "여기에"
+        r'지금\s*위치',         # "지금 위치에"
+        r'이곳'               # "이곳에"
+    ]
+    
+    for pattern in current_location_patterns:
+        if re.search(pattern, command):
+            return context.currentPath or '/'
+    
+    # 2. 사용자 명령에서 부모 디렉토리 이름(B) 추출
+    parent_dir_name = None
+    
+    # 다양한 패턴으로 부모 디렉토리 위치 추출 시도
+    patterns = [
+        r'(\w+)\s*폴더\s*안에',  # "프로젝트 폴더 안에"
+        r'(\w+)\s*폴더\s*내에',  # "프로젝트 폴더 내에" 
+        r'(\w+)\s*디렉토리\s*안에',  # "프로젝트 디렉토리 안에"
+        r'(\w+)\s*디렉토리\s*내에',  # "프로젝트 디렉토리 내에"
+        r'(\w+)\s*내에\s*생성',  # "프로젝트 내에 생성" 
+        r'(\w+)\s*안에\s*생성',  # "프로젝트 안에 생성"
+        r'(\w+)\s*폴더\s*아래',  # "프로젝트 폴더 아래"
+        r'(\w+)\s*디렉토리\s*아래',  # "프로젝트 디렉토리 아래"
+    ]
+    
+    # 각 패턴을 순서대로 시도하여 부모 디렉토리 이름 추출
+    for pattern in patterns:
+        match = re.search(pattern, command)
+        if match:
+            parent_dir_name = match.group(1)
+            break  # 첫 번째 매칭되는 패턴에서 중단
+    
+    # 3. availableFolders에서 매칭되는 path 찾기
+    if parent_dir_name:
+        for folder in context.availableFolders:
+            if folder.get('name') == parent_dir_name:
+                return folder.get('path')  # C 값 반환
+        
+        # 매칭되는 폴더가 없는 경우 'create_folder/B' 반환
+        return 'create_folder/' + parent_dir_name
+    
+    # 부모 디렉토리가 명시되지 않은 경우 현재 경로 사용
+    return context.currentPath or '/'
+
+def generate_create_folder_description(folder_name, parent_path):
+    """
+    폴더 생성 작업에 대한 설명 문장을 생성하는 함수
+    
+    Args:
+        folder_name: 생성할 폴더 이름
+        parent_path: 폴더 생성 위치
+            
+    Returns:
+        str: 폴더 생성 작업에 대한 설명 문장
+    """
+    # parent_path에 'create_folder' 문자열이 포함되어 있는지 확인
+    if 'create_folder' in parent_path:
+        # 'create_folder/'를 제거한 값을 parent_dir_name에 할당
+        parent_dir_name = parent_path.replace('create_folder/', '')
+    else:
+        # parent_path를 '/'로 split하고 가장 마지막 경로 문자열을 가져옴
+        path_parts = parent_path.strip('/').split('/')
+        # 빈 문자열이거나 루트 경로인 경우 처리
+        if path_parts and path_parts[0]:
+            parent_dir_name = path_parts[-1]
+        else:
+            parent_dir_name = '루트'
+    
+    # 결과 문자열 생성
+    result_desc = f"{parent_dir_name} 내에 {folder_name} 폴더를 생성합니다."
+    
+    return result_desc
