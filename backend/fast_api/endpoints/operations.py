@@ -54,12 +54,12 @@ async def stage_operation(
     available_folders = context.availableFolders
     timestamp = context.timestamp
 
-    # 테스트테스트테스트테스트
-    # 테스트 명령어들
+    # # 테스트테스트테스트테스트
+    # # 테스트 명령어들
     # test_commands = [
     #     # destination 테스트
-    #     "프로젝트 폴더로 이동",
-    #     "새 폴더로 이동"
+    #     # "프로젝트 폴더로 이동",
+    #     # "새 폴더로 이동"
     #     # # DELETE (3개)
     #     # "파일을 삭제해줘",
     #     # "이 문서들 지워줘", 
@@ -109,13 +109,28 @@ async def stage_operation(
     #     # "안녕하세요",
     #     # "오늘 날씨가 어때요?",
     #     # "점심 뭐 먹을까요?"
+        
+    #     # get_new_name()테스트
+    #     "선택된 파일을 새문서로 바꿔줘",
+    #     "이 폴더 이름을 마케팅으로 변경해줘",
+    #     "파일명을 보고서2024로 수정해줘",
+    #     "디렉토리를 프로젝트폴더로 이름변경해줘",
+    #     "선택한 문서를 최종버전으로 리네임해줘",
+    #     "이름을 임시파일로 바꿔",
+    #     "파일을 백업데이터로 rename해줘",
+    #     "폴더명을 업무자료으로 변경",
+    #     "선택된 항목을 새이름123으로 수정하고 싶어",
+    #     "이 파일 이름을 중요문서로 바꿔주세요"
     # ]
 
     # for cmd in test_commands:
-    #     output_destination = extract_move_destination(cmd, context)
-    #     print(f"'{cmd}' → {output_destination}")
+    #     output = get_new_name(cmd)
+    #     output_desc = generate_rename_description(context, output)
+    #     print(f"'{cmd}' → {output}")
+    #     print(f"'{cmd}' → {output_desc}")
+    #     print("--------------------------------")
     # debugging.stop_debugger()
-    # 테스트테스트테스트테스트
+    # # 테스트테스트테스트테스트
 
 
 
@@ -345,9 +360,8 @@ def process_delete(command, context):
     Returns:
         작업 결과 정보
     """
-    destination = None
     # 작업 설명 요약 생성.
-    description = get_description(context, destination, 'delete')
+    description = get_description(context, None, 'delete')
 
 
     # 데이터 준비
@@ -437,7 +451,30 @@ def process_rename(command, context):
     Returns:
         작업 결과 정보
     """
-    pass
+
+    # 데이터 준비
+    operationId = "op-"+str(uuid.uuid4())
+    new_name = get_new_name(command)
+    description = generate_rename_description(context, new_name)
+    # debugging.stop_debugger()
+
+    # 리턴 객체 준비
+    result = {
+        "operation": {
+            "type": "rename",
+    "target": context.selectedFiles, # 사용자가 선택한 파일
+    "newName": new_name
+  },
+  "requiresConfirmation": True,
+  "riskLevel": "medium",
+  "operationId": operationId,
+  "preview": {
+    "description": description
+  }
+}
+    
+    return result
+
 
 def process_create_folder(command, context):
     """
@@ -501,7 +538,7 @@ def get_destination(command, context, operation_type):
 
     return output_destination
 
-def get_description(context, destination = '/', operation_type = "default"):
+def get_description(context, destination = '/', operation_type = "default", new_name = None):
     """
     
     
@@ -514,6 +551,8 @@ def get_description(context, destination = '/', operation_type = "default"):
         output_description = generate_copy_description(context, destination)
     elif operation_type == 'delete':
         output_description = generate_delete_description(context)
+    elif operation_type == 'rename':
+        output_description = generate_rename_description(context, new_name)
     else:
         output_description = "작업 설명 문장 생성 오류"
 
@@ -712,3 +751,74 @@ def generate_delete_description(context):
     return desc_result
 
     
+def get_new_name(command):
+    """
+    이름 변경 작업에 대한 새로운 이름을 추출하는 함수
+    
+    Args:
+        command: 사용자의 자연어 명령
+    
+    Returns:
+        str: 추출된 새로운 이름 (없으면 None)
+    """
+    # 1. 사용자 명령에서 새 이름 추출
+    new_name = None
+    
+    # 다양한 패턴으로 새 이름 추출 시도
+    patterns = [
+        r'(\w+?)으로\s*바꿔',  # "새이름으로 바꿔" → "새이름"
+        r'(\w+?)으로\s*변경',  # "새이름으로 변경" → "새이름" 
+        r'(\w+?)으로\s*수정',  # "새이름으로 수정" → "새이름"
+        r'(\w+?)으로\s*이름변경',  # "새이름으로 이름변경" → "새이름"
+        r'(\w+?)으로\s*리네임',  # "새이름으로 리네임" → "새이름"
+        r'(\w+?)으로\s*rename',  # "새이름으로 rename" → "새이름"
+        r'(\w+)로\s*바꿔',  # "새이름로 바꿔"
+        r'(\w+)로\s*변경',  # "새이름로 변경"
+        r'(\w+)로\s*수정',  # "새이름로 수정"
+        r'(\w+)로\s*이름변경',  # "새이름로 이름변경"
+        r'(\w+)로\s*리네임',  # "새이름로 리네임"
+        r'(\w+)로\s*rename',  # "새이름로 rename" (영어 혼용)
+        r'이름을\s*(\w+)로',  # "이름을 새이름로"
+        r'이름을\s*(\w+?)으로',  # "이름을 새이름으로" → "새이름"
+        r'파일명을\s*(\w+)로',  # "파일명을 새이름로"
+        r'파일명을\s*(\w+?)으로',  # "파일명을 새이름으로" → "새이름"
+    ]
+    
+    # 각 패턴을 순서대로 시도하여 새 이름 추출
+    for pattern in patterns:
+        match = re.search(pattern, command)
+        if match:
+            new_name = match.group(1)
+            break  # 첫 번째 매칭되는 패턴에서 중단
+    
+    return new_name
+
+def generate_rename_description(context, new_name):
+    """
+    이름 변경 작업에 대한 설명 문장을 생성하는 함수
+    
+    Args:
+        context: 작업 컨텍스트 정보 (selectedFiles 포함)
+        new_name: 새로운 이름
+        
+    Returns:
+        str: "문서 이름을 new_name(으)로 변경합니다." 또는 "디렉토리 이름을 new_name(으)로 변경합니다." 형태의 설명 문장
+    """
+    # 1. selectedFiles에서 첫 번째 아이템의 타입 확인
+    # (rename 작업은 일반적으로 단일 아이템에 대해 수행됨)
+    if context.selectedFiles and len(context.selectedFiles) > 0:
+        selected_item = context.selectedFiles[0]
+        item_type = selected_item.get('type', '')
+        
+        # 2. 아이템 타입에 따른 설명 문구 생성
+        if item_type == 'folder':
+            # 폴더(디렉토리)인 경우
+            desc_result = f"디렉토리 이름을 {new_name}(으)로 변경합니다."
+        else:
+            # 파일인 경우 (기본값)
+            desc_result = f"문서 이름을 {new_name}(으)로 변경합니다."
+    else:
+        # 선택된 아이템이 없는 경우 기본 메시지
+        desc_result = f"아이템 이름을 {new_name}(으)로 변경합니다."
+    
+    return desc_result
