@@ -9,6 +9,7 @@ export const COMMAND_TYPES = {
   CREATE_FOLDER: 'CREATE_FOLDER',
   SUMMARIZE_DOCUMENT: 'SUMMARIZE_DOCUMENT',
   RENAME_DOCUMENT: 'RENAME_DOCUMENT',
+  UNDO: 'UNDO',
   UNKNOWN: 'UNKNOWN'
 };
 
@@ -301,10 +302,28 @@ const PATTERNS = {
   ]
 };
 
-// ===== 기존 extractors 확장 =====
+// ===== 개선된 extractors =====
 const extractors = {
-  extractFileName: (message) => {
-    debugLog('stage', '🔍 파일명 추출 시도', { message });
+  // ===== 개선된 파일명 추출 함수 =====
+  extractFileName: (message, selectedFiles = []) => {
+    debugLog('stage', '🔍 파일명 추출 시도', { message, selectedFiles });
+    
+    // "선택된 파일" "이 파일" "선택한 문서" 등의 표현 처리
+    const selectedPatterns = [
+      /선택(된|한)\s*(파일|문서|항목)(들?)/i,
+      /(이|그)\s*(파일|문서)(들?)/i,
+      /현재\s*선택(된|한)/i,
+      /지금\s*선택(된|한)/i
+    ];
+    
+    for (const pattern of selectedPatterns) {
+      if (pattern.test(message) && selectedFiles.length > 0) {
+        // 선택된 파일이 있으면 첫 번째 파일의 이름 반환
+        const fileName = selectedFiles[0].name;
+        debugLog('stage', '✅ 선택된 파일에서 파일명 추출', { fileName });
+        return fileName;
+      }
+    }
     
     const quotedMatch = message.match(/"([^"]+)"|'([^']+)'/);
     if (quotedMatch) {
@@ -330,9 +349,26 @@ const extractors = {
     debugLog('stage', '❌ 파일명 추출 실패', { message });
     return null;
   },
-  
-  extractPath: (message) => {
-    debugLog('stage', '🔍 경로 추출 시도', { message });
+
+  // ===== 개선된 경로 추출 함수 =====
+  extractPath: (message, currentPath = '/') => {
+    debugLog('stage', '🔍 경로 추출 시도', { message, currentPath });
+    
+    // "여기에" "현재 위치에" "이 폴더에" 등의 표현 처리
+    const herePatterns = [
+      /여기(에|로|서)/i,
+      /현재\s*(위치|폴더|경로)(에|로)/i,
+      /이\s*(위치|폴더|경로)(에|로)/i,
+      /지금\s*(여기|위치)(에|로)/i
+    ];
+    
+    for (const pattern of herePatterns) {
+      if (pattern.test(message)) {
+        debugLog('stage', '✅ "여기" 표현으로 현재 경로 사용', { currentPath });
+        return currentPath;
+      }
+    }
+
     
     const homeMatch = message.match(/~\/([^\s"']+)/);
     if (homeMatch) {
@@ -364,8 +400,9 @@ const extractors = {
       }
     }
     
-    debugLog('stage', '❌ 경로 추출 실패', { message });
-    return null;
+
+    debugLog('stage', '❌ 경로 추출 실패, 현재 경로 사용', { currentPath });
+    return currentPath; // 기본값으로 현재 경로 반환
   },
   
   extractNewFolderName: (message) => {
@@ -417,6 +454,46 @@ const extractors = {
     
     debugLog('stage', '❌ 새 이름 추출 실패', { message });
     return null;
+  },
+
+  // ===== 새로운 함수: 선택된 파일들 가져오기 =====
+  getTargetFiles: (message, selectedFiles = [], allFiles = []) => {
+    debugLog('stage', '🔍 대상 파일들 추출 시도', { message, selectedFilesCount: selectedFiles.length });
+    
+    // "선택된" "이" "현재" 등의 표현이 있고 선택된 파일이 있으면 선택된 파일들 사용
+    const selectedPatterns = [
+      /선택(된|한)\s*(파일|문서|항목)(들?)/i,
+      /(이|그)\s*(파일|문서)(들?)/i,
+      /현재\s*선택(된|한)/i
+    ];
+    
+    for (const pattern of selectedPatterns) {
+      if (pattern.test(message) && selectedFiles.length > 0) {
+        debugLog('stage', '✅ 선택된 파일들 사용', { count: selectedFiles.length });
+        return selectedFiles;
+      }
+    }
+    
+    // 구체적인 파일명이 언급된 경우
+    const fileName = extractors.extractFileName(message, selectedFiles);
+    if (fileName) {
+      const matchedFile = allFiles.find(file => 
+        file.name.toLowerCase().includes(fileName.toLowerCase())
+      );
+      if (matchedFile) {
+        debugLog('stage', '✅ 파일명으로 파일 찾음', { fileName, file: matchedFile });
+        return [matchedFile];
+      }
+    }
+    
+    // 아무것도 없으면 선택된 파일들 반환
+    if (selectedFiles.length > 0) {
+      debugLog('stage', '✅ 기본값으로 선택된 파일들 사용', { count: selectedFiles.length });
+      return selectedFiles;
+    }
+    
+    debugLog('stage', '❌ 대상 파일 없음');
+    return [];
   }
 };
 
@@ -452,7 +529,7 @@ export const CommandProcessor = {
       });
       
       // 백엔드 실패 시 기존 로컬 분석으로 폴백
-      const fallbackResult = this.processMessage(message, context.allFiles || [], context.availableFolders || []);
+      const fallbackResult = this.processMessage(message, context.allFiles || [], context.availableFolders || [], context);
       debugLog('stage', '🔄 로컬 폴백 분석 결과', fallbackResult);
       return fallbackResult;
     }
@@ -537,9 +614,16 @@ export const CommandProcessor = {
   },
 
   // ===== 기존 processMessage 함수 유지 (로컬 폴백용) =====
-  processMessage: function(message, files = [], directories = []) {
-    debugLog('stage', '🔄 로컬 명령 분석 시작', { message, fileCount: files.length, dirCount: directories.length });
+
+  processMessage: function(message, files = [], directories = [], context = {}) {
+    debugLog('stage', '🔄 로컬 명령 분석 시작', { 
+      message, 
+      fileCount: files.length, 
+      dirCount: directories.length,
+      context 
+    });
     
+    const { currentPath = '/', selectedFiles = [] } = context;
     const lowerMsg = message.toLowerCase();
     let commandType = COMMAND_TYPES.UNKNOWN;
     
@@ -576,7 +660,7 @@ export const CommandProcessor = {
     // 기존 switch 문 유지 및 확장
     switch (commandType) {
       case COMMAND_TYPES.DOCUMENT_SEARCH: {
-        const fileName = extractors.extractFileName(message);
+        const fileName = extractors.extractFileName(message, selectedFiles);
         const searchTerm = fileName || message.replace(/찾아|검색|어디에|있어|있나|위치|경로/g, '').trim();
         
         const searchResults = files
@@ -607,23 +691,14 @@ export const CommandProcessor = {
       }
       
       case COMMAND_TYPES.MOVE_DOCUMENT: {
-        const fileName = extractors.extractFileName(message);
-        const targetPath = extractors.extractPath(message) || '/';
+        const targetFiles = extractors.getTargetFiles(message, selectedFiles, files);
+        const targetPath = extractors.extractPath(message, currentPath);
         
-        let fileToMove = null;
-        if (fileName) {
-          fileToMove = files.find(file => 
-            file.name.toLowerCase().includes(fileName.toLowerCase())
-          );
-        } else if (files.length > 0) {
-          fileToMove = files[0];
-        }
-        
-        if (!fileToMove) {
+        if (targetFiles.length === 0) {
           const errorResult = {
             type: COMMAND_TYPES.MOVE_DOCUMENT,
             success: false,
-            error: '이동할 파일을 찾을 수 없습니다.'
+            error: '이동할 파일을 찾을 수 없습니다. 파일을 선택하거나 파일명을 명시해주세요.'
           };
           debugLog('error', '❌ 이동할 파일 없음', errorResult);
           return errorResult;
@@ -631,17 +706,17 @@ export const CommandProcessor = {
         
         const result = {
           type: COMMAND_TYPES.MOVE_DOCUMENT,
-          document: fileToMove,
+          documents: targetFiles,
           targetPath: targetPath,
-          previewAction: `"${fileToMove.name}" 문서를 "${targetPath}" 경로로 이동합니다.`,
+          previewAction: `${targetFiles.length}개 파일을 "${targetPath}" 경로로 이동합니다.`,
           success: true,
           operation: {
             type: OPERATION_TYPES.MOVE,
-            targets: [fileToMove],
+            targets: targetFiles,
             destination: targetPath,
             requiresConfirmation: true
           },
-          riskLevel: RISK_LEVELS.LOW,
+          riskLevel: RISK_LEVELS.MEDIUM,
           requiresConfirmation: true
         };
         
@@ -650,23 +725,14 @@ export const CommandProcessor = {
       }
       
       case COMMAND_TYPES.COPY_DOCUMENT: {
-        const fileName = extractors.extractFileName(message);
-        const targetPath = extractors.extractPath(message) || '/';
+        const targetFiles = extractors.getTargetFiles(message, selectedFiles, files);
+        const targetPath = extractors.extractPath(message, currentPath);
         
-        let fileToCopy = null;
-        if (fileName) {
-          fileToCopy = files.find(file => 
-            file.name.toLowerCase().includes(fileName.toLowerCase())
-          );
-        } else if (files.length > 0) {
-          fileToCopy = files[0];
-        }
-        
-        if (!fileToCopy) {
+        if (targetFiles.length === 0) {
           const errorResult = {
             type: COMMAND_TYPES.COPY_DOCUMENT,
             success: false,
-            error: '복사할 파일을 찾을 수 없습니다.'
+            error: '복사할 파일을 찾을 수 없습니다. 파일을 선택하거나 파일명을 명시해주세요.'
           };
           debugLog('error', '❌ 복사할 파일 없음', errorResult);
           return errorResult;
@@ -674,13 +740,13 @@ export const CommandProcessor = {
         
         const result = {
           type: COMMAND_TYPES.COPY_DOCUMENT,
-          document: fileToCopy,
+          documents: targetFiles,
           targetPath: targetPath,
-          previewAction: `"${fileToCopy.name}" 문서를 "${targetPath}" 경로로 복사합니다.`,
+          previewAction: `${targetFiles.length}개 파일을 "${targetPath}" 경로로 복사합니다.`,
           success: true,
           operation: {
             type: OPERATION_TYPES.COPY,
-            targets: [fileToCopy],
+            targets: targetFiles,
             destination: targetPath,
             requiresConfirmation: true
           },
@@ -693,22 +759,13 @@ export const CommandProcessor = {
       }
       
       case COMMAND_TYPES.DELETE_DOCUMENT: {
-        const fileName = extractors.extractFileName(message);
+        const targetFiles = extractors.getTargetFiles(message, selectedFiles, files);
         
-        let fileToDelete = null;
-        if (fileName) {
-          fileToDelete = files.find(file => 
-            file.name.toLowerCase().includes(fileName.toLowerCase())
-          );
-        } else if (files.length > 0) {
-          fileToDelete = files[0];
-        }
-        
-        if (!fileToDelete) {
+        if (targetFiles.length === 0) {
           const errorResult = {
             type: COMMAND_TYPES.DELETE_DOCUMENT,
             success: false,
-            error: '삭제할 파일을 찾을 수 없습니다.'
+            error: '삭제할 파일을 찾을 수 없습니다. 파일을 선택하거나 파일명을 명시해주세요.'
           };
           debugLog('error', '❌ 삭제할 파일 없음', errorResult);
           return errorResult;
@@ -716,12 +773,12 @@ export const CommandProcessor = {
         
         const result = {
           type: COMMAND_TYPES.DELETE_DOCUMENT,
-          document: fileToDelete,
-          previewAction: `"${fileToDelete.name}" 문서를 삭제합니다. 이 작업은 되돌릴 수 없습니다.`,
+          documents: targetFiles,
+          previewAction: `${targetFiles.length}개 파일을 삭제합니다. 이 작업은 되돌릴 수 없습니다.`,
           success: true,
           operation: {
             type: OPERATION_TYPES.DELETE,
-            targets: [fileToDelete],
+            targets: targetFiles,
             requiresConfirmation: true
           },
           riskLevel: RISK_LEVELS.HIGH,
@@ -734,7 +791,8 @@ export const CommandProcessor = {
       
       case COMMAND_TYPES.CREATE_FOLDER: {
         const folderName = extractors.extractNewFolderName(message) || '새 폴더';
-        const parentPath = extractors.extractPath(message) || '/';
+
+        const parentPath = extractors.extractPath(message, currentPath);
         
         const result = {
           type: COMMAND_TYPES.CREATE_FOLDER,
@@ -757,38 +815,30 @@ export const CommandProcessor = {
       }
       
       case COMMAND_TYPES.SUMMARIZE_DOCUMENT: {
-        const fileName = extractors.extractFileName(message);
+        const targetFiles = extractors.getTargetFiles(message, selectedFiles, files);
         
-        let fileToSummarize = null;
-        if (fileName) {
-          fileToSummarize = files.find(file => 
-            file.name.toLowerCase().includes(fileName.toLowerCase())
-          );
-        } else if (files.length > 0) {
-          fileToSummarize = files[0];
-        }
-        
-        if (!fileToSummarize) {
+        if (targetFiles.length === 0) {
           const errorResult = {
             type: COMMAND_TYPES.SUMMARIZE_DOCUMENT,
             success: false,
-            error: '요약할 파일을 찾을 수 없습니다.'
+            error: '요약할 파일을 찾을 수 없습니다. 파일을 선택하거나 파일명을 명시해주세요.'
           };
           debugLog('error', '❌ 요약할 파일 없음', errorResult);
           return errorResult;
         }
         
-        const mockSummary = `이 문서는 "${fileToSummarize.name}"에 대한 가상 요약입니다. 실제 요약은 백엔드에서 처리될 예정입니다.`;
+
+        const mockSummary = `선택된 ${targetFiles.length}개 파일에 대한 가상 요약입니다. 실제 요약은 백엔드에서 처리될 예정입니다.`;
         
         const result = {
           type: COMMAND_TYPES.SUMMARIZE_DOCUMENT,
-          document: fileToSummarize,
+          documents: targetFiles,
           summary: mockSummary,
-          previewAction: `"${fileToSummarize.name}" 문서의 요약본을 생성했습니다.`,
+          previewAction: `${targetFiles.length}개 파일의 요약본을 생성했습니다.`,
           success: true,
           operation: {
             type: OPERATION_TYPES.SUMMARIZE,
-            targets: [fileToSummarize],
+            targets: targetFiles,
             requiresConfirmation: true
           },
           riskLevel: RISK_LEVELS.LOW,
@@ -800,23 +850,14 @@ export const CommandProcessor = {
       }
 
       case COMMAND_TYPES.RENAME_DOCUMENT: {
-        const fileName = extractors.extractFileName(message);
+        const targetFiles = extractors.getTargetFiles(message, selectedFiles, files);
         const newName = extractors.extractNewName(message);
         
-        let fileToRename = null;
-        if (fileName) {
-          fileToRename = files.find(file => 
-            file.name.toLowerCase().includes(fileName.toLowerCase())
-          );
-        } else if (files.length > 0) {
-          fileToRename = files[0];
-        }
-        
-        if (!fileToRename) {
+        if (targetFiles.length === 0) {
           const errorResult = {
             type: COMMAND_TYPES.RENAME_DOCUMENT,
             success: false,
-            error: '이름을 변경할 파일을 찾을 수 없습니다.'
+            error: '이름을 변경할 파일을 찾을 수 없습니다. 파일을 선택하거나 파일명을 명시해주세요.'
           };
           debugLog('error', '❌ 이름 변경할 파일 없음', errorResult);
           return errorResult;
@@ -831,16 +872,26 @@ export const CommandProcessor = {
           debugLog('error', '❌ 새 이름 없음', errorResult);
           return errorResult;
         }
+
+        if (targetFiles.length > 1) {
+          const errorResult = {
+            type: COMMAND_TYPES.RENAME_DOCUMENT,
+            success: false,
+            error: '이름 변경은 한 번에 하나의 파일만 가능합니다.'
+          };
+          debugLog('error', '❌ 여러 파일 이름 변경 시도', errorResult);
+          return errorResult;
+        }
         
         const result = {
           type: COMMAND_TYPES.RENAME_DOCUMENT,
-          document: fileToRename,
+          document: targetFiles[0],
           newName: newName,
-          previewAction: `"${fileToRename.name}" 파일의 이름을 "${newName}"으로 변경합니다.`,
+          previewAction: `"${targetFiles[0].name}" 파일의 이름을 "${newName}"으로 변경합니다.`,
           success: true,
           operation: {
             type: OPERATION_TYPES.RENAME,
-            target: fileToRename,
+            target: targetFiles[0],
             newName: newName,
             requiresConfirmation: true
           },
@@ -853,11 +904,13 @@ export const CommandProcessor = {
       }
       
       default:
-        return {
+        const unknownResult = {
           type: COMMAND_TYPES.UNKNOWN,
           success: false,
-          error: '인식할 수 없는 명령입니다.'
+          error: '인식할 수 없는 명령입니다. "도움말"을 입력하여 사용 가능한 명령어를 확인해주세요.'
         };
+        debugLog('stage', '❌ 알 수 없는 명령', unknownResult);
+        return unknownResult;
     }
   },
   
