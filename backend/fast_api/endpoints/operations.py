@@ -345,7 +345,32 @@ def process_delete(command, context):
     Returns:
         작업 결과 정보
     """
-    pass
+    destination = None
+    # 작업 설명 요약 생성.
+    description = get_description(context, destination, 'delete')
+
+
+    # 데이터 준비
+    operationId = "op-"+str(uuid.uuid4())
+    warnings = [] 
+    
+    # 리턴 객체 준비
+    result = {
+  "operation": {
+    "type": "delete",
+    "targets": context.selectedFiles # 사용자가 선택한 파일
+  },
+  "requiresConfirmation": True,
+  "riskLevel": "high",
+  "operationId": operationId,
+  "preview": {
+    "description": description,
+    "warnings": warnings
+  }
+}
+    
+
+    return result
 
 def process_error(command, context, error_type):
     """
@@ -476,7 +501,7 @@ def get_destination(command, context, operation_type):
 
     return output_destination
 
-def get_description(context, destination, operation_type):
+def get_description(context, destination = '/', operation_type = "default"):
     """
     
     
@@ -487,7 +512,10 @@ def get_description(context, destination, operation_type):
         output_description = generate_move_description(context, destination)
     elif operation_type == 'copy':
         output_description = generate_copy_description(context, destination)
-    # ...
+    elif operation_type == 'delete':
+        output_description = generate_delete_description(context)
+    else:
+        output_description = "작업 설명 문장 생성 오류"
 
     return output_description
 
@@ -615,7 +643,7 @@ def extract_copy_destination(command, context):
     
     return output_destination
 
-def generate_copy_description(context, destination):
+def generate_copy_description(context, destination='/'):
     """
     복사 작업에 대한 설명 문장을 생성하는 함수
 
@@ -645,3 +673,42 @@ def generate_copy_description(context, destination):
 
     return desc_result
 
+def generate_delete_description(context):
+    """
+    삭제 작업에 대한 설명 문장을 생성하는 함수
+    
+    Args:
+        context: 작업 컨텍스트 정보 (selectedFiles 포함)
+        
+    Returns:
+        str: "선택한 X개 항목 (파일Y, 폴더 Z) 을 영구적으로 삭제합니다. 이 작업은 되돌릴 수 없습니다." 형태의 설명 문장
+    """
+    # 1. selectedFiles에서 파일과 폴더 개수 세기
+    file_count = 0
+    folder_count = 0
+    
+    for item in context.selectedFiles:
+        item_type = item.get('type', '')
+        if item_type == 'folder':
+            folder_count += 1
+        else:
+            file_count += 1
+    
+    # 2. 전체 항목 개수 계산
+    total_count = file_count + folder_count
+    
+    # 3. 항목 타입별 설명 문구 생성
+    type_description_parts = []
+    if file_count > 0:
+        type_description_parts.append(f"파일{file_count}")
+    if folder_count > 0:
+        type_description_parts.append(f"폴더 {folder_count}")
+    
+    type_description = ", ".join(type_description_parts)
+    
+    # 4. 최종 설명 문장 생성
+    desc_result = f"선택한 {total_count}개 항목 ({type_description}) 을 영구적으로 삭제합니다. 이 작업은 되돌릴 수 없습니다."
+
+    return desc_result
+
+    
