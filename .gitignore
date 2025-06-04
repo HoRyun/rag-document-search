@@ -17,6 +17,14 @@ package/
 #cursor 파일
 .cursor/*
 
+#layer 파일일
+db_layer/
+common_layer/
+
+.aws-sam/
+.serverless/
+config.*
+
 #zip 파일
 *.zip
 

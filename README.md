@@ -1,106 +1,104 @@
-[![RAG Document Search CI/CD Pipeline](https://github.com/HoRyun/rag-document-search/actions/workflows/rag-ci-cd.yml/badge.svg)](https://github.com/HoRyun/rag-document-search/actions/workflows/rag-ci-cd.yml)
+# Lambda API 배포 가이드
 
-# RAG Document Search
+## 개요
 
-Retrieval-Augmented Generation(RAG) 기술을 활용한 문서 검색 및 질의응답 시스템입니다. 사용자는 문서를 업로드하고 해당 문서에 관련된 질문을 할 수 있습니다. 
+이 프로젝트는 다음 API 엔드포인트를 별도의 Lambda 함수로 분할합니다:
 
----
+- Auth Lambda: `/fast_api/auth/me`, `/fast_api/auth/token`, `/fast_api/auth/register`
+- Users Lambda: `/fast_api/users`
+- Documents Lambda: `/fast_api/documents/structure`
 
-## 주요 기능 
-- **문서 관리**: 문서 업로드, 조회, 삭제
-- **텍스트 처리**: 문서에서 텍스트 추출 및 벡터화
-- **질의응답**: 자연어 질문에 대한 정확한 응답 생성
-- **사용자 친화적 UI**: 직관적인 인터페이스 제공
+## 시스템 요구사항
 
----
+- AWS Lambda x86_64 아키텍처
+- Python 3.12 런타임
+- AWS CLI가 설치되고 구성됨
+- PowerShell 5.1 이상
 
-## 기술 스택
+## 배포 방법
 
-### 백엔드
+### 1. 환경 변수 설정 (두 가지 방법)
 
-- **FastAPI**: 고성능 Python 기반 API 프레임워크
-- **LangChain**: LLM 애플리케이션 개발 프레임워크
-- **PostgreSQL (AWS RDS)**: 관계형 데이터베이스 및 벡터 확장 활용
-- **faiss**: 벡터 데이터 검색 엔진
+#### 방법 1: 직접 실행 (권장)
+스크립트에 기본 환경 변수가 포함되어 있어 별도 설정 없이 바로 실행 가능합니다.
 
-
-### 프론트엔드
-
-- **React**: 사용자 인터페이스 구현
-
-
-### 인프라/클라우드
-
-- **AWS S3**: 문서 파일 저장소
-- **AWS ECR**: 컨테이너 이미지 저장소
-- **AWS ECS Fargate**: 서버리스 백엔드 컨테이너 오케스트레이션
-- **AWS RDS**: 관리형 PostgreSQL 데이터베이스
-- **Docker**: 애플리케이션 컨테이너화 및 환경 통일
-
----
-
-## 아키텍처
-
-```
-[User]
-   |
-[React Front-end]
-   |
-[ALB (Application Load Balancer)]
-   |
-[ECS Fargate (FastAPI Backend)]
-   |           |             |
-[S3]       [ECR]         [RDS PostgreSQL]
-(문서저장) (이미지저장)    (벡터+일반DB)
+```powershell
+# 전체 배포 스크립트 실행
+.\deploy_all.ps1
 ```
 
-- **문서 저장**: 업로드 문서는 AWS S3에 저장
-- **컨테이너 관리**: 백엔드는 Docker 이미지로 빌드, ECR에 저장, ECS Fargate에서 실행
-- **DB 관리**: 벡터 검색 및 RAG 데이터는 AWS RDS PostgreSQL에서 관리
+#### 방법 2: 환경 변수 직접 설정
+필요한 경우 환경 변수를 직접 설정할 수 있습니다.
 
----
+```powershell
+# 필수 환경 변수 설정
+$env:DATABASE_URL = "postgresql://username:password@host:port/dbname"
+$env:SECRET_KEY = "your-secret-key"
+$env:ALGORITHM = "HS256"
+$env:ACCESS_TOKEN_EXPIRE_MINUTES = "30"
 
-## 설치 및 실행
-
-### 1. 사전 요구사항
-
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) 설치
-- AWS CLI 및 필요한 자격증명(로컬 테스트 시)
-
-
-### 2. 설치 및 실행
-
-```bash
-# 저장소 복제
-git clone https://github.com/HoRyun/rag-document-search.git
-cd rag-document-search
-
-# 애플리케이션 빌드 및 실행
-docker-compose up --build
+# 전체 배포 스크립트 실행
+.\deploy_all.ps1
 ```
 
+#### 방법 3: .env 파일 사용
+.env 파일을 생성하고 환경 변수를 설정한 후 set_env.ps1 스크립트를 실행합니다.
 
----
+1. .env 파일 생성:
+   ```
+   DATABASE_URL=postgresql://username:password@host:port/dbname
+   SECRET_KEY=your-secret-key
+   ALGORITHM=HS256
+   ACCESS_TOKEN_EXPIRE_MINUTES=30
+   ```
 
-## CI/CD 및 배포
+2. 환경 변수 설정 스크립트 실행:
+   ```powershell
+   .\set_env.ps1
+   ```
 
-- **GitHub Actions**를 통한 자동화된 CI/CD 파이프라인 구축
-- `main`, `develop-backend`, `develop-cloud` 브랜치 등에서 푸시 시
-    - 테스트 → Docker 이미지 빌드 → ECR 푸시 → ECS Fargate 무중단 배포
-- 워크플로 파일은 `.github/workflows/`에 위치
+3. 배포 스크립트 실행:
+   ```powershell
+   .\deploy_all.ps1
+   ```
 
----
+### 2. 단계별 수동 배포
 
-## 환경 변수 및 시크릿 관리
+각 단계를 개별적으로 실행하려면:
 
-- 민감정보(API Key 등)는 코드에 직접 포함하지 않고,
-AWS Secrets Manager, GitHub Secrets 또는 환경변수로 안전하게 관리
+1. DB 레이어 생성:
+   ```powershell
+   .\create_db_layer.ps1
+   ```
 
----
- 
-## 참고
+2. Lambda 함수 생성:
+   ```powershell
+   .\create_functions.ps1
+   ```
 
-- [GitHub Actions 공식 문서](https://docs.github.com/actions)
-- [AWS ECS 공식 문서](https://docs.aws.amazon.com/ko_kr/AmazonECS/latest/developerguide/Welcome.html)
+3. API Gateway 생성 및 연결:
+   ```powershell
+   .\create_api_gateway.ps1
+   ```
 
----
+## 배포 후 테스트
+
+배포가 완료되면 다음 URL로 API를 테스트할 수 있습니다:
+
+- `GET    https://{api-id}.execute-api.{region}.amazonaws.com/api/fast_api/auth/me`
+- `POST   https://{api-id}.execute-api.{region}.amazonaws.com/api/fast_api/auth/token`
+- `POST   https://{api-id}.execute-api.{region}.amazonaws.com/api/fast_api/auth/register`
+- `GET    https://{api-id}.execute-api.{region}.amazonaws.com/api/fast_api/users`
+- `GET    https://{api-id}.execute-api.{region}.amazonaws.com/api/fast_api/documents/structure`
+
+## 함수 코드 업데이트
+
+Lambda 함수 코드만 업데이트하려면:
+
+```powershell
+.\deploy.ps1
+```
+
+## 아키텍처 정보
+
+모든 Lambda 함수와 레이어는 x86_64 아키텍처를 사용합니다. ARM64 아키텍처(Graviton)는 지원하지 않습니다.
