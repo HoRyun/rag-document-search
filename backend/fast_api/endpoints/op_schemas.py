@@ -13,6 +13,14 @@ class StageOperationRequest(BaseModel):
     command: str
     context: OperationContext
 
+
+class StageOperationResponse(BaseModel):
+    operationId: str
+    operation: Dict[str, Any]
+    requiresConfirmation: bool
+    riskLevel: str
+    preview: Dict[str, Any]
+
 class ExecuteOperationRequest(BaseModel):
     confirmed: bool = True
     userOptions: Dict[str, Any] = {}
@@ -22,12 +30,6 @@ class UndoOperationRequest(BaseModel):
     reason: str = ""
     undoTime: datetime
 
-class OperationResponse(BaseModel):
-    operationId: str
-    operation: Dict[str, Any]
-    requiresConfirmation: bool
-    riskLevel: str
-    preview: Dict[str, Any]
 
 class ExecutionResponse(BaseModel):
     message: str
