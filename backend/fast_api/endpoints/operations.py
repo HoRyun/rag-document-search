@@ -23,7 +23,7 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
-@router.post("/stage", response_model=op_schemas.OperationResponse)
+@router.post("/stage", response_model=op_schemas.StageOperationResponse)
 async def stage_operation(
     request: op_schemas.StageOperationRequest,
     current_user: User = Depends(get_current_user),
@@ -193,24 +193,21 @@ async def process_move(command, context):
     
     warnings = [] 
     
-    # 리턴 객체 준비
-    result = {
-  "operation": {
-    "type": "move",
-    "targets": context.selectedFiles, # 사용자가 선택한 파일
-    "destination": destination # "/업무/마케팅"
-  },
-  "requiresConfirmation": True,
-  "riskLevel": "medium",
-  "operationId": operationId,
-  "preview": {
-    "description": description,
-    "warnings": warnings
-  }
-}
-    
-
-    return result
+    # StageOperationResponse 객체 생성
+    return op_schemas.StageOperationResponse(
+        operationId=operationId,
+        operation={
+            "type": "move",
+            "targets": context.selectedFiles,
+            "destination": destination
+        },
+        requiresConfirmation=True,
+        riskLevel="medium",
+        preview={
+            "description": description,
+            "warnings": warnings
+        }
+    )
 
 async def process_copy(command, context):
     """
@@ -249,24 +246,21 @@ async def process_copy(command, context):
     
     warnings = [] 
     
-    # 리턴 객체 준비
-    result = {
-  "operation": {
-    "type": "copy",
-    "targets": context.selectedFiles, # 사용자가 선택한 파일
-    "destination": destination # "/업무/마케팅"
-  },
-  "requiresConfirmation": True,
-  "riskLevel": "low",
-  "operationId": operationId,
-  "preview": {
-    "description": description,
-    "warnings": warnings
-  }
-}
-    
-
-    return result
+    # StageOperationResponse 객체 생성
+    return op_schemas.StageOperationResponse(
+        operationId=operationId,
+        operation={
+            "type": "copy",
+            "targets": context.selectedFiles,
+            "destination": destination
+        },
+        requiresConfirmation=True,
+        riskLevel="low",
+        preview={
+            "description": description,
+            "warnings": warnings
+        }
+    )
 
 def process_delete(command, context):
     """
@@ -287,23 +281,20 @@ def process_delete(command, context):
     operationId = "op-"+str(uuid.uuid4())
     warnings = [] 
     
-    # 리턴 객체 준비
-    result = {
-  "operation": {
-    "type": "delete",
-    "targets": context.selectedFiles # 사용자가 선택한 파일
-  },
-  "requiresConfirmation": True,
-  "riskLevel": "high",
-  "operationId": operationId,
-  "preview": {
-    "description": description,
-    "warnings": warnings
-  }
-}
-    
-
-    return result
+    # StageOperationResponse 객체 생성
+    return op_schemas.StageOperationResponse(
+        operationId=operationId,
+        operation={
+            "type": "delete",
+            "targets": context.selectedFiles
+        },
+        requiresConfirmation=True,
+        riskLevel="high",
+        preview={
+            "description": description,
+            "warnings": warnings
+        }
+    )
 
 def process_error(command, context, error_type):
     """
@@ -341,23 +332,21 @@ def process_error(command, context, error_type):
     # 로그 기록
     logger.warning(f"Error processing command: '{command}', Error type: {error_type}")
     
-    # 리턴 객체 준비
-    result = {
-        "operation": {
+    # StageOperationResponse 객체 생성
+    return op_schemas.StageOperationResponse(
+        operationId=operation_id,
+        operation={
             "type": "error",
             "error_type": error_type,
             "message": message
         },
-        "requiresConfirmation": False,  # 에러이므로 확인 불필요
-        "riskLevel": "none",           # 위험도 없음
-        "operationId": operation_id,
-        "preview": {
+        requiresConfirmation=False,
+        riskLevel="none",
+        preview={
             "description": description,
             "warnings": warnings
         }
-    }
-
-    return result
+    )
 
 def process_rename(command, context):
     """
@@ -377,23 +366,20 @@ def process_rename(command, context):
     description = generate_rename_description(context, new_name)
     # debugging.stop_debugger()
 
-    # 리턴 객체 준비
-    result = {
-        "operation": {
+    # StageOperationResponse 객체 생성
+    return op_schemas.StageOperationResponse(
+        operationId=operationId,
+        operation={
             "type": "rename",
-    "target": context.selectedFiles, # 사용자가 선택한 파일
-    "newName": new_name
-  },
-  "requiresConfirmation": True,
-  "riskLevel": "medium",
-  "operationId": operationId,
-  "preview": {
-    "description": description
-  }
-}
-    
-    return result
-
+            "target": context.selectedFiles,
+            "newName": new_name
+        },
+        requiresConfirmation=True,
+        riskLevel="medium",
+        preview={
+            "description": description
+        }
+    )
 
 def process_create_folder(command, context):
     """
@@ -424,22 +410,20 @@ def process_create_folder(command, context):
         # 추가 설명 문장 추가.
         description += " " + additional_desc
 
-    # 리턴 객체 준비
-    result = {
-  "operation": {
-    "type": "create_folder",
-    "folderName": folder_name,
-    "parentPath": parent_Path
-  },
-  "requiresConfirmation": True,
-  "riskLevel": "low",
-  "operationId": operationId,
-  "preview": {
-    "description": description
-  }
-}
-
-    return result
+    # StageOperationResponse 객체 생성
+    return op_schemas.StageOperationResponse(
+        operationId=operationId,
+        operation={
+            "type": "create_folder",
+            "folderName": folder_name,
+            "parentPath": parent_Path
+        },
+        requiresConfirmation=True,
+        riskLevel="low",
+        preview={
+            "description": description
+        }
+    )
 
 def process_search(command):
     """
@@ -456,22 +440,19 @@ def process_search(command):
     search_term = get_search_term(command)
     description = generate_search_description(search_term)
 
-
-    # 리턴 객체 준비
-    result = {
-  "operation": {
-    "type": "search",
-    "searchTerm": search_term
-  },
-  "requiresConfirmation": False,
-  "riskLevel": "low",
-  "operationId": operationId,
-  "preview": {
-    "description": description
-  }
-}
-
-    return result
+    # StageOperationResponse 객체 생성
+    return op_schemas.StageOperationResponse(
+        operationId=operationId,
+        operation={
+            "type": "search",
+            "searchTerm": search_term
+        },
+        requiresConfirmation=False,
+        riskLevel="low",
+        preview={
+            "description": description
+        }
+    )
 
 def process_summarize(command, context):
     """
@@ -489,22 +470,23 @@ def process_summarize(command, context):
     operationId = "op-"+str(uuid.uuid4())
     description = generate_summarize_description(context)
 
-    # 리턴 객체 준비
-    result = {
-  "operation": {
-    "type": "summarize",
-    "targets": context.selectedFiles, # 사용자가 선택한 파일
-  },
-  "requiresConfirmation": True,
-  "riskLevel": "low",
-  "operationId": operationId,
-  "preview": {
-    "description": description
-  }
-}
+    # StageOperationResponse 객체 생성
+    return op_schemas.StageOperationResponse(
+        operationId=operationId,
+        operation={
+            "type": "summarize",
+            "targets": context.selectedFiles
+        },
+        requiresConfirmation=True,
+        riskLevel="low",
+        preview={
+            "description": description
+        }
+    )
 
-        
-    return result
+
+
+
 
 def get_destination(command, context, operation_type):
     """
