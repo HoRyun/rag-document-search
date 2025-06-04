@@ -274,7 +274,7 @@ async def query_document(
 
     """문서 질의응답 엔드포인트"""
     from db.database import engine  # 기존 엔진을 임포트
-    
+    # debugging.stop_debugger()
     user_id = current_user.id
 
     docs = process_query(user_id,query,engine)
