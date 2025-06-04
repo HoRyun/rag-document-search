@@ -8,6 +8,13 @@ ollama/
 #aws
 aws/
 
+
+#lambda관련
+backend/lambda/python
+backend/package
+db_layer/
+.serverless/
+
 #deploy
 package/
 
@@ -52,6 +59,7 @@ data/faiss_db/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.*
 
 # 로그 파일
 *.log
@@ -102,6 +110,7 @@ isu_*.txt
 *.bak5
 *.bak6
 *.bak7
+
 
 #커서 룰 파일
 .cursor/*
