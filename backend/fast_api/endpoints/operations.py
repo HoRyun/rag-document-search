@@ -41,7 +41,7 @@ async def stage_operation(
         OperationResponse: 준비된 작업 정보
     """
     logger.info(f"Stage operation request from user {current_user.id}: {request.command}")
-    debugging.stop_debugger()
+    # debugging.stop_debugger()
     # command 값 접근
     command = request.command
 
@@ -53,87 +53,6 @@ async def stage_operation(
     selected_files = context.selectedFiles
     available_folders = context.availableFolders
     timestamp = context.timestamp
-
-    # # 테스트테스트테스트테스트
-    # # 테스트 명령어들
-    # test_commands = [
-    #     # destination 테스트
-    #     # "프로젝트 폴더로 이동",
-    #     # "새 폴더로 이동"
-    #     # # DELETE (3개)
-    #     # "파일을 삭제해줘",
-    #     # "이 문서들 지워줘", 
-    #     # "필요없는 파일 제거해줘",
-        
-    #     # # RENAME (3개)
-    #     # "파일 이름변경해줘",
-    #     # "이름 바꿔줘",
-    #     # "파일명 수정하고 싶어",
-        
-    #     # # CREATE_FOLDER (3개)
-    #     # "새 폴더 만들어줘",
-    #     # "폴더 생성해줘",
-    #     # "디렉토리 만들고 싶어",
-        
-    #     # # MOVE (3개)
-    #     # "파일을 마케팅 폴더로 이동해줘",
-    #     # "문서를 다른 곳으로 옮겨줘",
-    #     # "이 파일들 위치변경해줘",
-        
-    #     # # COPY (3개)
-    #     # "파일을 복사해줘",
-    #     # "문서를 백업해줘",
-    #     # "이 파일들 복제해줘",
-        
-    #     # # SUMMARIZE (3개)
-    #     # "문서 내용을 요약해줘",
-    #     # "이 파일들 정리해줘",
-    #     # "내용 정리하고 싶어",
-        
-    #     # # SEARCH (3개)
-    #     # "파일을 검색해줘",
-    #     # "문서 찾아줘",
-    #     # "이 문서 어디있나 찾아줘",
-        
-    #     # # ERROR ERR-1 부정표현 (3개)
-    #     # "파일을 이동하지마",
-    #     # "삭제하지 말아줘",
-    #     # "복사 안해줘",
-        
-    #     # # ERROR ERR-1 파일관련이지만 매칭안됨 (3개)
-    #     # "파일을 좀비로 바꿔줘",
-    #     # "문서를 폭파해줘",
-    #     # "파일을 우주로 보내줘",
-        
-    #     # # ERROR ERR-2 파일과 관련없는 명령 (3개)
-    #     # "안녕하세요",
-    #     # "오늘 날씨가 어때요?",
-    #     # "점심 뭐 먹을까요?"
-        
-    #     # get_new_name()테스트
-    #     "선택된 파일을 새문서로 바꿔줘",
-    #     "이 폴더 이름을 마케팅으로 변경해줘",
-    #     "파일명을 보고서2024로 수정해줘",
-    #     "디렉토리를 프로젝트폴더로 이름변경해줘",
-    #     "선택한 문서를 최종버전으로 리네임해줘",
-    #     "이름을 임시파일로 바꿔",
-    #     "파일을 백업데이터로 rename해줘",
-    #     "폴더명을 업무자료으로 변경",
-    #     "선택된 항목을 새이름123으로 수정하고 싶어",
-    #     "이 파일 이름을 중요문서로 바꿔주세요"
-    # ]
-
-    # for cmd in test_commands:
-    #     output = get_new_name(cmd)
-    #     output_desc = generate_rename_description(context, output)
-    #     print(f"'{cmd}' → {output}")
-    #     print(f"'{cmd}' → {output_desc}")
-    #     print("--------------------------------")
-    # debugging.stop_debugger()
-    # # 테스트테스트테스트테스트
-
-
-
 
     # 타입을 결정.
     operation_result = invoke.get_operation_type(command)
@@ -153,7 +72,7 @@ async def stage_operation(
     elif operation_type == "create_folder":
         result = process_create_folder(command, context)
     elif operation_type == "search":
-        result = process_search(command, context)
+        result = process_search(command)
     elif operation_type == "summarize":
         result = process_summarize(command, context)
     elif operation_type == "error":
@@ -520,21 +439,39 @@ def process_create_folder(command, context):
   }
 }
 
-
     return result
 
-def process_search(command, context):
+def process_search(command):
     """
     검색 작업을 처리하는 함수
     
     Args:
         command: 사용자의 자연어 명령
-        context: 작업 컨텍스트 정보
         
     Returns:
         작업 결과 정보
     """
-    pass
+    # 데이터 준비
+    operationId = "op-"+str(uuid.uuid4())
+    search_term = get_search_term(command)
+    description = generate_search_description(search_term)
+
+
+    # 리턴 객체 준비
+    result = {
+  "operation": {
+    "type": "search",
+    "searchTerm": search_term
+  },
+  "requiresConfirmation": False,
+  "riskLevel": "low",
+  "operationId": operationId,
+  "preview": {
+    "description": description
+  }
+}
+
+    return result
 
 def process_summarize(command, context):
     """
@@ -547,7 +484,27 @@ def process_summarize(command, context):
     Returns:
         작업 결과 정보
     """
-    pass
+
+    # 데이터 준비
+    operationId = "op-"+str(uuid.uuid4())
+    description = generate_summarize_description(context)
+
+    # 리턴 객체 준비
+    result = {
+  "operation": {
+    "type": "summarize",
+    "targets": context.selectedFiles, # 사용자가 선택한 파일
+  },
+  "requiresConfirmation": True,
+  "riskLevel": "low",
+  "operationId": operationId,
+  "preview": {
+    "description": description
+  }
+}
+
+        
+    return result
 
 def get_destination(command, context, operation_type):
     """
@@ -1028,4 +985,188 @@ def generate_create_folder_description(folder_name, parent_path):
     # 결과 문자열 생성
     result_desc = f"{parent_dir_name} 내에 {folder_name} 폴더를 생성합니다."
     
+    return result_desc
+
+
+def get_search_term(command):
+    """
+    사용자의 명령에서 검색하고 싶은 내용을 추출한다.
+    
+    Args:
+        command: 사용자의 자연어 명령
+        
+    Returns:
+        str: 추출된 검색 키워드
+    """
+    # 1. 파일명 검색 패턴 (확장자 포함) - 이것은 그대로 유지
+    filename_pattern = r'([^\s]+\.\w+)'
+    filename_match = re.search(filename_pattern, command)
+    if filename_match:
+        return filename_match.group(1)
+    
+    # 2. 검색 명령어와 불필요한 부분 제거
+    search_term = clean_search_command(command)
+    
+    return search_term
+
+def clean_search_command(command):
+    """
+    검색 명령에서 불필요한 명령어 부분만 제거하고 
+    중요한 검색 키워드와 컨텍스트는 유지한다.
+    
+    Args:
+        command: 원본 명령어
+        
+    Returns:
+        str: 정리된 검색어
+    """
+    # 제거할 명령어 패턴들 (순서 중요)
+    remove_patterns = [
+        # 문장 끝 패턴들 (물음표 포함)
+        r'\s*찾아\s*줘?\s*\??$',
+        r'\s*검색\s*해?\s*줘?\s*\??$',
+        r'\s*어디\s*있어\s*\??$',
+        r'\s*어디\s*에?\s*있나\s*\??$',
+        r'\s*어디\s*있지\s*\??$',
+        r'\s*어디\s*에?\s*저장\s*되어?\s*있어\s*\??$',
+        r'\s*확인\s*해?\s*줘?\s*\??$',
+        r'\s*알려\s*줘?\s*\??$',
+        r'\s*찾아\s*봐?\s*\??$',
+        r'\s*위치\s*알려\s*줘?\s*\??$',
+        r'\s*경로\s*알려\s*줘?\s*\??$',
+        r'\s*어디\s*에?\s*$',
+        r'\s*어디\s*$',
+        
+        # 특수 케이스
+        r'\s*이\s*어디\s*있지\s*\??$',  # '파일이 어디있지?'
+    ]
+    
+    # 원본 명령어 복사
+    cleaned = command
+    
+    # 패턴 제거
+    for pattern in remove_patterns:
+        cleaned = re.sub(pattern, '', cleaned)
+    
+    # 추가 정리
+    cleaned = cleaned.strip()
+    
+    # 빈 문자열이면 원본 반환
+    if not cleaned:
+        return command
+    
+    # 특수 케이스 처리
+    cleaned = handle_special_cases(cleaned, command)
+    
+    return cleaned
+
+
+def handle_special_cases(cleaned, original):
+    """
+    특수한 케이스들을 처리하는 함수
+    
+    Args:
+        cleaned: 정리된 검색어
+        original: 원본 명령어
+        
+    Returns:
+        str: 최종 검색어
+    """
+    # '~가 어디있는지', '~이 어디있는지' 패턴 제거
+    cleaned = re.sub(r'\s*가\s*어디\s*있는지\s*', '', cleaned)
+    cleaned = re.sub(r'\s*이\s*어디\s*있는지\s*', '', cleaned)
+    
+    # '~에서 ~' 패턴 처리
+    if '에서' in cleaned:
+        # '계약서에서 조건 관련 내용' 형태로 유지
+        parts = cleaned.split('에서', 1)
+        if len(parts) == 2:
+            doc = parts[0].strip()
+            content = parts[1].strip()
+            return f"{doc}에서 {content}"
+    
+    # '보고서에 매출 데이터가 있는지' → '보고서 매출 데이터'
+    if '에' in cleaned and ('데이터가' in cleaned or '있는지' in cleaned):
+        # '있는지' 제거
+        cleaned = re.sub(r'\s*있는지\s*', '', cleaned)
+        # '에' → 공백으로 변경
+        cleaned = re.sub(r'에\s+', ' ', cleaned)
+        # '데이터가' → '데이터'
+        cleaned = cleaned.replace('데이터가', '데이터')
+    
+    # '~가 있는지' 패턴 제거
+    cleaned = re.sub(r'\s*가\s*있는지\s*', '', cleaned)
+    cleaned = re.sub(r'\s*이\s*있는지\s*', '', cleaned)
+    
+    # 불필요한 조사 제거 (순서 중요)
+    # '~들' 처리 (파일들, 문서들)
+    if '들' in cleaned and ('파일들' in cleaned or '문서들' in cleaned):
+        # '파일들', '문서들'은 유지
+        pass
+    else:
+        # 다른 경우의 '들' 제거
+        cleaned = re.sub(r'(\w+)들\s+', r'\1 ', cleaned)
+    
+    # 기타 조사 정리
+    cleaned = re.sub(r'\s+을\s+', ' ', cleaned)
+    cleaned = re.sub(r'\s+를\s+', ' ', cleaned)
+    cleaned = re.sub(r'\s+이\s+', ' ', cleaned)
+    cleaned = re.sub(r'\s+가\s+', ' ', cleaned)
+    
+    # 문장 끝 조사 제거
+    cleaned = re.sub(r'\s*을\s*$', '', cleaned)
+    cleaned = re.sub(r'\s*를\s*$', '', cleaned)
+    cleaned = re.sub(r'\s*이\s*$', '', cleaned)
+    cleaned = re.sub(r'\s*가\s*$', '', cleaned)
+    
+    # 중복 공백 제거
+    cleaned = ' '.join(cleaned.split())
+    
+    return cleaned
+
+def generate_search_description(search_term):
+    description = f"'{search_term}'에 대한 검색을 실행합니다."
+    return description
+
+def generate_summarize_description(context):
+    """
+    요약 작업에 대한 설명 문장을 생성하는 함수
+    
+    Args:
+        context: 작업 컨텍스트 정보 (selectedFiles 포함)
+        
+    Returns:
+        str: "파일명의 주요 내용을 요약합니다." 또는 "선택한 X개 문서의 주요 내용을 요약합니다." 형태의 설명 문장
+    """
+    # 1. selectedFiles에서 파일 이름들 추출
+    if not context.selectedFiles or len(context.selectedFiles) == 0:
+        return "선택된 문서가 없습니다."
+    
+    file_count = len(context.selectedFiles)
+    
+    # 2. 단일 파일인 경우
+    if file_count == 1:
+        file_name = context.selectedFiles[0].get('name', '문서')
+        # 파일 확장자 제거하여 더 자연스러운 문장 생성
+        clean_name = file_name.rsplit('.', 1)[0] if '.' in file_name else file_name
+        result_desc = f"{clean_name}의 주요 내용을 요약합니다."
+    
+    # 3. 복수 파일인 경우
+    else:
+        # 파일 개수가 3개 이하인 경우 모든 파일명 나열
+        if file_count <= 3:
+            file_names = []
+            for file in context.selectedFiles:
+                file_name = file.get('name', '')
+                # 파일 확장자 제거
+                clean_name = file_name.rsplit('.', 1)[0] if '.' in file_name else file_name
+                file_names.append(clean_name)
+            
+            names_str = ', '.join(file_names)
+            result_desc = f"{names_str}의 주요 내용을 요약합니다."
+        
+        # 파일 개수가 많은 경우 개수로 표시
+        else:
+            result_desc = f"선택한 {file_count}개 문서의 주요 내용을 요약합니다."
+
     return result_desc
