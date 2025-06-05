@@ -17,16 +17,16 @@ package/
 #cursor 파일
 .cursor/*
 
-#layer 파일일
-db_layer/
-common_layer/
-
+#layer 파일
 .aws-sam/
 .serverless/
-config.*
-
-#zip 파일
+db_layer/
+common_layer/
+custom_modules_layer/
+temp_lambda_layer/
+temp_postgresql_layer/
 *.zip
+
 
 #테스트 용 주피터 노트북
 *test.ipynb
@@ -60,6 +60,8 @@ data/faiss_db/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.example
+config.*
 
 # 로그 파일
 *.log
