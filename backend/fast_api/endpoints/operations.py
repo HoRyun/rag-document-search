@@ -55,7 +55,7 @@ async def stage_operation(
     timestamp = context.timestamp
 
     # 타입을 결정.
-    operation_result = invoke.get_operation_type(command)
+    operation_result = await invoke.get_operation_type(command)
     # 타입 결정 결과 분류.
     operation_type = operation_result["value"]
     error_type = operation_result.get("value_type", None)
