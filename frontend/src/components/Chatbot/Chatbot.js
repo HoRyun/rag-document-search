@@ -467,7 +467,7 @@ ${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => 
   };
   
   // ===== 기존 가이드 관련 함수들 유지 =====
-  
+
   const handleGuideClose = () => {
     setShowGuide(false);
   };

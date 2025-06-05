@@ -1,7 +1,6 @@
 from rag.embeddings import get_embeddings
 
 
-
 async def save_to_vector_store(db, documents, file_name, file_path):
     """문서를 PostgreSQL 벡터 스토어에 저장합니다."""
     from db.database import SessionLocal
@@ -12,6 +11,8 @@ async def save_to_vector_store(db, documents, file_name, file_path):
         # 임베딩 모델
         embeddings = get_embeddings()
         
+
+
         # 각 청크에 대해
         tasks = []
         for chunk in documents:
@@ -22,6 +23,9 @@ async def save_to_vector_store(db, documents, file_name, file_path):
             # 문서 ID 찾기. 문서 이름이 db에 존재하면 해당 문서의 레코드 반환. # 더 효율적인 방법으로 수정하기.
             document = crud.get_file_info_by_filename(db, file_name)
             
+            # 테스트 후 주석처리 하기
+            # stop_debugger()
+
             if document:
                 # 메타데이터에서 필요한 정보 추출
                 metadata_text = f"<The name of this document>{file_name}</The name of this document> <The path of this document>{file_path}</The path of this document>"
@@ -85,3 +89,15 @@ def manually_create_vector_extension(engine):
     except Exception as e:
         print(f"수동 벡터 확장 생성 오류: {str(e)}")
         return False
+    
+# 디버깅 stop 시 다음 코드 강제 실행 불가하도록 하는 함수.
+def stop_debugger():
+    """q누르면 루프를 강제 종료한다."""
+    while 1:
+        # 키 입력 받기
+        key = input("프로그램이 중단되었습니다. 끝내려면 'q', 계속하려면 'g'.")
+        # q 키를 누르면 예외를 발생시켜 프로그램을 강제 종료
+        if key.lower() == 'q':
+            raise Exception("사용자에 의해 강제 종료되었습니다.")
+        elif key.lower() == 'g':
+            break

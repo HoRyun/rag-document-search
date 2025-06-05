@@ -1,13 +1,46 @@
-name: Backend Deploy to ECS with ALB (develop-cloud)
+name: Backend Deploy to ECS with ALB (develop-backend)
 
 on:
   push:
-    branches: [ develop-cloud ]
+    branches: [ develop-backend ]
 
 jobs:
-  build-and-deploy-backend:
+  lint-and-test:
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pytest
+          if [ -f backend/requirements.txt ]; then
+            pip install -r backend/requirements.txt
+          fi
+          pip install "pydantic[email]" "passlib[bcrypt]" "python-jose[cryptography]"
+
+      - name: Lint with flake8
+        run: |
+          # 심각한 오류만 빌드 실패 처리
+          flake8 backend --count --select=E9,F63,F7,F82 --show-source --statistics
+          # 경고는 표시하되 빌드 실패는 아님
+          flake8 backend --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Run unit tests
+        run: |
+          cd backend
+          export TEST_MODE=True
+          pytest -xvs
+
+  build-and-deploy-backend:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -48,6 +81,13 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Check if service exists
+        id: check-service
+        run: |
+          SERVICE_STATUS=$(aws ecs describe-services --cluster ${{ secrets.ECS_CLUSTER }} --services ${{ secrets.ECS_SERVICE }} --query 'services[0].status' --output text || echo "MISSING")
+          echo "service_exists=$([[ "$SERVICE_STATUS" != "MISSING" ]] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+          echo "Service status: $SERVICE_STATUS"
+
       - name: Render new ECS task definition
         id: task-def
         uses: aws-actions/amazon-ecs-render-task-definition@v1
@@ -74,7 +114,8 @@ jobs:
           task-definition: ${{ steps.task-def.outputs.task-definition }}
           service: ${{ secrets.ECS_SERVICE }}
           cluster: ${{ secrets.ECS_CLUSTER }}
-          wait-for-service-stability: true
+          wait-for-service-stability: ${{ steps.check-service.outputs.service_exists == 'true' }}
+          wait-for-minutes: 5
           
       - name: Verify deployment
         run: |
@@ -83,7 +124,26 @@ jobs:
           ALB_DNS="${{ secrets.ALB_DNS }}"
           if [ -n "$ALB_DNS" ]; then
             echo "Testing connection to ALB at $ALB_DNS"
-            curl -s -o /dev/null -w "%{http_code}" "http://$ALB_DNS/fast_api/health" | grep -q "200" && echo "✅ Health check passed" || echo "❌ Health check failed"
+            HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://$ALB_DNS/fast_api/health" || echo "Failed")
+            if [ "$HEALTH_STATUS" = "200" ]; then
+              echo "✅ Health check passed"
+            else
+              echo "⚠️ Health check returned: $HEALTH_STATUS (not 200)"
+              echo "Deployment completed, but health check is not yet passing. This could be normal during initialization."
+            fi
           else
             echo "ALB_DNS secret not set, skipping verification"
           fi
+
+      - name: Send Discord notification
+        if: always()
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          status: ${{ job.status }}
+          title: "Backend Deployment to ECS"
+          description: |
+            Repository: ${{ github.repository }}
+            Commit: ${{ github.sha }}
+            Ref: ${{ github.ref }}
+            Triggered by: ${{ github.actor }}

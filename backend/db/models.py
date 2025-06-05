@@ -52,3 +52,14 @@ class Directory(Base):
     parent_id = Column(String)
     created_at = Column(DateTime, default=datetime.now)
     owner_id = Column(Integer, ForeignKey("users.id"))
+
+# 잠시 주석처리. 일단 보류..
+# class ChatLog(Base):
+#     """채팅 로그 모델"""
+#     __tablename__ = "chat_logs"
+
+#     id = Column(Integer, primary_key=True, index=True)
+#     content = Column(String)
+#     sender = Column(String)
+#     owner_id = Column(Integer, ForeignKey("users.id"))
+
