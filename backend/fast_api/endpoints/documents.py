@@ -277,12 +277,15 @@ async def query_document(
     # debugging.stop_debugger()
     user_id = current_user.id
 
-    docs = process_query(user_id,query,engine)
+    pass
+
+
+    # docs = process_query(user_id,query,engine)
     
-    answer = get_llms_answer(docs, query)
+    # answer = get_llms_answer(docs, query)
 
 
-    return {"answer": answer} 
+    # return {"answer": answer} 
 
 
 # -----------------------------------------

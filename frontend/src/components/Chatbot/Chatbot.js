@@ -259,7 +259,10 @@ ${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => 
           addMessage(statusMessage.trim());
           return;
         }
-        
+
+        // 임시 주석 처리: RAG 폴백 비활성화 =====
+        // TODO: 프론트엔드 팀에서 이중 API 요청 이슈 해결 후 제거 오후 10:43 2025-06-05        
+        /*
         // 2. 일반적인 RAG 질의로 처리 (백엔드 실패 후에만)
         console.log('🔄 RAG 질의로 폴백 처리');
         
@@ -286,6 +289,11 @@ ${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => 
           setMessages(prev => prev.filter(msg => msg.id !== 'typing'));
           addMessage('죄송합니다, 오류가 발생했습니다.');
         }
+        */
+
+        // ===== 임시 에러 처리 =====
+        addMessage('죄송합니다, 현재 명령을 처리할 수 없습니다. 잠시 후 다시 시도해주세요.');
+        // ===== 임시 주석 처리 끝 =====       
       }
       
     } catch (error) {
