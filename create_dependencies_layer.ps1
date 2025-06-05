@@ -1,9 +1,9 @@
-# 의존성 패키지 레이어 생성 (올바른 Lambda 구조, Python 3.11 호환)
-Write-Host "Creating dependencies layer with correct Lambda structure for Python 3.11..." -ForegroundColor Green
+# 의존성 패키지 레이어 생성 (올바른 Lambda 구조, Python 3.9 호환)
+Write-Host "Creating dependencies layer with correct Lambda structure for Python 3.9..." -ForegroundColor Green
 
 # 임시 디렉토리 생성 (올바른 Lambda 구조)
 $tempDir = "temp_lambda_layer"
-$pythonDir = "$tempDir\python\lib\python3.11\site-packages"
+$pythonDir = "$tempDir\python\lib\python3.9\site-packages"
 
 try {
     # 기존 디렉토리가 있으면 내용만 정리
@@ -33,8 +33,8 @@ try {
     Write-Host "Upgrading pip..." -ForegroundColor Yellow
     python -m pip install --upgrade pip
 
-    # Python 3.11 x86_64 아키텍처에 맞는 호환 패키지 설치
-    Write-Host "Installing dependencies for Python 3.11 x86_64 with correct Lambda structure..." -ForegroundColor Yellow
+    # Python 3.9 x86_64 아키텍처에 맞는 호환 패키지 설치
+    Write-Host "Installing dependencies for Python 3.9 x86_64 with correct Lambda structure..." -ForegroundColor Yellow
     
     $packages = @(
         "fastapi==0.115.7",
@@ -53,7 +53,7 @@ try {
             --platform manylinux2014_x86_64 `
             --target $pythonDir `
             --implementation cp `
-            --python-version 3.11 `
+            --python-version 3.9 `
             --only-binary=:all: `
             --upgrade `
             $package
@@ -73,11 +73,11 @@ try {
         Write-Host "✓ python/ directory exists" -ForegroundColor Green
         if (Test-Path "$tempDir\python\lib") {
             Write-Host "✓ python/lib/ directory exists" -ForegroundColor Green
-            if (Test-Path "$tempDir\python\lib\python3.11") {
-                Write-Host "✓ python/lib/python3.11/ directory exists" -ForegroundColor Green
-                if (Test-Path "$tempDir\python\lib\python3.11\site-packages") {
-                    Write-Host "✓ python/lib/python3.11/site-packages/ directory exists" -ForegroundColor Green
-                    $packageCount = (Get-ChildItem -Path "$tempDir\python\lib\python3.11\site-packages" -Directory).Count
+            if (Test-Path "$tempDir\python\lib\python3.9") {
+                Write-Host "✓ python/lib/python3.9/ directory exists" -ForegroundColor Green
+                if (Test-Path "$tempDir\python\lib\python3.9\site-packages") {
+                    Write-Host "✓ python/lib/python3.9/site-packages/ directory exists" -ForegroundColor Green
+                    $packageCount = (Get-ChildItem -Path "$tempDir\python\lib\python3.9\site-packages" -Directory).Count
                     Write-Host "✓ Found $packageCount packages in site-packages" -ForegroundColor Green
                 }
             }
@@ -129,16 +129,16 @@ try {
     Write-Host "- SQLAlchemy: 2.0.36" -ForegroundColor White
     Write-Host "- Mangum: 0.18.0" -ForegroundColor White
     Write-Host "- Architecture: x86_64 (manylinux2014)" -ForegroundColor White
-    Write-Host "- Python version: 3.11" -ForegroundColor White
-    Write-Host "- Layer structure: python/lib/python3.11/site-packages/" -ForegroundColor White
+    Write-Host "- Python version: 3.9" -ForegroundColor White
+    Write-Host "- Layer structure: python/lib/python3.9/site-packages/" -ForegroundColor White
 
     # AWS CLI로 의존성 패키지 레이어 생성
     Write-Host "`nPublishing layer to AWS Lambda..." -ForegroundColor Yellow
     
     $dependenciesLayerOutput = aws lambda publish-layer-version `
         --layer-name ai-document-api-dependencies-layer `
-        --description "Dependencies Layer for AI Document API (FastAPI 0.115.7, Pydantic 2.10.6, Python 3.11 x86_64 compatible, correct Lambda structure)" `
-        --compatible-runtimes python3.11 `
+        --description "Dependencies Layer for AI Document API (FastAPI 0.115.7, Pydantic 2.10.6, Python 3.9 x86_64 compatible, correct Lambda structure)" `
+        --compatible-runtimes python3.9 `
         --compatible-architectures x86_64 `
         --zip-file fileb://$zipPath
 
@@ -169,9 +169,9 @@ try {
 Write-Host ""
 Write-Host "Dependencies layer creation completed!" -ForegroundColor Green
 Write-Host "Lambda compatibility verified:" -ForegroundColor Cyan
-Write-Host "✓ Correct python/lib/python3.11/site-packages/ structure" -ForegroundColor Green
+Write-Host "✓ Correct python/lib/python3.9/site-packages/ structure" -ForegroundColor Green
 Write-Host "✓ FastAPI 0.115.7 and Pydantic 2.10.6 compatibility secured" -ForegroundColor Green
-Write-Host "✓ Python 3.11 x86_64 architecture compatibility secured" -ForegroundColor Green
+Write-Host "✓ Python 3.9 x86_64 architecture compatibility secured" -ForegroundColor Green
 Write-Host "✓ AWS Lambda runtime compatibility secured" -ForegroundColor Green
 Write-Host ""
 Write-Host "Installed packages are available in the '$tempDir' directory" -ForegroundColor Yellow

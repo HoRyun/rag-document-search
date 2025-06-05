@@ -58,21 +58,6 @@ except ImportError as e:
     postgresql_modules['psycopg2'] = f"Import failed: {e}"
     logger.error(f"✗ Failed to import psycopg2: {e}")
 
-try:
-    import pgvector
-    postgresql_modules['pgvector'] = pgvector.__version__ if hasattr(pgvector, '__version__') else 'version unknown'
-    logger.info(f"✓ pgvector imported successfully")
-except ImportError as e:
-    postgresql_modules['pgvector'] = f"Import failed: {e}"
-    logger.error(f"✗ Failed to import pgvector: {e}")
-
-try:
-    import numpy
-    postgresql_modules['numpy'] = numpy.__version__
-    logger.info(f"✓ numpy imported successfully: {numpy.__version__}")
-except ImportError as e:
-    postgresql_modules['numpy'] = f"Import failed: {e}"
-    logger.error(f"✗ Failed to import numpy: {e}")
 
 # 커스텀 모듈 import (에러 처리 강화)
 custom_modules = {}

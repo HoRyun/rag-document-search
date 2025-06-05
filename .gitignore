@@ -23,6 +23,7 @@ package/
 db_layer/
 common_layer/
 custom_modules_layer/
+temp_custom_layer/
 temp_lambda_layer/
 temp_postgresql_layer/
 *.zip

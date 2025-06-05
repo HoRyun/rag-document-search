@@ -37,7 +37,7 @@ $roleArn = "arn:aws:iam::286857866962:role/document-management-Lambda"
 Write-Host "`nauth Lambda 함수 생성 중..." -ForegroundColor Cyan
 aws lambda create-function `
     --function-name ai-document-api-auth `
-    --runtime python3.11 `
+    --runtime python3.9 `
     --handler lambda_auth.handler `
     --role $roleArn `
     --zip-file fileb://auth_function.zip `
@@ -54,7 +54,7 @@ aws lambda update-function-configuration `
 Write-Host "`nusers Lambda 함수 생성 중..." -ForegroundColor Cyan
 aws lambda create-function `
     --function-name ai-document-api-users `
-    --runtime python3.11 `
+    --runtime python3.9 `
     --handler lambda_users.handler `
     --role $roleArn `
     --zip-file fileb://users_function.zip `
@@ -71,7 +71,7 @@ aws lambda update-function-configuration `
 Write-Host "`ndocuments Lambda 함수 생성 중..." -ForegroundColor Cyan
 aws lambda create-function `
     --function-name ai-document-api-documents `
-    --runtime python3.11 `
+    --runtime python3.9 `
     --handler lambda_documents.handler `
     --role $roleArn `
     --zip-file fileb://documents_function.zip `
