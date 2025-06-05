@@ -39,6 +39,9 @@ function App() {
   // 사이드바 표시 상태 (모바일용)
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // 다운로드 관련
+  const [isDownloading, setIsDownloading] = useState(false);
+
   const [notification, setNotification] = useState({ visible: false, message: '' });
 
   // 컴포넌트 마운트 시 로그인 상태 확인 및 테마 설정 불러오기
@@ -60,6 +63,317 @@ function App() {
   const handleSelectedItemsChange = (newSelectedItems) => {
     setSelectedItems(newSelectedItems);
     console.log('App.js에서 선택된 아이템 업데이트:', newSelectedItems);
+  };
+
+  const handleDownloadItems = async (selectedFileIds) => {
+    if (!selectedFileIds || selectedFileIds.length === 0) {
+      console.warn('다운로드할 파일이 선택되지 않았습니다.');
+      return;
+    }
+
+    try {
+      setIsDownloading(true);
+      const token = localStorage.getItem("token");
+
+      // 선택된 파일 정보 가져오기
+      const selectedFiles = files.filter(file => selectedFileIds.includes(file.id));
+      
+      console.log('===== 다운로드 시작 =====');
+      console.log('선택된 파일들:', selectedFiles);
+      console.log('파일 개수:', selectedFiles.length);
+
+      // 단일 파일과 다중 파일 처리 분기
+      if (selectedFiles.length === 1) {
+        await downloadSingleFile(selectedFiles[0], token);
+      } else {
+        await downloadMultipleFiles(selectedFiles, token);
+      }
+
+      console.log('===== 다운로드 완료 =====');
+      
+    } catch (error) {
+      console.error("다운로드 중 오류 발생:", error);
+      
+      // 에러 타입에 따른 사용자 알림
+      if (error.message.includes('취소')) {
+        showNotification('다운로드가 취소되었습니다.');
+      } else if (error.message.includes('네트워크')) {
+        showNotification('네트워크 오류로 다운로드에 실패했습니다. 인터넷 연결을 확인해주세요.');
+      } else if (error.message.includes('권한')) {
+        showNotification('파일 다운로드 권한이 없습니다.');
+      } else if (error.message.includes('404')) {
+        showNotification('파일을 찾을 수 없습니다.');
+      } else {
+        showNotification('다운로드 중 오류가 발생했습니다. 다시 시도해주세요.');
+      }
+      
+      // 진행률 모달이 열려있다면 닫기
+      if (window.updateDownloadProgress) {
+        window.updateDownloadProgress({
+          progress: 0,
+          receivedSize: 0,
+          totalSize: 0,
+          speed: 0,
+          fileName: '',
+          elapsedTime: 0,
+          isZip: false,
+          error: true
+        });
+      }
+    } finally {
+      setIsDownloading(false);
+      
+      // AbortController 정리 (안전장치)
+      if (window.downloadAbortController) {
+        delete window.downloadAbortController;
+      }
+    }
+  };
+
+  const downloadSingleFile = async (file, token) => {
+    console.log(`단일 파일 다운로드 시작: ${file.name}`);
+    
+    // AbortController 생성
+    const abortController = new AbortController();
+    window.downloadAbortController = abortController;
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/documents/${file.id}/download`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        signal: abortController.signal // AbortController 신호 추가
+      });
+
+      if (!response.ok) {
+        throw new Error(`다운로드 실패: ${response.status} ${response.statusText}`);
+      }
+
+      // Content-Length 헤더에서 파일 크기 가져오기
+      const contentLength = response.headers.get('Content-Length');
+      const totalSize = contentLength ? parseInt(contentLength, 10) : 0;
+      
+      console.log('파일 크기:', totalSize, 'bytes');
+      
+      // Response body를 ReadableStream으로 읽기
+      const reader = response.body.getReader();
+      const chunks = [];
+      let receivedSize = 0;
+      
+      // 진행률 추적을 위한 시간 변수
+      let startTime = Date.now();
+      let lastUpdateTime = startTime;
+      
+      while (true) {
+        // 취소 신호 확인
+        if (abortController.signal.aborted) {
+          reader.cancel();
+          throw new Error('다운로드가 사용자에 의해 취소되었습니다.');
+        }
+        
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        chunks.push(value);
+        receivedSize += value.length;
+        
+        const currentTime = Date.now();
+        
+        // 100ms마다 진행률 업데이트 (너무 자주 업데이트하면 성능 저하)
+        if (currentTime - lastUpdateTime >= 100) {
+          const progress = totalSize > 0 ? Math.round((receivedSize / totalSize) * 100) : 0;
+          const elapsedTime = (currentTime - startTime) / 1000; // 초 단위
+          const speed = receivedSize / elapsedTime; // bytes/sec
+          
+          // 진행률 정보를 FileDisplay로 전달
+          if (window.updateDownloadProgress) {
+            window.updateDownloadProgress({
+              progress,
+              receivedSize,
+              totalSize,
+              speed,
+              fileName: file.name,
+              elapsedTime
+            });
+          }
+          
+          lastUpdateTime = currentTime;
+          
+          console.log(`진행률: ${progress}%, 속도: ${formatBytes(speed)}/s`);
+        }
+      }
+      
+      // 다운로드 완료 - Blob 생성 및 파일 저장
+      const blob = new Blob(chunks, { 
+        type: response.headers.get('Content-Type') || 'application/octet-stream' 
+      });
+      
+      // 파일 다운로드 실행
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      console.log(`파일 다운로드 완료: ${file.name}`);
+      showNotification(`"${file.name}" 다운로드가 완료되었습니다.`);
+      
+    } catch (error) {
+      if (error.name === 'AbortError' || error.message.includes('취소')) {
+        console.log(`파일 다운로드 취소됨: ${file.name}`);
+        throw new Error('다운로드가 취소되었습니다.');
+      } else {
+        console.error(`파일 다운로드 오류 (${file.name}):`, error);
+        throw error;
+      }
+    } finally {
+      // AbortController 정리
+      delete window.downloadAbortController;
+    }
+  };
+
+  const downloadMultipleFiles = async (files, token) => {
+    console.log(`다중 파일 ZIP 다운로드 시작: ${files.length}개 파일`);
+    
+    // AbortController 생성
+    const abortController = new AbortController();
+    window.downloadAbortController = abortController;
+    
+    try {
+      // 서버에 ZIP 생성 요청
+      const response = await fetch(`${API_BASE_URL}/documents/download-zip`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileIds: files.map(f => f.id),
+          zipName: `selected_files_${new Date().getTime()}.zip`
+        }),
+        signal: abortController.signal // AbortController 신호 추가
+      });
+
+      if (!response.ok) {
+        throw new Error(`ZIP 다운로드 실패: ${response.status} ${response.statusText}`);
+      }
+
+      // Content-Length 헤더에서 ZIP 파일 크기 가져오기
+      const contentLength = response.headers.get('Content-Length');
+      const totalSize = contentLength ? parseInt(contentLength, 10) : 0;
+      
+      console.log('ZIP 파일 크기:', totalSize, 'bytes');
+      
+      // Response body를 ReadableStream으로 읽기
+      const reader = response.body.getReader();
+      const chunks = [];
+      let receivedSize = 0;
+      
+      // 진행률 추적을 위한 시간 변수
+      let startTime = Date.now();
+      let lastUpdateTime = startTime;
+      
+      while (true) {
+        // 취소 신호 확인
+        if (abortController.signal.aborted) {
+          reader.cancel();
+          throw new Error('ZIP 다운로드가 사용자에 의해 취소되었습니다.');
+        }
+        
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        chunks.push(value);
+        receivedSize += value.length;
+        
+        const currentTime = Date.now();
+        
+        // 100ms마다 진행률 업데이트
+        if (currentTime - lastUpdateTime >= 100) {
+          const progress = totalSize > 0 ? Math.round((receivedSize / totalSize) * 100) : 0;
+          const elapsedTime = (currentTime - startTime) / 1000; // 초 단위
+          const speed = receivedSize / elapsedTime; // bytes/sec
+          
+          // 진행률 정보를 FileDisplay로 전달
+          if (window.updateDownloadProgress) {
+            window.updateDownloadProgress({
+              progress,
+              receivedSize,
+              totalSize,
+              speed,
+              fileName: `${files.length}개 파일 압축`,
+              elapsedTime,
+              isZip: true
+            });
+          }
+          
+          lastUpdateTime = currentTime;
+          
+          console.log(`ZIP 진행률: ${progress}%, 속도: ${formatBytes(speed)}/s`);
+        }
+      }
+      
+      // ZIP 다운로드 완료 - Blob 생성 및 파일 저장
+      const blob = new Blob(chunks, { type: 'application/zip' });
+      
+      // 파일 다운로드 실행
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `selected_files_${new Date().getTime()}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      console.log(`ZIP 다운로드 완료: ${files.length}개 파일`);
+      showNotification(`${files.length}개 파일이 ZIP으로 다운로드되었습니다.`);
+      
+    } catch (error) {
+      if (error.name === 'AbortError' || error.message.includes('취소')) {
+        console.log(`ZIP 다운로드 취소됨: ${files.length}개 파일`);
+        throw new Error('ZIP 다운로드가 취소되었습니다.');
+      } else {
+        console.error('ZIP 다운로드 오류:', error);
+        throw error;
+      }
+    } finally {
+      // AbortController 정리
+      delete window.downloadAbortController;
+    }
+  };
+
+  const formatBytes = (bytes, decimals = 1) => {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+  };
+
+  // 남은 시간 계산 유틸리티 함수
+  const formatRemainingTime = (speed, remainingBytes) => {
+    if (speed === 0) return '계산 중...';
+    
+    const remainingSeconds = remainingBytes / speed;
+    
+    if (remainingSeconds < 60) {
+      return `${Math.round(remainingSeconds)}초`;
+    } else if (remainingSeconds < 3600) {
+      return `${Math.round(remainingSeconds / 60)}분`;
+    } else {
+      return `${Math.round(remainingSeconds / 3600)}시간`;
+    }
   };
 
   // 테마 토글 핸들러
@@ -873,7 +1187,6 @@ function App() {
           closeSidebar={closeSidebar}
         />
         
-        {/* ===== FileDisplay에 선택 상태 관련 props 추가 ===== */}
         <FileDisplay
           files={files}
           directories={directories}
@@ -887,13 +1200,13 @@ function App() {
           onFolderOpen={handleFolderOpen}
           onRefresh={fetchDocuments}
           isLoading={isLoading}
-          // ===== 새로 추가되는 props =====
           selectedItems={selectedItems}
           onSelectedItemsChange={handleSelectedItemsChange}
+          onDownloadItems={handleDownloadItems}
+          isDownloading={isDownloading}
         />
       </div>
       
-      {/* ===== Chatbot에 실제 selectedItems 전달 ===== */}
       <Chatbot
         isOpen={chatbotOpen}
         toggleChatbot={toggleChatbot}
