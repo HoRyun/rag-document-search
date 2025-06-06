@@ -46,47 +46,27 @@ def health_check():
     return {"status": "healthy", "service": "documents", "timestamp": datetime.utcnow()}
 
 
-@app.get("/fast_api/documents/structure", response_model=DocumentStructureResponse)
-async def documents_structure(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """문서 구조 조회 엔드포인트"""
-    try:
-        logger.info(f"Fetching documents for user: {current_user.username}")
-        documents = db.query(Document).filter(Document.user_id == current_user.id).all()
-        
-        structure = {
-            "documents": [
-                {
-                    "id": doc.id,
-                    "title": doc.title,
-                    "content": doc.content[:100] + "..." if len(doc.content) > 100 else doc.content,
-                    "created_at": doc.created_at,
-                    "updated_at": doc.updated_at
-                } for doc in documents
-            ]
-        }
-        
-        logger.info(f"Successfully retrieved {len(documents)} documents for user {current_user.username}")
-        return DocumentStructureResponse(**structure)
-        
-    except Exception as e:
-        logger.error(f"Error retrieving documents: {e}")
-        raise HTTPException(
-            status_code=500, 
-            detail="문서 구조를 가져오는 중 오류가 발생했습니다."
-        )
-
-@app.get("/fast_api/documents/count")
-def get_documents_count(
-    db: Session = Depends(get_db), 
+@app.get("/fast_api/documents", response_model=List[DocumentResponse])
+def get_documents(
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """사용자 문서 수 조회 엔드포인트"""
+    """사용자 문서 목록 조회"""
     try:
-        count = db.query(Document).filter(Document.user_id == current_user.id).count()
-        return {"total_documents": count, "user": current_user.username}
+        document_service = DocumentService(db)
+        documents = document_service.get_user_documents(
+            user_id=current_user.id,
+            skip=skip,
+            limit=limit
+        )
+        logger.info(f"Retrieved {len(documents)} documents for user: {current_user.username}")
+        return documents
     except Exception as e:
-        logger.error(f"Error counting documents: {e}")
-        raise HTTPException(status_code=500, detail="문서 수를 가져오는 중 오류가 발생했습니다.")
+        logger.error(f"Document retrieval error: {e}")
+        raise HTTPException(status_code=500, detail="문서 조회 중 오류가 발생했습니다.")
+
 
 # 전역 예외 핸들러
 @app.exception_handler(Exception)
