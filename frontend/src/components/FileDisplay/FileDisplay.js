@@ -9,14 +9,17 @@ const FileDisplay = ({
   onAddFile, 
   onCreateFolder, 
   onMoveItem, 
+  onCopyItem, 
   onDeleteItem, 
   onRenameItem, 
   onFolderOpen, 
-  onCopyItem, 
   onRefresh, 
   isLoading,
-  selectedItems: parentSelectedItems = [], // 부모로부터 받은 선택 상태
-  onSelectedItemsChange // 선택 변경을 부모에게 알리는 함수
+  selectedItems: parentSelectedItems = [],
+  onSelectedItemsChange,
+  onDownloadItems,
+  downloadState = { isActive: false },
+  onDownloadCancel
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -54,6 +57,18 @@ const FileDisplay = ({
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, type: null });
   const [notification, setNotification] = useState({ visible: false, message: '' });
 
+  // 기존 상태들과 함께 다운로드 관련 상태 추가
+  const [showDownloadProgress, setShowDownloadProgress] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState({
+    progress: 0,
+    receivedSize: 0,
+    totalSize: 0,
+    speed: 0,
+    fileName: '',
+    elapsedTime: 0,
+    isZip: false
+  });
+
   // 모바일 환경 감지 - 새로 추가
   useEffect(() => {
     const checkMobile = () => {
@@ -67,6 +82,32 @@ const FileDisplay = ({
       window.removeEventListener('resize', checkMobile);
     };
   }, []);
+
+  // 다운로드 상태 동기화
+  useEffect(() => {
+    if (downloadState.isActive && !showDownloadProgress) {
+      setShowDownloadProgress(true);
+    } else if (!downloadState.isActive && downloadProgress.progress >= 100) {
+      setTimeout(() => {
+        setShowDownloadProgress(false);
+      }, 1000);
+    }
+  }, [downloadState.isActive, showDownloadProgress, downloadProgress.progress]);
+
+  // App.js에서 전달받은 downloadState를 local downloadProgress에 동기화
+  useEffect(() => {
+    if (downloadState.isActive && downloadState.progress !== undefined) {
+      setDownloadProgress({
+        progress: downloadState.progress || 0,
+        receivedSize: downloadState.receivedSize || 0,
+        totalSize: downloadState.totalSize || 0,
+        speed: downloadState.speed || 0,
+        fileName: downloadState.fileName || '',
+        elapsedTime: downloadState.elapsedTime || 0,
+        isZip: downloadState.isZip || false
+      });
+    }
+  }, [downloadState]);
 
   // 부모의 selectedItems가 변경될 때 로컬 상태 업데이트
   useEffect(() => {
@@ -273,6 +314,96 @@ const FileDisplay = ({
         setLastSelectedItem(itemId);
       }
     }
+  };
+
+  // ✅ 다운로드 핸들러
+  const handleDownloadSelected = useCallback(async () => {
+    if (selectedItems.length === 0) {
+      showNotification('다운로드할 파일을 선택해주세요.');
+      return;
+    }
+
+    console.log('다운로드 요청:', selectedItems);
+    
+    try {
+      // 다운로드 진행률 모달 표시
+      setShowDownloadProgress(true);
+      
+      // App.js의 다운로드 함수 호출
+      await onDownloadItems(selectedItems);
+      
+      // 다운로드 완료 후 진행률 모달 숨김
+      setTimeout(() => {
+        setShowDownloadProgress(false);
+        setDownloadProgress({
+          progress: 0,
+          receivedSize: 0,
+          totalSize: 0,
+          speed: 0,
+          fileName: '',
+          elapsedTime: 0,
+          isZip: false
+        });
+      }, 1000); // 1초 후에 모달 숨김
+      
+    } catch (error) {
+      console.error('다운로드 오류:', error);
+      setShowDownloadProgress(false);
+      showNotification('다운로드 중 오류가 발생했습니다.');
+    }
+  }, [selectedItems, onDownloadItems]);
+
+  // ✅ 다운로드 취소 핸들러
+  const handleCancelDownload = () => {
+    // 부모 컴포넌트의 취소 함수 호출
+    if (onDownloadCancel) {
+      onDownloadCancel();
+    }
+    setShowDownloadProgress(false);
+    setDownloadProgress({
+      progress: 0,
+      receivedSize: 0,
+      totalSize: 0,
+      speed: 0,
+      fileName: '',
+      elapsedTime: 0,
+      isZip: false
+    });
+    
+    showNotification('다운로드가 취소되었습니다.');
+  };
+
+  // ✅ 바이트를 읽기 쉬운 형태로 변환하는 유틸리티 함수
+  const formatBytes = (bytes, decimals = 1) => {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+  };
+
+  // ✅ 남은 시간 계산 함수
+  const formatRemainingTime = (speed, remainingBytes) => {
+    if (speed === 0 || remainingBytes === 0) return '계산 중...';
+    
+    const remainingSeconds = remainingBytes / speed;
+    
+    if (remainingSeconds < 60) {
+      return `약 ${Math.round(remainingSeconds)}초`;
+    } else if (remainingSeconds < 3600) {
+      return `약 ${Math.round(remainingSeconds / 60)}분`;
+    } else {
+      return `약 ${Math.round(remainingSeconds / 3600)}시간`;
+    }
+  };
+
+  // ✅ 다운로드 속도 형태로 포맷
+  const formatSpeed = (bytesPerSecond) => {
+    return `${formatBytes(bytesPerSecond)}/초`;
   };
 
   // 파일 영역 클릭 처리 (빈 공간 클릭시 선택 해제)
@@ -541,6 +672,71 @@ const FileDisplay = ({
     }, 3000);
   };
 
+  // ✅ 다운로드 진행률 모달 렌더링 함수
+  const renderDownloadProgressModal = () => {
+    if (!showDownloadProgress) return null;
+    
+    const remainingBytes = downloadProgress.totalSize - downloadProgress.receivedSize;
+    const remainingTime = formatRemainingTime(downloadProgress.speed, remainingBytes);
+    
+    return (
+      <div className="download-progress-overlay">
+        <div className="download-progress-modal">
+          <h3>
+            {downloadProgress.isZip ? '📦 파일 압축 중...' : '💾 파일 다운로드 중...'}
+          </h3>
+          
+          <div className="progress-info">
+            <div className="file-name">
+              {downloadProgress.fileName}
+            </div>
+            
+            <div className="progress-bar-container">
+              <div 
+                className="progress-bar" 
+                style={{ width: `${downloadProgress.progress}%` }}
+              ></div>
+            </div>
+            
+            <div className="progress-details">
+              <div className="progress-percent">
+                {downloadProgress.progress}%
+              </div>
+              
+              <div className="progress-size">
+                {formatBytes(downloadProgress.receivedSize)} / {formatBytes(downloadProgress.totalSize)}
+              </div>
+              
+              <div className="progress-speed">
+                속도: {formatSpeed(downloadProgress.speed)}
+              </div>
+              
+              {downloadProgress.speed > 0 && (
+                <div className="progress-remaining">
+                  남은 시간: {remainingTime}
+                </div>
+              )}
+              
+              <div className="progress-elapsed">
+                경과 시간: {Math.round(downloadProgress.elapsedTime)}초
+              </div>
+            </div>
+          </div>
+          
+          <div className="progress-actions">
+            <button 
+              className="cancel-download-btn"
+              onClick={handleCancelDownload}
+              disabled={downloadProgress.progress >= 100}
+            >
+              {downloadProgress.progress >= 100 ? '완료' : '취소'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // 키보드 이벤트 리스너 설정
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -611,6 +807,14 @@ const FileDisplay = ({
         e.preventDefault();
         setSelectedItems(files.map(file => file.id));
       }
+
+      // Ctrl + D: 다운로드 (브라우저 북마크 기본 동작 방지)
+      if (e.ctrlKey && e.key === 'd') {
+        e.preventDefault();
+        if (selectedItems.length > 0) {
+          handleDownloadSelected();
+        }
+      }
     };
     
     const handleKeyUp = (e) => {
@@ -636,7 +840,9 @@ const FileDisplay = ({
     handleCopyItems, 
     handleCutItems, 
     handlePasteItems, 
-    handleDeleteSelectedItems
+    handleDeleteSelectedItems,
+    handleDownloadSelected,
+    downloadState.isActive
   ]);
 
   // 드래그 선택을 위한 이벤트 리스너 추가
@@ -1032,13 +1238,6 @@ const FileDisplay = ({
       document.removeEventListener('click', handleDocumentClick);
     };
   }, [handleDocumentClick]); // handleDocumentClick 의존성 추가
-  
-  // Refresh file list
-  const handleRefresh = () => {
-    if (onRefresh) {
-      onRefresh();
-    }
-  };
 
   // Show new folder modal
   const handleNewFolderClick = () => {
@@ -1200,12 +1399,13 @@ const FileDisplay = ({
           <span className="mobile-action-icon">📁+</span>
         </button>
         <button 
-          className="mobile-action-btn refresh-btn" 
-          onClick={handleRefresh}
-          disabled={isLoading || isLocalLoading}
-          aria-label="새로고침"
+          className="mobile-action-btn download-btn" 
+          onClick={handleDownloadSelected}
+          disabled={isLoading || isLocalLoading || selectedItems.length === 0 || downloadState.isActive}
+          aria-label="다운로드"
         >
-          <span className="mobile-action-icon">🔄</span>
+          <span className="mobile-action-icon">⬇️</span>
+          <span className="mobile-action-text">다운로드</span>
         </button>
         <div className="mobile-upload-dropdown" ref={uploadButtonRef}>
           <button
@@ -1367,11 +1567,12 @@ const FileDisplay = ({
               새 폴더
             </button>
             <button 
-              className="refresh-btn" 
-              onClick={handleRefresh}
-              disabled={isLoading || isLocalLoading}
+              className="download-btn" 
+              onClick={handleDownloadSelected}
+              disabled={selectedItems.length === 0 || isLoading || isLocalLoading || downloadState.isActive}
+              title={selectedItems.length === 0 ? '다운로드할 항목을 선택하세요' : `${selectedItems.length}개 항목 다운로드`}
             >
-              새로고침
+              {downloadState.isActive ? '다운로드 중...' : `다운로드${selectedItems.length > 0 ? ` (${selectedItems.length})` : ''}`}
             </button>
             <div className="upload-dropdown" ref={uploadButtonRef}>
               <button
@@ -1615,6 +1816,9 @@ const FileDisplay = ({
         </div>
       )}
 
+      {/* ✅ 다운로드 진행률 모달 추가 */}
+      {renderDownloadProgressModal()}
+
       {/* 컨텍스트 메뉴 */}
       {contextMenu.visible && contextMenu.type === 'display' && (
         <div 
@@ -1649,8 +1853,12 @@ const FileDisplay = ({
           >
             선택 항목 삭제
           </div>
-          <div className="context-menu-item" onClick={handleRefresh}>
-            새로고침
+          <div 
+            className="context-menu-item" 
+            onClick={handleDownloadSelected}
+            style={{ opacity: selectedItems.length > 0 ? 1 : 0.5 }}
+          >
+            선택 항목 다운로드
           </div>
         </div>
       )}
@@ -1695,6 +1903,13 @@ const FileDisplay = ({
             disabled={isLoading || isLocalLoading}
           >
             삭제
+          </button>
+          <button 
+            className="mobile-action-bar-btn download-btn"
+            onClick={handleDownloadSelected}
+            disabled={isLoading || isLocalLoading || downloadState.isActive}
+          >
+            다운로드
           </button>
         </div>
       )}
