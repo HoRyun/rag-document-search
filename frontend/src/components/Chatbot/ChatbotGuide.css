@@ -1,394 +1,194 @@
+/* ChatbotGuide.css */
 .chatbot-guide {
-  width: 100%;
-  height: 100%;
-  background-color: var(--bg-primary);
-  border-radius: 8px;
-  box-shadow: 0 4px 20px var(--shadow-color);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden; /* 전체 가이드에서는 오버플로우 숨김 */
-  transition: background-color 0.3s, box-shadow 0.3s;
-}
-
-/* Header */
-.guide-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  background-color: var(--highlight-color);
-  color: white;
-  border-bottom: 1px solid var(--border-color);
-  transition: background-color 0.3s, border-color 0.3s;
-}
-
-.guide-header h2 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 500;
-}
-
-.close-guide-btn {
-  background: none;
-  border: none;
-  color: white;
-  font-size: 24px;
-  cursor: pointer;
-}
-
-/* Content - 세로 스크롤만 가능하도록 설정 */
-.guide-content {
-  flex: 1;
-  padding: 20px;
-  overflow-y: auto; /* 세로 스크롤만 허용 */
-  overflow-x: hidden; /* 가로 스크롤 방지 */
-}
-
-.guide-intro {
-  margin-bottom: 20px;
-  font-size: 15px;
-  line-height: 1.5;
-  color: var(--text-primary);
-  transition: color 0.3s;
-}
-
-/* 카테고리 그리드 레이아웃을 2열로 변경 */
-.command-examples {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr); /* 2열로 조정 */
-  gap: 20px;
-  margin-bottom: 20px;
-  width: 100%; /* 컨테이너 너비에 맞춤 */
-}
-
-/* Category Section - 너비 제한 */
-.category-section {
-  background-color: var(--bg-secondary);
-  border-radius: 6px;
-  padding: 15px;
-  transition: background-color 0.3s;
-  width: 100%; /* 부모 컨테이너 너비에 맞춤 */
-  box-sizing: border-box; /* 패딩을 너비에 포함 */
-}
-
-.category-section h3 {
-  margin: 0 0 10px;
-  font-size: 16px;
-  color: var(--text-primary);
-  padding-bottom: 5px;
-  border-bottom: 1px solid var(--border-color);
-  transition: color 0.3s, border-color 0.3s;
-}
-
-.category-section ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  width: 100%; /* 부모 컨테이너 너비에 맞춤 */
-}
-
-.category-section li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 0;
-  border-bottom: 1px dashed var(--border-color);
-  transition: border-color 0.3s;
-  width: 100%; /* 부모 컨테이너 너비에 맞춤 */
-}
-
-.category-section li:last-child {
-  border-bottom: none;
-}
-
-/* 명령어 텍스트 너비 제한 및 말줄임표 처리 */
-.command-text {
-  font-size: 14px;
-  color: var(--text-primary);
-  transition: color 0.3s;
-  flex: 1; /* 가능한 모든 공간 차지 */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding-right: 10px; /* 버튼과의 간격 */
-}
-
-.try-btn {
-  background-color: var(--bg-primary);
-  color: var(--highlight-color);
-  border: 1px solid var(--highlight-color);
-  border-radius: 4px;
-  padding: 4px 8px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: background-color 0.3s, color 0.3s, border-color 0.3s;
-  white-space: nowrap; /* 버튼 텍스트 줄바꿈 방지 */
-  flex-shrink: 0; /* 버튼 크기 유지 */
-}
-
-.try-btn:hover {
-  background-color: var(--highlight-color);
-  color: white;
-}
-
-/* Tips */
-.guide-tips {
-  background-color: var(--bg-secondary);
-  border-radius: 6px;
-  padding: 15px;
-  margin-top: 20px;
-  transition: background-color 0.3s;
-  width: 100%; /* 컨테이너 너비에 맞춤 */
-  box-sizing: border-box; /* 패딩을 너비에 포함 */
-}
-
-.guide-tips h3 {
-  margin: 0 0 10px;
-  font-size: 16px;
-  color: var(--text-primary);
-  transition: color 0.3s;
-}
-
-/* 팁 목록을 단일 컬럼으로 변경 */
-.guide-tips ul {
-  padding-left: 20px;
-  margin: 0;
-  width: 100%; /* 컨테이너 너비에 맞춤 */
-}
-
-.guide-tips li {
-  margin-bottom: 8px;
-  font-size: 14px;
-  color: var(--text-primary);
-  transition: color 0.3s;
-}
-
-.guide-tips li:last-child {
-  margin-bottom: 0;
-}
-
-/* Footer */
-.guide-footer {
-  padding: 15px 20px;
-  display: flex;
-  justify-content: flex-end;
-  border-top: 1px solid var(--border-color);
-  background-color: var(--bg-secondary);
-  transition: background-color 0.3s, border-color 0.3s;
-}
-
-.guide-footer .close-btn {
-  background-color: var(--highlight-color);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 8px 24px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.2s;
-  white-space: nowrap;
-}
-
-.guide-footer .close-btn:hover {
-  background-color: var(--highlight-hover);
-}
-
-/* 반응형 스타일 추가 */
-
-/* 태블릿 크기 (1024px 이하) */
-@media (max-width: 1024px) {
+    width: 100%;
+    height: 100%;
+    background-color: var(--bg-primary);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px var(--shadow-color);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* 전체 가이드에서는 오버플로우 숨김 */
+    transition: background-color 0.3s, box-shadow 0.3s;
+  }
+  
+  /* Header */
   .guide-header {
-    padding: 12px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background-color: var(--highlight-color);
+    color: white;
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.3s, border-color 0.3s;
   }
   
   .guide-header h2 {
-    font-size: 18px;
-  }
-  
-  .guide-content {
-    padding: 15px;
-  }
-  
-  .guide-intro {
-    font-size: 14px;
-    margin-bottom: 15px;
-  }
-  
-  .command-examples {
-    gap: 15px;
-  }
-  
-  .category-section {
-    padding: 12px;
-  }
-  
-  .category-section h3 {
-    font-size: 15px;
-  }
-  
-  .command-text {
-    font-size: 13px;
-  }
-  
-  .try-btn {
-    padding: 3px 7px;
-    font-size: 11px;
-  }
-  
-  .guide-tips {
-    padding: 12px;
-    margin-top: 15px;
-  }
-  
-  .guide-tips h3 {
-    font-size: 15px;
-  }
-  
-  .guide-tips li {
-    font-size: 13px;
-  }
-  
-  .guide-footer {
-    padding: 12px 15px;
-  }
-  
-  .guide-footer .close-btn {
-    padding: 7px 14px;
-    font-size: 13px;
-  }
-}
-
-/* 작은 태블릿 크기 (768px 이하) */
-@media (max-width: 768px) {
-  .command-examples {
-    grid-template-columns: 1fr; /* 모바일에서는 단일 컬럼으로 변경 */
-    gap: 12px;
-  }
-  
-  .guide-header h2 {
-    font-size: 16px;
-  }
-  
-  .guide-content {
-    padding: 12px;
-  }
-  
-  .guide-intro {
-    font-size: 13px;
-    margin-bottom: 12px;
-  }
-  
-  .category-section {
-    padding: 10px;
-  }
-  
-  .category-section h3 {
-    font-size: 14px;
-    margin-bottom: 8px;
-  }
-  
-  .category-section li {
-    padding: 5px 0;
-  }
-  
-  /* 명령어 텍스트 줄임 처리 강화 */
-  .command-text {
-    max-width: 200px;
-    font-size: 12px;
-  }
-  
-  /* 버튼 크기 확대 (터치 영역 증가) */
-  .try-btn {
-    padding: 5px 10px;
-    font-size: 12px;
-  }
-  
-  .guide-tips h3 {
-    font-size: 14px;
-  }
-  
-  .guide-tips li {
-    font-size: 12px;
-    margin-bottom: 6px;
-  }
-  
-  .guide-footer .close-btn {
-    padding: 6px 12px;
-    font-size: 12px;
-  }
-}
-
-/* 모바일 크기 (480px 이하) */
-@media (max-width: 480px) {
-  .guide-header {
-    padding: 10px 12px;
-  }
-  
-  .guide-header h2 {
-    font-size: 15px;
+    margin: 0;
+    font-size: 20px;
+    font-weight: 500;
   }
   
   .close-guide-btn {
-    font-size: 20px;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
   }
   
+  /* Content - 세로 스크롤만 가능하도록 설정 */
   .guide-content {
-    padding: 10px;
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto; /* 세로 스크롤만 허용 */
+    overflow-x: hidden; /* 가로 스크롤 방지 */
   }
   
   .guide-intro {
-    font-size: 12px;
-    margin-bottom: 10px;
+    margin-bottom: 20px;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    transition: color 0.3s;
   }
   
+  /* 카테고리 그리드 레이아웃을 2열로 변경 */
   .command-examples {
-    gap: 10px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* 2열로 조정 */
+    gap: 20px;
+    margin-bottom: 20px;
+    width: 100%; /* 컨테이너 너비에 맞춤 */
   }
   
+  /* Category Section - 너비 제한 */
   .category-section {
-    padding: 8px;
+    background-color: var(--bg-secondary);
+    border-radius: 6px;
+    padding: 15px;
+    transition: background-color 0.3s;
+    width: 100%; /* 부모 컨테이너 너비에 맞춤 */
+    box-sizing: border-box; /* 패딩을 너비에 포함 */
   }
   
   .category-section h3 {
-    font-size: 13px;
-    padding-bottom: 4px;
-    margin-bottom: 6px;
+    margin: 0 0 10px;
+    font-size: 16px;
+    color: var(--text-primary);
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--border-color);
+    transition: color 0.3s, border-color 0.3s;
   }
   
+  .category-section ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    width: 100%; /* 부모 컨테이너 너비에 맞춤 */
+  }
+  
+  .category-section li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--border-color);
+    transition: border-color 0.3s;
+    width: 100%; /* 부모 컨테이너 너비에 맞춤 */
+  }
+  
+  .category-section li:last-child {
+    border-bottom: none;
+  }
+  
+  /* 명령어 텍스트 너비 제한 및 말줄임표 처리 */
   .command-text {
-    max-width: 150px; /* 더 좁게 */
-    font-size: 11px;
+    font-size: 14px;
+    color: var(--text-primary);
+    transition: color 0.3s;
+    flex: 1; /* 가능한 모든 공간 차지 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 10px; /* 버튼과의 간격 */
   }
   
   .try-btn {
-    padding: 5px 8px;
-    font-size: 11px;
+    background-color: var(--bg-primary);
+    color: var(--highlight-color);
+    border: 1px solid var(--highlight-color);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+    white-space: nowrap; /* 버튼 텍스트 줄바꿈 방지 */
+    flex-shrink: 0; /* 버튼 크기 유지 */
   }
   
+  .try-btn:hover {
+    background-color: var(--highlight-color);
+    color: white;
+  }
+  
+  /* Tips */
   .guide-tips {
-    padding: 8px;
-    margin-top: 10px;
+    background-color: var(--bg-secondary);
+    border-radius: 6px;
+    padding: 15px;
+    margin-top: 20px;
+    transition: background-color 0.3s;
+    width: 100%; /* 컨테이너 너비에 맞춤 */
+    box-sizing: border-box; /* 패딩을 너비에 포함 */
   }
   
   .guide-tips h3 {
-    font-size: 13px;
+    margin: 0 0 10px;
+    font-size: 16px;
+    color: var(--text-primary);
+    transition: color 0.3s;
   }
   
+  /* 팁 목록을 단일 컬럼으로 변경 */
   .guide-tips ul {
-    padding-left: 15px;
+    padding-left: 20px;
+    margin: 0;
+    width: 100%; /* 컨테이너 너비에 맞춤 */
   }
   
   .guide-tips li {
-    font-size: 11px;
-    margin-bottom: 5px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: var(--text-primary);
+    transition: color 0.3s;
   }
   
+  .guide-tips li:last-child {
+    margin-bottom: 0;
+  }
+  
+  /* Footer */
   .guide-footer {
-    padding: 10px 12px;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid var(--border-color);
+    background-color: var(--bg-secondary);
+    transition: background-color 0.3s, border-color 0.3s;
   }
   
   .guide-footer .close-btn {
-    padding: 5px 10px;
-    font-size: 11px;
+    background-color: var(--highlight-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
   }
-}
+  
+  .guide-footer .close-btn:hover {
+    background-color: var(--highlight-hover);
+  }
