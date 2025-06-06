@@ -1,7 +1,9 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from pgvector.sqlalchemy import Vector
 from sqlalchemy.types import Boolean
+
 from db.database import Base
 
 class User(Base):
@@ -28,6 +30,16 @@ class Document(Base):
     
     owner = relationship("User", back_populates="documents") # 이 코드 설명을 들어야 함.
     chunks = relationship("DocumentChunk", back_populates="document")
+
+class DocumentChunk(Base):
+    """문서 청크 모델"""
+    __tablename__ = "document_chunks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, ForeignKey("documents.id"))
+    content = Column(String)
+    embedding = Column(Vector(1536))
+    document = relationship("Document", back_populates="chunks") 
 
 class Directory(Base):
     """디렉토리 모델"""
