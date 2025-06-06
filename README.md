@@ -1,105 +1,73 @@
-[![RAG Document Search Frontend CI/CD Pipeline](https://github.com/HoRyun/rag-document-search/actions/workflows/frontend-ci-cd.yml/badge.svg)](https://github.com/HoRyun/rag-document-search/actions/workflows/frontend-ci-cd.yml)
+# 간단한 Lambda 레이어 테스트 가이드
 
-# RAG Document Search
+이 프로젝트는 AWS Lambda에서 의존성 레이어를 차근차근 추가하고 테스트하는 방법을 보여줍니다.
 
-Retrieval-Augmented Generation(RAG) 기술을 활용한 문서 검색 및 질의응답 시스템입니다. 사용자는 문서를 업로드하고 해당 문서에 관련된 질문을 할 수 있습니다. 
+## 파일 구조
 
----
+- `simple_lambda.py` - 가장 기본적인 Lambda 함수
+- `email_validator_test.py` - email-validator 의존성을 테스트하는 Lambda 함수
+- `create_simple_layer.ps1` - 간단한 의존성 레이어를 생성하는 PowerShell 스크립트
+- `deploy_simple_lambda.ps1` - Lambda 함수를 배포하는 PowerShell 스크립트
 
-## 주요 기능 
-- **문서 관리**: 문서 업로드, 조회, 삭제
-- **텍스트 처리**: 문서에서 텍스트 추출 및 벡터화
-- **질의응답**: 자연어 질문에 대한 정확한 응답 생성
-- **사용자 친화적 UI**: 직관적인 인터페이스 제공
+## 사용 방법
 
----
+### 1. 간단한 의존성 레이어 생성
 
-## 기술 스택
-
-### 백엔드
-
-- **FastAPI**: 고성능 Python 기반 API 프레임워크
-- **LangChain**: LLM 애플리케이션 개발 프레임워크
-- **PostgreSQL (AWS RDS)**: 관계형 데이터베이스 및 벡터 확장 활용
-- **Redis** 
-
-### 프론트엔드
-
-- **React**: 사용자 인터페이스 구현
-
-
-### 인프라/클라우드
-
-- **AWS S3**: 문서 파일 저장소
-- **AWS ECR**: 컨테이너 이미지 저장소
-- **AWS ECS Fargate**: 서버리스 백엔드 컨테이너 오케스트레이션
-- **AWS RDS**: 관리형 PostgreSQL 데이터베이스
-- **Docker**: 애플리케이션 컨테이너화 및 환경 통일
-
----
-
-## 아키텍처
-
-```
-[User]
-   |
-[React Front-end]
-   |
-[ALB (Application Load Balancer)]
-   |
-[ECS Fargate (FastAPI Backend)]
-   |           |             |
-[S3]       [ECR]         [RDS PostgreSQL]
-(문서저장) (이미지저장)    (벡터+일반DB)
+```powershell
+.\create_simple_layer.ps1
 ```
 
-- **문서 저장**: 업로드 문서는 AWS S3에 저장
-- **컨테이너 관리**: 백엔드는 Docker 이미지로 빌드, ECR에 저장, ECS Fargate에서 실행
-- **DB 관리**: 벡터 검색 및 RAG 데이터는 AWS RDS PostgreSQL에서 관리
+이 스크립트는 다음을 수행합니다:
+- Lambda 레이어 구조에 맞는 디렉토리 생성
+- email-validator와 dnspython 패키지 설치
+- 레이어 ZIP 파일 생성
+- AWS Lambda에 레이어 게시
+- 레이어 ARN을 환경 변수로 설정
 
----
+### 2. Lambda 함수 배포
 
-## 설치 및 실행
-
-### 1. 사전 요구사항
-
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) 설치
-- AWS CLI 및 필요한 자격증명(로컬 테스트 시)
-
-
-### 2. 설치 및 실행
-
-```bash
-# 저장소 복제
-git clone https://github.com/HoRyun/rag-document-search.git
-cd rag-document-search
-
-# 애플리케이션 빌드 및 실행
-docker-compose up --build
+```powershell
+.\deploy_simple_lambda.ps1
 ```
 
+이 스크립트는 다음을 수행합니다:
+- Lambda 함수 파일 압축
+- 함수가 이미 존재하는지 확인
+- 함수 생성 또는 업데이트
+- 생성된 레이어 연결
 
----
+### 3. Lambda 함수 테스트
 
-## CI/CD 및 배포
+```powershell
+aws lambda invoke --function-name simple-email-validator-test --payload '{}' response.json
+cat response.json
+```
 
-- **GitHub Actions**를 통한 자동화된 CI/CD 파이프라인 구축
-- `main`, `develop-backend`, `develop-cloud` 브랜치 등에서 푸시 시
-    - 테스트 → Docker 이미지 빌드 → ECR 푸시 → ECS Fargate 무중단 배포
-- 워크플로 파일은 `.github/workflows/`에 위치
+## 의존성 레이어 구조
 
----
+Lambda 레이어는 다음과 같은 구조를 가져야 합니다:
 
-## 환경 변수 및 시크릿 관리
+```
+python/
+└── lib/
+    └── python3.9/
+        └── site-packages/
+            ├── email_validator/
+            ├── dns/
+            └── ... (기타 패키지)
+```
 
-- 민감정보(API Key 등)는 코드에 직접 포함하지 않고,
-AWS Secrets Manager, GitHub Secrets 또는 환경변수로 안전하게 관리
+## 문제 해결
 
----
- 
-## 참고
+1. **ImportError 발생 시**:
+   - 레이어 구조가 올바른지 확인
+   - 필요한 모든 의존성 패키지가 포함되어 있는지 확인
+   - Lambda 함수에 레이어가 제대로 연결되었는지 확인
 
-- [GitHub Actions 공식 문서](https://docs.github.com/actions)
-- [AWS ECS 공식 문서](https://docs.aws.amazon.com/ko_kr/AmazonECS/latest/developerguide/Welcome.html)
+2. **Lambda 함수 실행 시간 초과**:
+   - Lambda 함수의 타임아웃 설정 확인
+   - 무거운 의존성이 있는 경우 타임아웃 시간 증가
 
----
+3. **레이어 크기 제한**:
+   - Lambda 레이어는 압축 해제 시 250MB로 제한됨
+   - 필요한 패키지만 포함하여 크기 최소화
