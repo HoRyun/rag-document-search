@@ -1,0 +1,32 @@
+{
+  "httpMethod": "POST",
+  "path": "/fast_api/auth/register",
+  "headers": {
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+  },
+  "multiValueHeaders": {},
+  "queryStringParameters": null,
+  "multiValueQueryStringParameters": null,
+  "pathParameters": null,
+  "stageVariables": null,
+  "requestContext": {
+    "requestId": "test-request-id-004",
+    "stage": "test",
+    "requestTime": "06/Jun/2025:08:37:00 +0000",
+    "requestTimeEpoch": 1717660620000,
+    "identity": {
+      "sourceIp": "127.0.0.1",
+      "userAgent": "Lambda-Test"
+    },
+    "httpMethod": "POST",
+    "resourcePath": "/fast_api/auth/register",
+    "protocol": "HTTP/1.1",
+    "accountId": "123456789012",
+    "apiId": "test-api-id",
+    "resourceId": "test-resource-id"
+  },
+  "body": "{\"username\": \"testuser\", \"email\": \"test@example.com\", \"password\": \"testpassword123\"}",
+  "isBase64Encoded": false,
+  "version": "1.0"
+}
