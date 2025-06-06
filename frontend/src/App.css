@@ -1,3 +1,4 @@
+/* 기존 스타일 유지 */
 * {
   margin: 0;
   padding: 0;
@@ -49,4 +50,87 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-thumb-hover);
+}
+
+/* 반응형 스타일 추가 */
+
+/* 모바일 사이드바 토글 버튼 */
+.sidebar-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0 15px;
+}
+
+/* 태블릿 크기 (1024px 이하) */
+@media (max-width: 1024px) {
+  .main-container {
+    position: relative;
+  }
+  
+  .sidebar {
+    width: 220px;
+  }
+}
+
+/* 작은 태블릿 크기 (768px 이하) */
+@media (max-width: 768px) {
+  /* 사이드바 토글 버튼 표시 */
+  .sidebar-toggle {
+    display: block;
+  }
+  
+  /* 메인 컨테이너를 세로 방향으로 변경 */
+  .main-container {
+    flex-direction: column;
+    position: relative;
+  }
+  
+  /* 사이드바 숨김 (기본 상태) */
+  .sidebar {
+    position: absolute;
+    left: -250px;
+    top: 0;
+    height: 100%;
+    z-index: 100;
+    transition: left 0.3s ease;
+    box-shadow: 2px 0 5px var(--shadow-color);
+  }
+  
+  /* 사이드바 활성화 상태 */
+  .sidebar.active {
+    left: 0;
+  }
+  
+  /* 사이드바 활성화시 배경 오버레이 */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 90;
+  }
+  
+  .sidebar-overlay.active {
+    display: block;
+  }
+}
+
+/* 모바일 크기 (480px 이하) */
+@media (max-width: 480px) {
+  /* 인증 폼 크기 조정 */
+  .auth-container {
+    padding: 10px;
+  }
+  
+  /* 인증 폼 내부 패딩 축소 */
+  .login-form, .register-form {
+    padding: 20px;
+  }
 }

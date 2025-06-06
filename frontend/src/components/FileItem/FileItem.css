@@ -151,3 +151,381 @@
   user-select: none; /* 텍스트 선택 방지 */
   outline: none; /* 기본 포커스 아웃라인 제거 */
 }
+
+/* 반응형 스타일 추가 */
+
+/* 태블릿 크기 (1024px 이하) */
+@media (max-width: 1024px) {
+  .file-icon {
+    width: 50px;
+    height: 60px;
+  }
+  
+  .file-name {
+    font-size: 11px;
+  }
+  
+  .context-menu {
+    width: 140px;
+  }
+  
+  .context-menu-item {
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+}
+
+/* 작은 태블릿 크기 (768px 이하) */
+@media (max-width: 768px) {
+  .file-item {
+    padding: 8px;
+  }
+  
+  .file-icon {
+    width: 45px;
+    height: 55px;
+  }
+  
+  /* 컨텍스트 메뉴 크기 확대 (터치 친화적) */
+  .context-menu {
+    width: 160px;
+  }
+  
+  .context-menu-item {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+}
+
+/* 모바일 크기 (480px 이하) */
+@media (max-width: 480px) {
+  .file-item {
+    padding: 6px;
+  }
+  
+  .file-icon {
+    width: 40px;
+    height: 50px;
+    margin-bottom: 5px;
+  }
+  
+  .file-name {
+    font-size: 10px;
+  }
+  
+  .file-item.selected,
+  .file-item[aria-selected="true"] {
+    border-width: 1px;
+    padding: 5px;
+  }
+  
+  /* 컨텍스트 메뉴 모바일 최적화 */
+  .context-menu {
+    width: 180px; /* 더 넓게 */
+  }
+  
+  .context-menu-item {
+    padding: 12px 15px; /* 더 큰 터치 영역 */
+    font-size: 15px;
+  }
+  
+  /* 이름 변경 입력 필드 모바일 최적화 */
+  .rename-input {
+    padding: 6px 8px;
+    font-size: 14px;
+  }
+}
+
+/* 모바일 FileItem 스타일 추가 */
+
+/* 모바일 파일 아이템 기본 스타일 */
+.file-item.mobile-item {
+  padding: 8px;
+  touch-action: manipulation; /* 더블 탭 확대 방지 */
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.file-item.mobile-item .file-icon {
+  width: 45px;
+  height: 45px;
+}
+
+.file-item.mobile-item .file-name {
+  font-size: 12px;
+  margin-top: 4px;
+  max-width: 100%;
+  padding: 0 2px;
+}
+
+/* 모바일 선택된 파일 아이템 스타일 */
+.file-item.mobile-item.selected {
+  background-color: rgba(var(--highlight-color-rgb), 0.1);
+  border: 1px solid var(--highlight-color);
+  padding: 7px; /* 테두리 두께만큼 패딩 감소 */
+}
+
+/* 모바일 환경에서의 컨텍스트 메뉴 (바텀 시트) */
+.context-menu.mobile-context-menu {
+  width: 100%;
+  max-height: 70vh;
+  overflow-y: auto;
+  background-color: var(--bg-primary);
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 -2px 10px var(--shadow-color);
+  animation: slide-up 0.3s ease;
+  padding-bottom: env(safe-area-inset-bottom, 0); /* iOS 안전 영역 처리 */
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* 모바일 컨텍스트 메뉴 헤더 */
+.context-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.context-menu-title {
+  font-weight: 500;
+  font-size: 16px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80%;
+}
+
+.close-context-menu {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+/* 모바일 컨텍스트 메뉴 아이템 */
+.mobile-context-menu .context-menu-item {
+  padding: 16px;
+  font-size: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.mobile-context-menu .context-menu-item:last-child {
+  border-bottom: none;
+}
+
+.mobile-context-menu .context-menu-item.cancel-item {
+  text-align: center;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background-color: var(--bg-secondary);
+  margin-top: 8px;
+}
+
+/* 모바일에서 이름 변경 입력 필드 */
+.file-item.mobile-item .rename-input {
+  padding: 8px;
+  font-size: 14px;
+  border-radius: 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 모바일 디바이스에서 활성 상태 피드백 개선 */
+.file-item.mobile-item:active {
+  background-color: var(--item-hover);
+  opacity: 0.8;
+}
+
+.file-item.mobile-item.directory-item:active {
+  background-color: var(--folder-hover);
+}
+
+/* 모바일에서의 터치 인터랙션 가이드 */
+.file-item.mobile-item.long-touch {
+  transform: scale(0.95);
+  opacity: 0.7;
+}
+
+/* 모바일 지원을 위한 추가 미디어 쿼리 */
+@media (max-width: 360px) {
+  .file-item.mobile-item .file-icon {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .file-item.mobile-item .file-name {
+    font-size: 11px;
+  }
+  
+  .mobile-context-menu .context-menu-item {
+    padding: 14px;
+    font-size: 15px;
+  }
+}
+
+/* 터치 타깃 영역 확대 */
+.file-item.mobile-item {
+  min-height: 70px; /* 충분한 터치 영역 확보 */
+}
+
+/* 다크 모드 컨텍스트 메뉴 최적화 */
+[data-theme="dark"] .context-menu.mobile-context-menu {
+  border-top: 1px solid var(--border-color);
+}/* 모바일 FileItem 스타일 추가 */
+
+/* 모바일 파일 아이템 기본 스타일 */
+.file-item.mobile-item {
+  padding: 8px;
+  touch-action: manipulation; /* 더블 탭 확대 방지 */
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.file-item.mobile-item .file-icon {
+  width: 45px;
+  height: 45px;
+}
+
+.file-item.mobile-item .file-name {
+  font-size: 12px;
+  margin-top: 4px;
+  max-width: 100%;
+  padding: 0 2px;
+}
+
+/* 모바일 선택된 파일 아이템 스타일 */
+.file-item.mobile-item.selected {
+  background-color: rgba(var(--highlight-color-rgb), 0.1);
+  border: 1px solid var(--highlight-color);
+  padding: 7px; /* 테두리 두께만큼 패딩 감소 */
+}
+
+/* 모바일 환경에서의 컨텍스트 메뉴 (바텀 시트) */
+.context-menu.mobile-context-menu {
+  width: 100%;
+  max-height: 70vh;
+  overflow-y: auto;
+  background-color: var(--bg-primary);
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 -2px 10px var(--shadow-color);
+  animation: slide-up 0.3s ease;
+  padding-bottom: env(safe-area-inset-bottom, 0); /* iOS 안전 영역 처리 */
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* 모바일 컨텍스트 메뉴 헤더 */
+.context-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.context-menu-title {
+  font-weight: 500;
+  font-size: 16px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80%;
+}
+
+.close-context-menu {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+/* 모바일 컨텍스트 메뉴 아이템 */
+.mobile-context-menu .context-menu-item {
+  padding: 16px;
+  font-size: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.mobile-context-menu .context-menu-item:last-child {
+  border-bottom: none;
+}
+
+.mobile-context-menu .context-menu-item.cancel-item {
+  text-align: center;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background-color: var(--bg-secondary);
+  margin-top: 8px;
+}
+
+/* 모바일에서 이름 변경 입력 필드 */
+.file-item.mobile-item .rename-input {
+  padding: 8px;
+  font-size: 14px;
+  border-radius: 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 모바일 디바이스에서 활성 상태 피드백 개선 */
+.file-item.mobile-item:active {
+  background-color: var(--item-hover);
+  opacity: 0.8;
+}
+
+.file-item.mobile-item.directory-item:active {
+  background-color: var(--folder-hover);
+}
+
+/* 모바일에서의 터치 인터랙션 가이드 */
+.file-item.mobile-item.long-touch {
+  transform: scale(0.95);
+  opacity: 0.7;
+}
+
+/* 모바일 지원을 위한 추가 미디어 쿼리 */
+@media (max-width: 360px) {
+  .file-item.mobile-item .file-icon {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .file-item.mobile-item .file-name {
+    font-size: 11px;
+  }
+  
+  .mobile-context-menu .context-menu-item {
+    padding: 14px;
+    font-size: 15px;
+  }
+}
+
+/* 터치 타깃 영역 확대 */
+.file-item.mobile-item {
+  min-height: 70px; /* 충분한 터치 영역 확보 */
+}
+
+/* 다크 모드 컨텍스트 메뉴 최적화 */
+[data-theme="dark"] .context-menu.mobile-context-menu {
+  border-top: 1px solid var(--border-color);
+}

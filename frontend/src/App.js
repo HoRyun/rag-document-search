@@ -10,7 +10,7 @@ import "./App.css";
 import "./Theme.css";
 
 // API 기본 URL 설정
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000/fast_api";
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://rag-alb-547296323.ap-northeast-2.elb.amazonaws.com/fast_api";
 
 function App() {
   const [files, setFiles] = useState([]);
@@ -19,6 +19,8 @@ function App() {
   ]);
   const [currentPath, setCurrentPath] = useState("/");
   const [chatbotOpen, setChatbotOpen] = useState(false);
+
+  const [selectedItems, setSelectedItems] = useState([]);
 
   // 인증 관련 상태
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -33,6 +35,20 @@ function App() {
 
   // 테마 상태 (다크 모드)
   const [isDarkMode, setIsDarkMode] = useState(false);
+  
+  // 사이드바 표시 상태 (모바일용)
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // 다운로드 관련
+  const [downloadState, setDownloadState] = useState({
+    isActive: false,
+    progress: 0,
+    fileName: '',
+    error: null,
+    abortController: null
+  });
+
+  const [notification, setNotification] = useState({ visible: false, message: '' });
 
   // 컴포넌트 마운트 시 로그인 상태 확인 및 테마 설정 불러오기
   useEffect(() => {
@@ -50,6 +66,319 @@ function App() {
     }
   }, []);
 
+  const handleSelectedItemsChange = (newSelectedItems) => {
+    setSelectedItems(newSelectedItems);
+    console.log('App.js에서 선택된 아이템 업데이트:', newSelectedItems);
+  };
+
+  const handleDownloadItems = async (selectedFileIds) => {
+    if (!selectedFileIds || selectedFileIds.length === 0) {
+      console.warn('다운로드할 파일이 선택되지 않았습니다.');
+      return;
+    }
+
+    // 큰 파일 다운로드 전 확인
+    const selectedFiles = files.filter(file => selectedFileIds.includes(file.id));
+    const totalSize = selectedFiles.reduce((sum, file) => sum + (file.size || 0), 0);
+    
+    if (totalSize > 100 * 1024 * 1024) { // 100MB 이상
+      const formatBytes = (bytes) => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+      };
+      
+      const confirm = window.confirm(
+        `선택한 파일의 총 크기가 ${formatBytes(totalSize)}입니다. 다운로드하시겠습니까?`
+      );
+      if (!confirm) return;
+    }
+
+    try {
+      setDownloadState(prev => ({ ...prev, isActive: true, error: null }));
+      const token = localStorage.getItem("token");
+
+      // 선택된 파일 정보 가져오기
+      const selectedFiles = files.filter(file => selectedFileIds.includes(file.id));
+      
+      console.log('===== 다운로드 시작 =====');
+      console.log('선택된 파일들:', selectedFiles);
+      console.log('파일 개수:', selectedFiles.length);
+
+      // 단일 파일과 다중 파일 처리 분기
+      if (selectedFiles.length === 1) {
+        await downloadSingleFile(selectedFiles[0], token);
+      } else {
+        await downloadMultipleFiles(selectedFiles, token);
+      }
+
+      console.log('===== 다운로드 완료 =====');
+      
+    } catch (error) {
+      console.error("다운로드 중 오류 발생:", error);
+      
+      // 에러 타입에 따른 사용자 알림
+      if (error.message.includes('취소')) {
+        showNotification('다운로드가 취소되었습니다.');
+      } else if (error.message.includes('네트워크')) {
+        showNotification('네트워크 오류로 다운로드에 실패했습니다. 인터넷 연결을 확인해주세요.');
+      } else if (error.message.includes('권한')) {
+        showNotification('파일 다운로드 권한이 없습니다.');
+      } else if (error.message.includes('404')) {
+        showNotification('파일을 찾을 수 없습니다.');
+      } else {
+        showNotification('다운로드 중 오류가 발생했습니다. 다시 시도해주세요.');
+      }
+    } finally {
+      setDownloadState(prev => ({ ...prev, isActive: false }));
+    }
+  };
+
+  useEffect(() => { //****
+    return () => {
+      if (downloadState.abortController) {
+        downloadState.abortController.abort();
+      }
+    };
+  }, [downloadState.abortController]);
+
+  const downloadSingleFile = async (file, token) => {
+    console.log(`단일 파일 다운로드 시작: ${file.name}`);
+    
+    // AbortController 생성
+    const abortController = new AbortController();
+    setDownloadState(prev => ({ ...prev, abortController }));
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/documents/${file.id}/download`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        signal: abortController.signal // AbortController 신호 추가
+      });
+
+      if (!response.ok) {
+        const errorMessage = response.status === 404 
+          ? '파일을 찾을 수 없습니다.' 
+          : response.status === 403 
+          ? '파일 다운로드 권한이 없습니다.'
+          : `다운로드 실패 (${response.status})`;
+        throw new Error(errorMessage);
+      }
+
+      // Content-Length 헤더에서 파일 크기 가져오기
+      const contentLength = response.headers.get('Content-Length');
+      const totalSize = contentLength ? parseInt(contentLength, 10) : 0;
+      
+      console.log('파일 크기:', totalSize, 'bytes');
+      
+      // Response body를 ReadableStream으로 읽기
+      const reader = response.body.getReader();
+      const chunks = [];
+      let receivedSize = 0;
+      
+      // 진행률 추적을 위한 시간 변수
+      let startTime = Date.now();
+      let lastUpdateTime = startTime;
+      
+      while (true) {
+        // 취소 신호 확인
+        if (abortController.signal.aborted) {
+          reader.cancel();
+          throw new Error('다운로드가 사용자에 의해 취소되었습니다.');
+        }
+        
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        chunks.push(value);
+        receivedSize += value.length;
+        
+        const currentTime = Date.now();
+        
+        // 100ms마다 진행률 업데이트 (너무 자주 업데이트하면 성능 저하)
+        if (currentTime - lastUpdateTime >= 100) {
+          const currentReceived = receivedSize;  // 변수 캡처
+          const currentTotal = totalSize;
+          const currentElapsed = (currentTime - startTime) / 1000;
+          const currentSpeed = currentReceived / currentElapsed;
+          const progress = currentTotal > 0 ? Math.round((currentReceived / currentTotal) * 100) : 0;
+          
+          setDownloadState(prev => ({
+            ...prev,
+            progress,
+            fileName: file.name,
+            receivedSize: currentReceived,
+            totalSize: currentTotal,
+            speed: currentSpeed,
+            elapsedTime: currentElapsed
+          }));
+          
+          lastUpdateTime = currentTime;
+          console.log(`진행률: ${progress}%, 속도: ${formatBytes(currentSpeed)}/s`);
+        }
+      }
+      
+      // 다운로드 완료 - Blob 생성 및 파일 저장
+      const blob = new Blob(chunks, { 
+        type: response.headers.get('Content-Type') || 'application/octet-stream' 
+      });
+      
+      // 파일 다운로드 실행
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      console.log(`파일 다운로드 완료: ${file.name}`);
+      showNotification(`"${file.name}" 다운로드가 완료되었습니다.`);
+      
+    } catch (error) {
+      if (error.name === 'AbortError' || error.message.includes('취소')) {
+        console.log(`파일 다운로드 취소됨: ${file.name}`);
+        throw new Error('다운로드가 취소되었습니다.');
+      } else if (error.message.includes('Failed to fetch')) {
+        throw new Error('네트워크 연결을 확인해주세요.');
+      } else {
+        console.error(`파일 다운로드 오류 (${file.name}):`, error);
+        throw error;
+      }
+    } finally {
+      setDownloadState(prev => ({ ...prev, abortController: null }));
+    }
+  };
+
+  const downloadMultipleFiles = async (files, token) => {
+    console.log(`다중 파일 ZIP 다운로드 시작: ${files.length}개 파일`);
+    
+    // AbortController 생성
+    const abortController = new AbortController();
+    setDownloadState(prev => ({ ...prev, abortController }));
+    
+    try {
+      // 서버에 ZIP 생성 요청
+      const response = await fetch(`${API_BASE_URL}/documents/download-zip`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileIds: files.map(f => f.id),
+          zipName: `selected_files_${new Date().getTime()}.zip`
+        }),
+        signal: abortController.signal // AbortController 신호 추가
+      });
+
+      if (!response.ok) {
+        throw new Error(`ZIP 다운로드 실패: ${response.status} ${response.statusText}`);
+      }
+
+      // Content-Length 헤더에서 ZIP 파일 크기 가져오기
+      const contentLength = response.headers.get('Content-Length');
+      const totalSize = contentLength ? parseInt(contentLength, 10) : 0;
+      
+      console.log('ZIP 파일 크기:', totalSize, 'bytes');
+      
+      // Response body를 ReadableStream으로 읽기
+      const reader = response.body.getReader();
+      const chunks = [];
+      let receivedSize = 0;
+      
+      // 진행률 추적을 위한 시간 변수
+      let startTime = Date.now();
+      let lastUpdateTime = startTime;
+      
+      while (true) {
+        // 취소 신호 확인
+        if (abortController.signal.aborted) {
+          reader.cancel();
+          throw new Error('ZIP 다운로드가 사용자에 의해 취소되었습니다.');
+        }
+        
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        chunks.push(value);
+        receivedSize += value.length;
+        
+        const currentTime = Date.now();
+        
+        // 100ms마다 진행률 업데이트
+        if (currentTime - lastUpdateTime >= 100) {
+          const currentReceived = receivedSize;  // 변수 캡처
+          const currentTotal = totalSize;
+          const currentElapsed = (currentTime - startTime) / 1000;
+          const currentSpeed = currentReceived / currentElapsed;
+          const progress = currentTotal > 0 ? Math.round((currentReceived / currentTotal) * 100) : 0;
+          
+          setDownloadState(prev => ({
+            ...prev,
+            progress,
+            fileName: `${files.length}개 파일`,
+            receivedSize: currentReceived,
+            totalSize: currentTotal,
+            speed: currentSpeed,
+            elapsedTime: currentElapsed,
+            isZip: true
+          }));
+                      
+          lastUpdateTime = currentTime;
+          console.log(`ZIP 진행률: ${progress}%, 속도: ${formatBytes(currentSpeed)}/s`);
+        }
+      }
+      
+      // ZIP 다운로드 완료 - Blob 생성 및 파일 저장
+      const blob = new Blob(chunks, { type: 'application/zip' });
+      
+      // 파일 다운로드 실행
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `selected_files_${new Date().getTime()}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      console.log(`ZIP 다운로드 완료: ${files.length}개 파일`);
+      showNotification(`${files.length}개 파일이 ZIP으로 다운로드되었습니다.`);
+      
+    } catch (error) {
+      if (error.name === 'AbortError' || error.message.includes('취소')) {
+        console.log(`ZIP 다운로드 취소됨: ${files.length}개 파일`);
+        throw new Error('ZIP 다운로드가 취소되었습니다.');
+      } else {
+        console.error('ZIP 다운로드 오류:', error);
+        throw error;
+      }
+    } finally {
+      // AbortController 정리
+      setDownloadState(prev => ({ ...prev, abortController: null }));
+    }
+  };
+
+  const formatBytes = (bytes, decimals = 1) => {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+  };
+
   // 테마 토글 핸들러
   const toggleTheme = () => {
     const newTheme = !isDarkMode;
@@ -63,6 +392,23 @@ function App() {
     
     // 테마 설정 저장
     localStorage.setItem("theme", newTheme ? "dark" : "light");
+  };
+
+  // 사이드바 토글 핸들러
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  // 사이드바 닫기 핸들러
+  const closeSidebar = () => {
+    setSidebarOpen(false);
+  };
+
+  const showNotification = (message) => {
+    setNotification({ visible: true, message });
+    setTimeout(() => {
+      setNotification({ visible: false, message: '' });
+    }, 3000);
   };
 
   // 컴포넌트 마운트 시 로그인 상태 확인
@@ -733,6 +1079,10 @@ function App() {
   const handleFolderOpen = (folderPath) => {
     console.log(`폴더 열기: ${folderPath}`);
     setCurrentPath(folderPath);
+    // 모바일에서 폴더 이동 시 사이드바 닫기
+    if (window.innerWidth <= 768) {
+      setSidebarOpen(false);
+    }
   };
 
   // 질문 처리
@@ -823,13 +1173,23 @@ function App() {
   return (
     <div className="app">
       <Header onLogout={handleLogout} username={user?.username} isDarkMode={isDarkMode} toggleTheme={toggleTheme}/>
+      
+      <button className="sidebar-toggle-btn" onClick={toggleSidebar}>
+        ☰
+      </button>
+      
+      {sidebarOpen && <div className="sidebar-overlay active" onClick={closeSidebar}></div>}
+      
       <div className="main-container">
         <Sidebar
+          className={sidebarOpen ? 'active' : ''}
           directories={directories}
           currentPath={currentPath}
           setCurrentPath={setCurrentPath}
           onRefresh={fetchDirectories}
+          closeSidebar={closeSidebar}
         />
+        
         <FileDisplay
           files={files}
           directories={directories}
@@ -837,20 +1197,42 @@ function App() {
           onAddFile={handleAddFile}
           onCreateFolder={handleCreateFolder}
           onMoveItem={handleMoveItem}
-          onCopyItem={handleCopyItem} // 새로 추가된 props
+          onCopyItem={handleCopyItem}
           onDeleteItem={handleDeleteItem}
           onRenameItem={handleRenameItem}
           onFolderOpen={handleFolderOpen}
           onRefresh={fetchDocuments}
           isLoading={isLoading}
+          selectedItems={selectedItems}
+          onSelectedItemsChange={handleSelectedItemsChange}
+          onDownloadItems={handleDownloadItems}
+          downloadState={downloadState}
+          onDownloadCancel={() => {
+            if (downloadState.abortController) {
+              downloadState.abortController.abort();
+            }
+          }}
         />
       </div>
+      
       <Chatbot
         isOpen={chatbotOpen}
         toggleChatbot={toggleChatbot}
         onQuery={handleQuery}
         isQuerying={isQuerying}
+        files={files}
+        directories={directories}
+        selectedItems={selectedItems} // ← 실제 상태 전달
+        currentPath={currentPath}
+        onRefreshFiles={fetchDocuments}
+        onShowNotification={showNotification}
       />
+
+      {notification.visible && (
+        <div className="notification">
+          {notification.message}
+        </div>
+      )}
     </div>
   );
 }

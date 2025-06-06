@@ -105,7 +105,7 @@ const ChatbotGuide = ({ onClose, onTryExample }) => {
       </div>
       
       <div className="guide-footer">
-        <button className="close-btn" onClick={onClose}>가이드 닫기</button>
+        <button className="close-btn" onClick={onClose}>닫기</button>
       </div>
     </div>
   );
