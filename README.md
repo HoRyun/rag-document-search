@@ -21,8 +21,7 @@ Retrieval-Augmented Generation(RAG) 기술을 활용한 문서 검색 및 질의
 - **FastAPI**: 고성능 Python 기반 API 프레임워크
 - **LangChain**: LLM 애플리케이션 개발 프레임워크
 - **PostgreSQL (AWS RDS)**: 관계형 데이터베이스 및 벡터 확장 활용
-- **faiss**: 벡터 데이터 검색 엔진
-
+- **Redis** 
 
 ### 프론트엔드
 

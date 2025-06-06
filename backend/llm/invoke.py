@@ -18,8 +18,8 @@ def get_operation_type(command: str) -> str:
     prompt = PromptTemplate.from_template(
         """
         <Instructions>
-You analyze the <User's command> and determine what operation the user wants to perform.
-The operation the user requests is always one of the following:
+You must analyze <User's command> and determine what task the user wants to perform.
+The task the user requests is always one of the following:
 
 * move
 * copy
@@ -29,13 +29,16 @@ The operation the user requests is always one of the following:
 * search
 * summarize
 
-If <User's command> matches one of the above items, output it in the following format.
-For example, if the user wants the operation "move," output as follows:
+If <User's command> matches one of the above tasks, output it in the following format:
+For example, if the user's desired task is move, output:
 <operation.type>move</operation.type>
 
-Summary of your task:
+If <User's command> is incompatible with this system or cannot be understood, output:
+<operation.type>error</operation.type>
 
-1. Identify the operation the user wants.
+Summary of your duties:
+
+1. Identify the task the user wants to perform.
 2. Respond according to the specified output format.
 
 Note:
@@ -65,7 +68,9 @@ Write only the output.
     try:
         result = chain.invoke(command)
         print(f"Operation type: {result}")
-        return result
+        # 모델 출력을 파싱하여 operation_type을 추출
+        operation_type = result.split("<operation.type>")[1].split("</operation.type>")[0]
+        return operation_type
     except Exception as e:
         print(f"Error in get_operation_type: {e}")
         return "error"

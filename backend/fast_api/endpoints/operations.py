@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # 메서드 import
 from debug import debugging
@@ -11,6 +11,7 @@ from db.models import User
 from fast_api.security import get_current_user
 from llm import invoke
 from fast_api.endpoints import op_schemas
+from services.operation_store import get_operation_store, OperationStore
 
 import uuid
 import re
@@ -27,7 +28,8 @@ logger = logging.getLogger(__name__)
 async def stage_operation(
     request: op_schemas.StageOperationRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    operation_store: OperationStore = Depends(get_operation_store)
 ):
     """
     자연어 명령을 분석하고 작업을 준비하는 엔드포인트
@@ -36,58 +38,97 @@ async def stage_operation(
         request: 사용자 명령과 컨텍스트 정보
         current_user: 현재 인증된 사용자
         db: 데이터베이스 세션
+        operation_store: Redis 작업 저장소
     
     Returns:
         OperationResponse: 준비된 작업 정보
     """
     logger.info(f"Stage operation request from user {current_user.id}: {request.command}")
     # debugging.stop_debugger()
-    # command 값 접근
-    command = request.command
+    
+    try:
+        # command 값 접근
+        command = request.command
 
-    # context 값 접근
-    context = request.context
+        # context 값 접근
+        context = request.context
 
-    # context의 하위 아이템 접근
-    current_path = context.currentPath
-    selected_files = context.selectedFiles
-    available_folders = context.availableFolders
-    timestamp = context.timestamp
+        # context의 하위 아이템 접근
+        current_path = context.currentPath
+        selected_files = context.selectedFiles
+        available_folders = context.availableFolders
+        timestamp = context.timestamp
 
-    # 타입을 결정.
-    operation_result = await invoke.get_operation_type(command)
-    # 타입 결정 결과 분류.
-    operation_type = operation_result["value"]
-    error_type = operation_result.get("value_type", None)
+        # 타입을 결정.
+        operation_type = invoke.get_operation_type(command)
 
-    # 타입 별 AI 호출 분기. 각 함수의 매개변수로 command, context전달.
-    if operation_type == "move":
-        result = await process_move(command, context)
-    elif operation_type == "copy":
-        result = await process_copy(command, context)
-    elif operation_type == "delete":
-        result = process_delete(command, context)
-    elif operation_type == "rename":
-        result = process_rename(command, context)
-    elif operation_type == "create_folder":
-        result = process_create_folder(command, context)
-    elif operation_type == "search":
-        result = process_search(command)
-    elif operation_type == "summarize":
-        result = process_summarize(command, context)
-    elif operation_type == "error":
-        result = process_error(command, context, error_type)
+        # 타입 별 AI 호출 분기. 각 함수의 매개변수로 command, context전달.
+        if operation_type == "move":
+            result = await process_move(command, context)
+        elif operation_type == "copy":
+            result = await process_copy(command, context)
+        elif operation_type == "delete":
+            result = process_delete(command, context)
+        elif operation_type == "rename":
+            result = process_rename(command, context)
+        elif operation_type == "create_folder":
+            result = process_create_folder(command, context)
+        elif operation_type == "search":
+            result = process_search(command)
+        elif operation_type == "summarize":
+            result = process_summarize(command, context)
+        elif operation_type == "error":
+            result = process_error(command, operation_type)
 
+        # ✅ Redis에 작업 정보 저장 (error 타입 제외)
+        if operation_type != "error":
+            operation_data = {
+                "operation_id": result.operationId,
+                "command": command,
+                "context": {
+                    "currentPath": current_path,
+                    "selectedFiles": [dict(file) for file in selected_files],
+                    "availableFolders": [dict(folder) for folder in available_folders],
+                    "timestamp": timestamp.isoformat() if timestamp else datetime.now().isoformat()
+                },
+                "operation": dict(result.operation),
+                "requiresConfirmation": result.requiresConfirmation,
+                "riskLevel": result.riskLevel,
+                "preview": dict(result.preview),
+                "user_id": current_user.id,
+                "created_at": datetime.now().isoformat()
+            }
+            
+            # Redis에 저장
+            if not operation_store.store_operation(result.operationId, operation_data):
+                logger.error(f"Failed to store operation {result.operationId} in Redis")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="작업 정보 저장에 실패했습니다"
+                )
+            
+            logger.info(f"Operation {result.operationId} stored successfully in Redis")
 
-    # 결과 반환
-    return result
+        # 결과 반환
+        return result
+        
+    except HTTPException:
+        # HTTPException은 그대로 다시 발생
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in stage_operation: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="작업 준비 중 오류가 발생했습니다"
+        )
 
 @router.post("/{operation_id}/execute", response_model=op_schemas.ExecutionResponse)
 async def execute_operation(
     operation_id: str,
     request: op_schemas.ExecuteOperationRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    operation_store: OperationStore = Depends(get_operation_store)
 ):
     """
     준비된 작업을 실행하는 엔드포인트
@@ -97,6 +138,7 @@ async def execute_operation(
         request: 사용자 확인 및 옵션
         current_user: 현재 인증된 사용자
         db: 데이터베이스 세션
+        operation_store: Redis 작업 저장소
     
     Returns:
         ExecutionResponse: 실행 결과 정보
@@ -104,14 +146,63 @@ async def execute_operation(
     logger.info(f"Execute operation {operation_id} for user {current_user.id}")
     # debugging.stop_debugger()
     
-    # TODO: 실제 로직 구현
-    pass
+    try:
+        # Redis에서 작업 정보 조회
+        operation_data = operation_store.get_operation(operation_id)
+        
+        if not operation_data:
+            logger.warning(f"Operation not found: {operation_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="작업을 찾을 수 없거나 만료되었습니다"
+            )
+        
+        # 사용자 권한 확인
+        if operation_data.get("user_id") != current_user.id:
+            logger.warning(f"Unauthorized access attempt for operation {operation_id} by user {current_user.id}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="이 작업에 대한 권한이 없습니다"
+            )
+        
+        # 작업 타입 확인
+        operation = operation_data.get("operation", {})
+        operation_type = operation.get("type")
+        
+        logger.info(f"Executing {operation_type} operation: {operation_id}")
+        
+        # 작업 타입별 실제 실행 로직
+        execution_result = await execute_operation_logic(operation_type, operation, request.userOptions, current_user, db)
+        
+        # ~~실행 완료 후 Redis에서 작업 정보 삭제~~ 실행 후 삭제하면 안 됨.
+        # operation_store.delete_operation(operation_id)
+        
+        # 성공 응답 생성
+        response = op_schemas.ExecutionResponse(
+            message=execution_result.get("message", "작업이 성공적으로 완료되었습니다"),
+            undoAvailable=execution_result.get("undoAvailable", False),
+            undoDeadline=execution_result.get("undoDeadline")
+        )
+        
+        logger.info(f"Operation {operation_id} executed successfully")
+        return response
+        
+    except HTTPException:
+        # HTTPException은 그대로 다시 발생
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error executing operation {operation_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="작업 실행 중 오류가 발생했습니다"
+        )
 
 @router.post("/{operation_id}/cancel", response_model=op_schemas.BasicResponse)
 async def cancel_operation(
     operation_id: str,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    operation_store: OperationStore = Depends(get_operation_store)
 ):
     """
     준비된 작업을 취소하는 엔드포인트
@@ -120,21 +211,60 @@ async def cancel_operation(
         operation_id: 취소할 작업의 ID
         current_user: 현재 인증된 사용자
         db: 데이터베이스 세션
+        operation_store: Redis 작업 저장소
     
     Returns:
         BasicResponse: 취소 결과 메시지
     """
     logger.info(f"Cancel operation {operation_id} for user {current_user.id}")
     
-    # TODO: 실제 로직 구현
-    pass
+    try:
+        # Redis에서 작업 정보 조회
+        operation_data = operation_store.get_operation(operation_id)
+        
+        if not operation_data:
+            logger.warning(f"Operation not found for cancellation: {operation_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="취소할 작업을 찾을 수 없거나 이미 만료되었습니다"
+            )
+        
+        # 사용자 권한 확인
+        if operation_data.get("user_id") != current_user.id:
+            logger.warning(f"Unauthorized cancel attempt for operation {operation_id} by user {current_user.id}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="이 작업을 취소할 권한이 없습니다"
+            )
+        
+        # Redis에서 작업 정보 삭제
+        if operation_store.delete_operation(operation_id):
+            logger.info(f"Operation {operation_id} cancelled successfully")
+            return op_schemas.BasicResponse(message="작업이 취소되었습니다")
+        else:
+            logger.warning(f"Failed to delete operation {operation_id} from Redis")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="작업 취소 중 오류가 발생했습니다"
+            )
+            
+    except HTTPException:
+        # HTTPException은 그대로 다시 발생
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error cancelling operation {operation_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="작업 취소 중 오류가 발생했습니다"
+        )
 
 @router.post("/{operation_id}/undo", response_model=op_schemas.BasicResponse)
 async def undo_operation(
     operation_id: str,
     request: op_schemas.UndoOperationRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    operation_store: OperationStore = Depends(get_operation_store)
 ):
     """
     실행된 작업을 되돌리는 엔드포인트
@@ -144,14 +274,59 @@ async def undo_operation(
         request: 되돌리기 사유 및 시간
         current_user: 현재 인증된 사용자
         db: 데이터베이스 세션
+        operation_store: Redis 작업 저장소
     
     Returns:
         BasicResponse: 되돌리기 결과 메시지
     """
     logger.info(f"Undo operation {operation_id} for user {current_user.id}, reason: {request.reason}")
     
-    # TODO: 실제 로직 구현
-    pass
+    try:
+        # 실행된 작업의 undo 정보 조회 (별도 키로 저장되어 있어야 함)
+        undo_data = operation_store.get_operation(f"undo:{operation_id}")
+        
+        if not undo_data:
+            logger.warning(f"Undo data not found for operation: {operation_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="되돌릴 수 있는 작업을 찾을 수 없거나 되돌리기 기한이 만료되었습니다"
+            )
+        
+        # 사용자 권한 확인
+        if undo_data.get("user_id") != current_user.id:
+            logger.warning(f"Unauthorized undo attempt for operation {operation_id} by user {current_user.id}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="이 작업을 되돌릴 권한이 없습니다"
+            )
+        
+        # 작업 타입별 undo 로직 실행
+        operation_type = undo_data.get("operation_type")
+        undo_result = await execute_undo_logic(operation_type, undo_data, request.reason, current_user, db)
+        
+        if undo_result.get("success", False):
+            # undo 정보 삭제
+            operation_store.delete_operation(f"undo:{operation_id}")
+            
+            logger.info(f"Operation {operation_id} undone successfully")
+            return op_schemas.BasicResponse(
+                message=undo_result.get("message", "작업이 성공적으로 되돌려졌습니다")
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=undo_result.get("error", "작업 되돌리기에 실패했습니다")
+            )
+            
+    except HTTPException:
+        # HTTPException은 그대로 다시 발생
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error undoing operation {operation_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="작업 되돌리기 중 오류가 발생했습니다"
+        )
 
 
 # operation_type별 function 만들기
@@ -296,7 +471,7 @@ def process_delete(command, context):
         }
     )
 
-def process_error(command, context, error_type):
+def process_error(command, operation_type):
     """
     오류 상황을 처리하는 함수
     
@@ -312,17 +487,11 @@ def process_error(command, context, error_type):
     operation_id = "error-"+str(uuid.uuid4())
     
     # 에러 타입별 메시지 및 가이드 설정
-    if error_type == "err-1":
+    if operation_type == "error":
         # 부정표현 또는 파일관련이지만 매칭안됨
-        message = "명령을 이해할 수 없습니다. 다시 입력해주세요."
+        message = "파일 관리와 관련없는 명령이거나, 명령을 이해할 수 없습니다. 다시 입력해주세요."
         description = f"입력하신 명령 '{command}'을(를) 처리할 수 없습니다."
-        warnings = ["'파일 이동', '파일 복사', '파일 삭제' 등의 명령어를 사용해보세요."]
-    elif error_type == "err-2":
-        # 파일과 관련없는 명령
-        message = "파일 관리와 관련없는 명령입니다."
-        description = f"입력하신 명령 '{command}'은(는) 파일 관리와 관련이 없습니다."
-        warnings = ["이 시스템은 파일 관리를 위한 도구입니다.", 
-                    "'파일 검색', '폴더 생성' 등의 명령어를 사용해보세요."]
+        warnings = ["적절한 명령을 다시 입력해주십시오."]
     else:
         # 기본 에러 메시지
         message = "알 수 없는 오류가 발생했습니다."
@@ -330,14 +499,14 @@ def process_error(command, context, error_type):
         warnings = ["잠시 후 다시 시도해주세요."]
     
     # 로그 기록
-    logger.warning(f"Error processing command: '{command}', Error type: {error_type}")
+    logger.warning(f"Error processing command: '{command}', Error type: error")
     
     # StageOperationResponse 객체 생성
     return op_schemas.StageOperationResponse(
         operationId=operation_id,
         operation={
             "type": "error",
-            "error_type": error_type,
+            "error_type": "error",
             "message": message
         },
         requiresConfirmation=False,
@@ -1152,3 +1321,232 @@ def generate_summarize_description(context):
             result_desc = f"선택한 {file_count}개 문서의 주요 내용을 요약합니다."
 
     return result_desc
+
+
+# ===== 작업 실행 로직 헬퍼 함수들 =====
+
+async def execute_operation_logic(operation_type: str, operation: dict, user_options: dict, current_user: User, db: Session) -> dict:
+    """
+    작업 타입별 실제 실행 로직
+    
+    Args:
+        operation_type: 작업 타입
+        operation: 작업 상세 정보
+        user_options: 사용자 옵션
+        current_user: 현재 사용자
+        db: 데이터베이스 세션
+        
+    Returns:
+        dict: 실행 결과 정보
+    """
+    logger.info(f"Executing operation logic for type: {operation_type}")
+    
+    try:
+        if operation_type == "move":
+            return await execute_move_logic(operation, user_options, current_user, db)
+        elif operation_type == "copy":
+            return await execute_copy_logic(operation, user_options, current_user, db)
+        elif operation_type == "delete":
+            return await execute_delete_logic(operation, user_options, current_user, db)
+        elif operation_type == "rename":
+            return await execute_rename_logic(operation, user_options, current_user, db)
+        elif operation_type == "create_folder":
+            return await execute_create_folder_logic(operation, user_options, current_user, db)
+        elif operation_type == "search":
+            return await execute_search_logic(operation, user_options, current_user, db)
+        elif operation_type == "summarize":
+            return await execute_summarize_logic(operation, user_options, current_user, db)
+        else:
+            logger.error(f"Unknown operation type: {operation_type}")
+            return {
+                "message": f"지원되지 않는 작업 타입입니다: {operation_type}",
+                "undoAvailable": False
+            }
+            
+    except Exception as e:
+        logger.error(f"Error executing {operation_type} operation: {e}")
+        return {
+            "message": f"작업 실행 중 오류가 발생했습니다: {str(e)}",
+            "undoAvailable": False
+        }
+
+
+async def execute_move_logic(operation: dict, user_options: dict, current_user: User, db: Session) -> dict:
+    """이동 작업 실행 로직"""
+    # TODO: 실제 파일 이동 로직 구현
+    # 여기에 documents.py의 파일 이동 로직을 연동
+    targets = operation.get("targets", [])
+    destination = operation.get("destination", "/")
+    
+    logger.info(f"Moving {len(targets)} files to {destination}")
+    
+    # 시뮬레이션 (실제 구현 시 documents.py의 로직 사용)
+    return {
+        "message": f"{len(targets)}개 파일이 {destination}로 이동되었습니다",
+        "undoAvailable": True,
+        "undoDeadline": (datetime.now() + timedelta(minutes=10)).isoformat()
+    }
+
+
+async def execute_copy_logic(operation: dict, user_options: dict, current_user: User, db: Session) -> dict:
+    """복사 작업 실행 로직"""
+    # TODO: 실제 파일 복사 로직 구현
+    targets = operation.get("targets", [])
+    destination = operation.get("destination", "/")
+    
+    logger.info(f"Copying {len(targets)} files to {destination}")
+    
+    return {
+        "message": f"{len(targets)}개 파일이 {destination}로 복사되었습니다",
+        "undoAvailable": False  # 복사는 일반적으로 undo 불가
+    }
+
+
+async def execute_delete_logic(operation: dict, user_options: dict, current_user: User, db: Session) -> dict:
+    """삭제 작업 실행 로직"""
+    # TODO: 실제 파일 삭제 로직 구현
+    targets = operation.get("targets", [])
+    
+    logger.info(f"Deleting {len(targets)} files")
+    
+    return {
+        "message": f"{len(targets)}개 파일이 삭제되었습니다",
+        "undoAvailable": False  # 삭제는 일반적으로 undo 불가 (복구 어려움)
+    }
+
+
+async def execute_rename_logic(operation: dict, user_options: dict, current_user: User, db: Session) -> dict:
+    """이름 변경 작업 실행 로직"""
+    # TODO: 실제 파일 이름 변경 로직 구현
+    target = operation.get("target", {})
+    new_name = operation.get("newName", "")
+    
+    logger.info(f"Renaming file to {new_name}")
+    
+    return {
+        "message": f"파일 이름이 '{new_name}'으로 변경되었습니다",
+        "undoAvailable": True,
+        "undoDeadline": (datetime.now() + timedelta(minutes=10)).isoformat()
+    }
+
+
+async def execute_create_folder_logic(operation: dict, user_options: dict, current_user: User, db: Session) -> dict:
+    """폴더 생성 작업 실행 로직"""
+    # TODO: 실제 폴더 생성 로직 구현
+    folder_name = operation.get("folderName", "")
+    parent_path = operation.get("parentPath", "/")
+    
+    logger.info(f"Creating folder '{folder_name}' in {parent_path}")
+    
+    return {
+        "message": f"'{folder_name}' 폴더가 생성되었습니다",
+        "undoAvailable": True,
+        "undoDeadline": (datetime.now() + timedelta(minutes=10)).isoformat()
+    }
+
+
+async def execute_search_logic(operation: dict, user_options: dict, current_user: User, db: Session) -> dict:
+    """검색 작업 실행 로직"""
+    # TODO: 실제 검색 로직 구현
+    search_term = operation.get("searchTerm", "")
+    
+    logger.info(f"Searching for: {search_term}")
+    
+    return {
+        "message": f"'{search_term}' 검색이 완료되었습니다",
+        "undoAvailable": False  # 검색은 undo 불필요
+    }
+
+
+async def execute_summarize_logic(operation: dict, user_options: dict, current_user: User, db: Session) -> dict:
+    """요약 작업 실행 로직"""
+    # TODO: 실제 문서 요약 로직 구현
+    targets = operation.get("targets", [])
+    
+    logger.info(f"Summarizing {len(targets)} documents")
+    
+    return {
+        "message": f"{len(targets)}개 문서의 요약이 완료되었습니다",
+        "undoAvailable": False  # 요약은 undo 불필요
+    }
+
+
+# ===== Undo 로직 헬퍼 함수들 =====
+
+async def execute_undo_logic(operation_type: str, undo_data: dict, reason: str, current_user: User, db: Session) -> dict:
+    """
+    작업 타입별 undo 로직
+    
+    Args:
+        operation_type: 원본 작업 타입
+        undo_data: undo를 위한 데이터
+        reason: undo 사유
+        current_user: 현재 사용자
+        db: 데이터베이스 세션
+        
+    Returns:
+        dict: undo 결과 정보
+    """
+    logger.info(f"Executing undo logic for type: {operation_type}, reason: {reason}")
+    
+    try:
+        if operation_type == "move":
+            return await undo_move_logic(undo_data, reason, current_user, db)
+        elif operation_type == "rename":
+            return await undo_rename_logic(undo_data, reason, current_user, db)
+        elif operation_type == "create_folder":
+            return await undo_create_folder_logic(undo_data, reason, current_user, db)
+        else:
+            return {
+                "success": False,
+                "error": f"'{operation_type}' 작업은 되돌리기를 지원하지 않습니다"
+            }
+            
+    except Exception as e:
+        logger.error(f"Error undoing {operation_type} operation: {e}")
+        return {
+            "success": False,
+            "error": f"되돌리기 중 오류가 발생했습니다: {str(e)}"
+        }
+
+
+async def undo_move_logic(undo_data: dict, reason: str, current_user: User, db: Session) -> dict:
+    """이동 작업 되돌리기 로직"""
+    # TODO: 실제 파일 이동 되돌리기 로직 구현
+    original_location = undo_data.get("original_location", "/")
+    files = undo_data.get("files", [])
+    
+    logger.info(f"Undoing move operation: moving {len(files)} files back to {original_location}")
+    
+    return {
+        "success": True,
+        "message": f"{len(files)}개 파일이 원래 위치로 되돌려졌습니다"
+    }
+
+
+async def undo_rename_logic(undo_data: dict, reason: str, current_user: User, db: Session) -> dict:
+    """이름 변경 작업 되돌리기 로직"""
+    # TODO: 실제 파일 이름 되돌리기 로직 구현
+    original_name = undo_data.get("original_name", "")
+    current_name = undo_data.get("current_name", "")
+    
+    logger.info(f"Undoing rename operation: changing '{current_name}' back to '{original_name}'")
+    
+    return {
+        "success": True,
+        "message": f"파일 이름이 '{original_name}'으로 되돌려졌습니다"
+    }
+
+
+async def undo_create_folder_logic(undo_data: dict, reason: str, current_user: User, db: Session) -> dict:
+    """폴더 생성 작업 되돌리기 로직"""
+    # TODO: 실제 폴더 삭제 로직 구현
+    folder_path = undo_data.get("folder_path", "")
+    folder_name = undo_data.get("folder_name", "")
+    
+    logger.info(f"Undoing create folder operation: deleting folder '{folder_name}' at {folder_path}")
+    
+    return {
+        "success": True,
+        "message": f"생성된 폴더 '{folder_name}'가 삭제되었습니다"
+    }
