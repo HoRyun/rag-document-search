@@ -44,6 +44,8 @@ async def stage_operation(
         OperationResponse: 준비된 작업 정보
     """
     logger.info(f"Stage operation request from user {current_user.id}: {request.command}")
+    
+    # debugging.redis_store_test('op-4db0b366-fa7e-44f6-9813-5fc875dd9998')
     # debugging.stop_debugger()
     
     try:
@@ -82,22 +84,26 @@ async def stage_operation(
 
         # ✅ Redis에 작업 정보 저장 (error 타입 제외)
         if operation_type != "error":
-            operation_data = {
-                "operation_id": result.operationId,
-                "command": command,
-                "context": {
+            # Pydantic 모델을 사용하여 데이터 구조 검증
+            operation_store_data = op_schemas.OperationStoreData(
+                operation_id=result.operationId,
+                command=command,
+                context={
                     "currentPath": current_path,
                     "selectedFiles": [dict(file) for file in selected_files],
                     "availableFolders": [dict(folder) for folder in available_folders],
                     "timestamp": timestamp.isoformat() if timestamp else datetime.now().isoformat()
                 },
-                "operation": dict(result.operation),
-                "requiresConfirmation": result.requiresConfirmation,
-                "riskLevel": result.riskLevel,
-                "preview": dict(result.preview),
-                "user_id": current_user.id,
-                "created_at": datetime.now().isoformat()
-            }
+                operation=dict(result.operation),
+                requiresConfirmation=result.requiresConfirmation,
+                riskLevel=result.riskLevel,
+                preview=dict(result.preview),
+                user_id=current_user.id,
+                created_at=datetime.now().isoformat()
+            )
+            
+            # 딕셔너리로 변환하여 Redis에 저장
+            operation_data = operation_store_data.dict()
             
             # Redis에 저장
             if not operation_store.store_operation(result.operationId, operation_data):
@@ -181,10 +187,16 @@ async def execute_operation(
         response = op_schemas.ExecutionResponse(
             message=execution_result.get("message", "작업이 성공적으로 완료되었습니다"),
             undoAvailable=execution_result.get("undoAvailable", False),
-            undoDeadline=execution_result.get("undoDeadline")
+            undoDeadline=execution_result.get("undoDeadline"),
+            results=execution_result.get("results"),
+            searchResults=execution_result.get("searchResults"),
+            summaries=execution_result.get("summaries")
         )
         
         logger.info(f"Operation {operation_id} executed successfully")
+        # 저장소 테스트
+        # debugging.redis_store_test(operation_id)
+
         return response
         
     except HTTPException:
@@ -282,9 +294,13 @@ async def undo_operation(
     logger.info(f"Undo operation {operation_id} for user {current_user.id}, reason: {request.reason}")
     
     try:
-        # 실행된 작업의 undo 정보 조회 (별도 키로 저장되어 있어야 함)
-        undo_data = operation_store.get_operation(f"undo:{operation_id}")
+        # 실행되었던 작업 정보 조회 
+        undo_data = operation_store.get_operation(operation_id)
         
+        # 저장소 테스트
+        # debugging.redis_store_test(operation_id)
+        # debugging.stop_debugger()
+
         if not undo_data:
             logger.warning(f"Undo data not found for operation: {operation_id}")
             raise HTTPException(
@@ -301,12 +317,12 @@ async def undo_operation(
             )
         
         # 작업 타입별 undo 로직 실행
-        operation_type = undo_data.get("operation_type")
+        operation_type = undo_data.get("operation", {}).get("type")
         undo_result = await execute_undo_logic(operation_type, undo_data, request.reason, current_user, db)
         
         if undo_result.get("success", False):
-            # undo 정보 삭제
-            operation_store.delete_operation(f"undo:{operation_id}")
+            # 실행되었던 작업 정보 삭제
+            operation_store.delete_operation(operation_id)
             
             logger.info(f"Operation {operation_id} undone successfully")
             return op_schemas.BasicResponse(
@@ -347,7 +363,6 @@ async def process_move(command, context):
     # 작업 설명 요약 생성.
     description = get_description(context, destination, 'move')
 
-
     # 데이터 준비
     operationId = "op-"+str(uuid.uuid4())
     
@@ -368,20 +383,24 @@ async def process_move(command, context):
     
     warnings = [] 
     
+    # Pydantic 모델 사용
+    move_operation = op_schemas.MoveOperation(
+        targets=context.selectedFiles,
+        destination=destination
+    )
+    
+    preview = op_schemas.OperationPreview(
+        description=description,
+        warnings=warnings
+    )
+    
     # StageOperationResponse 객체 생성
     return op_schemas.StageOperationResponse(
         operationId=operationId,
-        operation={
-            "type": "move",
-            "targets": context.selectedFiles,
-            "destination": destination
-        },
+        operation=move_operation,
         requiresConfirmation=True,
         riskLevel="medium",
-        preview={
-            "description": description,
-            "warnings": warnings
-        }
+        preview=preview
     )
 
 async def process_copy(command, context):
@@ -400,7 +419,6 @@ async def process_copy(command, context):
     # 작업 설명 요약 생성.
     description = get_description(context, destination, 'copy')
 
-
     # 데이터 준비
     operationId = "op-"+str(uuid.uuid4())
     
@@ -421,20 +439,24 @@ async def process_copy(command, context):
     
     warnings = [] 
     
+    # Pydantic 모델 사용
+    copy_operation = op_schemas.CopyOperation(
+        targets=context.selectedFiles,
+        destination=destination
+    )
+    
+    preview = op_schemas.OperationPreview(
+        description=description,
+        warnings=warnings
+    )
+    
     # StageOperationResponse 객체 생성
     return op_schemas.StageOperationResponse(
         operationId=operationId,
-        operation={
-            "type": "copy",
-            "targets": context.selectedFiles,
-            "destination": destination
-        },
+        operation=copy_operation,
         requiresConfirmation=True,
         riskLevel="low",
-        preview={
-            "description": description,
-            "warnings": warnings
-        }
+        preview=preview
     )
 
 def process_delete(command, context):
@@ -451,24 +473,27 @@ def process_delete(command, context):
     # 작업 설명 요약 생성.
     description = get_description(context, None, 'delete')
 
-
     # 데이터 준비
     operationId = "op-"+str(uuid.uuid4())
     warnings = [] 
     
+    # Pydantic 모델 사용
+    delete_operation = op_schemas.DeleteOperation(
+        targets=context.selectedFiles
+    )
+    
+    preview = op_schemas.OperationPreview(
+        description=description,
+        warnings=warnings
+    )
+    
     # StageOperationResponse 객체 생성
     return op_schemas.StageOperationResponse(
         operationId=operationId,
-        operation={
-            "type": "delete",
-            "targets": context.selectedFiles
-        },
+        operation=delete_operation,
         requiresConfirmation=True,
         riskLevel="high",
-        preview={
-            "description": description,
-            "warnings": warnings
-        }
+        preview=preview
     )
 
 def process_error(command, operation_type):
@@ -501,20 +526,24 @@ def process_error(command, operation_type):
     # 로그 기록
     logger.warning(f"Error processing command: '{command}', Error type: error")
     
+    # Pydantic 모델 사용
+    error_operation = op_schemas.ErrorOperation(
+        error_type="error",
+        message=message
+    )
+    
+    preview = op_schemas.OperationPreview(
+        description=description,
+        warnings=warnings
+    )
+    
     # StageOperationResponse 객체 생성
     return op_schemas.StageOperationResponse(
         operationId=operation_id,
-        operation={
-            "type": "error",
-            "error_type": "error",
-            "message": message
-        },
+        operation=error_operation,
         requiresConfirmation=False,
         riskLevel="none",
-        preview={
-            "description": description,
-            "warnings": warnings
-        }
+        preview=preview
     )
 
 def process_rename(command, context):
@@ -535,19 +564,23 @@ def process_rename(command, context):
     description = generate_rename_description(context, new_name)
     # debugging.stop_debugger()
 
+    # Pydantic 모델 사용
+    rename_operation = op_schemas.RenameOperation(
+        target=context.selectedFiles,
+        newName=new_name
+    )
+    
+    preview = op_schemas.OperationPreview(
+        description=description
+    )
+
     # StageOperationResponse 객체 생성
     return op_schemas.StageOperationResponse(
         operationId=operationId,
-        operation={
-            "type": "rename",
-            "target": context.selectedFiles,
-            "newName": new_name
-        },
+        operation=rename_operation,
         requiresConfirmation=True,
         riskLevel="medium",
-        preview={
-            "description": description
-        }
+        preview=preview
     )
 
 def process_create_folder(command, context):
@@ -579,19 +612,23 @@ def process_create_folder(command, context):
         # 추가 설명 문장 추가.
         description += " " + additional_desc
 
+    # Pydantic 모델 사용
+    create_folder_operation = op_schemas.CreateFolderOperation(
+        folderName=folder_name,
+        parentPath=parent_Path
+    )
+    
+    preview = op_schemas.OperationPreview(
+        description=description
+    )
+
     # StageOperationResponse 객체 생성
     return op_schemas.StageOperationResponse(
         operationId=operationId,
-        operation={
-            "type": "create_folder",
-            "folderName": folder_name,
-            "parentPath": parent_Path
-        },
+        operation=create_folder_operation,
         requiresConfirmation=True,
         riskLevel="low",
-        preview={
-            "description": description
-        }
+        preview=preview
     )
 
 def process_search(command):
@@ -609,18 +646,22 @@ def process_search(command):
     search_term = get_search_term(command)
     description = generate_search_description(search_term)
 
+    # Pydantic 모델 사용
+    search_operation = op_schemas.SearchOperation(
+        searchTerm=search_term
+    )
+    
+    preview = op_schemas.OperationPreview(
+        description=description
+    )
+
     # StageOperationResponse 객체 생성
     return op_schemas.StageOperationResponse(
         operationId=operationId,
-        operation={
-            "type": "search",
-            "searchTerm": search_term
-        },
+        operation=search_operation,
         requiresConfirmation=False,
         riskLevel="low",
-        preview={
-            "description": description
-        }
+        preview=preview
     )
 
 def process_summarize(command, context):
@@ -639,18 +680,22 @@ def process_summarize(command, context):
     operationId = "op-"+str(uuid.uuid4())
     description = generate_summarize_description(context)
 
+    # Pydantic 모델 사용
+    summarize_operation = op_schemas.SummarizeOperation(
+        targets=context.selectedFiles
+    )
+    
+    preview = op_schemas.OperationPreview(
+        description=description
+    )
+
     # StageOperationResponse 객체 생성
     return op_schemas.StageOperationResponse(
         operationId=operationId,
-        operation={
-            "type": "summarize",
-            "targets": context.selectedFiles
-        },
+        operation=summarize_operation,
         requiresConfirmation=True,
         riskLevel="low",
-        preview={
-            "description": description
-        }
+        preview=preview
     )
 
 
@@ -1373,102 +1418,468 @@ async def execute_operation_logic(operation_type: str, operation: dict, user_opt
 
 async def execute_move_logic(operation: dict, user_options: dict, current_user: User, db: Session) -> dict:
     """이동 작업 실행 로직"""
-    # TODO: 실제 파일 이동 로직 구현
-    # 여기에 documents.py의 파일 이동 로직을 연동
+    from fast_api.endpoints.documents import process_directory_operations
+    
     targets = operation.get("targets", [])
     destination = operation.get("destination", "/")
     
     logger.info(f"Moving {len(targets)} files to {destination}")
     
-    # 시뮬레이션 (실제 구현 시 documents.py의 로직 사용)
-    return {
-        "message": f"{len(targets)}개 파일이 {destination}로 이동되었습니다",
-        "undoAvailable": True,
-        "undoDeadline": (datetime.now() + timedelta(minutes=10)).isoformat()
-    }
+    try:
+        # process_directory_operations 형식에 맞게 데이터 준비
+        operations = []
+        for target in targets:
+            operations.append({
+                "operation_type": "move",
+                "item_id": target.get("id"),
+                "name": target.get("name"),
+                "target_path": destination,
+                "path": destination  # target_path와 path 둘 다 사용하는 경우를 위해
+            })
+        
+        # 작업 실행
+        results = await process_directory_operations(operations, current_user.id, db)
+        
+        # 결과 확인
+        success_count = sum(1 for r in results if r.get("status") == "success")
+        failed_count = len(results) - success_count
+        
+        if failed_count > 0:
+            message = f"{success_count}개 파일이 이동되었습니다. {failed_count}개 실패"
+        else:
+            message = f"{len(targets)}개 파일이 {destination}로 이동되었습니다"
+        
+        # 결과를 Pydantic 모델로 변환
+        operation_results = [
+            op_schemas.OperationResult(
+                status=r.get("status", "unknown"),
+                message=r.get("message", ""),
+                item_id=r.get("item_id")
+            ) for r in results
+        ]
+        
+        return {
+            "message": message,
+            "undoAvailable": True,
+            "undoDeadline": (datetime.now() + timedelta(minutes=10)).isoformat(),
+            "results": operation_results
+        }
+        
+    except Exception as e:
+        logger.error(f"Error executing move operation: {e}")
+        return {
+            "message": f"파일 이동 중 오류가 발생했습니다: {str(e)}",
+            "undoAvailable": False
+        }
 
 
 async def execute_copy_logic(operation: dict, user_options: dict, current_user: User, db: Session) -> dict:
     """복사 작업 실행 로직"""
-    # TODO: 실제 파일 복사 로직 구현
+    from fast_api.endpoints.documents import process_directory_operations
+    
     targets = operation.get("targets", [])
     destination = operation.get("destination", "/")
     
     logger.info(f"Copying {len(targets)} files to {destination}")
     
-    return {
-        "message": f"{len(targets)}개 파일이 {destination}로 복사되었습니다",
-        "undoAvailable": False  # 복사는 일반적으로 undo 불가
-    }
+    try:
+        # process_directory_operations 형식에 맞게 데이터 준비
+        operations = []
+        for target in targets:
+            operations.append({
+                "operation_type": "copy",
+                "item_id": target.get("id"),
+                "name": target.get("name"),
+                "target_path": destination,
+                "path": destination
+            })
+        
+        # 작업 실행
+        results = await process_directory_operations(operations, current_user.id, db)
+        
+        # 결과 확인
+        success_count = sum(1 for r in results if r.get("status") == "success")
+        failed_count = len(results) - success_count
+        
+        if failed_count > 0:
+            message = f"{success_count}개 파일이 복사되었습니다. {failed_count}개 실패"
+        else:
+            message = f"{len(targets)}개 파일이 {destination}로 복사되었습니다"
+        
+        # 결과를 Pydantic 모델로 변환
+        operation_results = [
+            op_schemas.OperationResult(
+                status=r.get("status", "unknown"),
+                message=r.get("message", ""),
+                item_id=r.get("item_id")
+            ) for r in results
+        ]
+        
+        return {
+            "message": message,
+            "undoAvailable": False,  # 복사는 일반적으로 undo 불가
+            "results": operation_results
+        }
+        
+    except Exception as e:
+        logger.error(f"Error executing copy operation: {e}")
+        return {
+            "message": f"파일 복사 중 오류가 발생했습니다: {str(e)}",
+            "undoAvailable": False
+        }
 
 
 async def execute_delete_logic(operation: dict, user_options: dict, current_user: User, db: Session) -> dict:
     """삭제 작업 실행 로직"""
-    # TODO: 실제 파일 삭제 로직 구현
+    from fast_api.endpoints.documents import process_directory_operations
+    
     targets = operation.get("targets", [])
     
     logger.info(f"Deleting {len(targets)} files")
     
-    return {
-        "message": f"{len(targets)}개 파일이 삭제되었습니다",
-        "undoAvailable": False  # 삭제는 일반적으로 undo 불가 (복구 어려움)
-    }
+    try:
+        # process_directory_operations 형식에 맞게 데이터 준비
+        operations = []
+        for target in targets:
+            operations.append({
+                "operation_type": "delete",
+                "item_id": target.get("id"),
+                "name": target.get("name")
+            })
+        
+        # 작업 실행
+        results = await process_directory_operations(operations, current_user.id, db)
+        
+        # 결과 확인
+        success_count = sum(1 for r in results if r.get("status") == "success")
+        failed_count = len(results) - success_count
+        
+        if failed_count > 0:
+            message = f"{success_count}개 파일이 삭제되었습니다. {failed_count}개 실패"
+        else:
+            message = f"{len(targets)}개 파일이 삭제되었습니다"
+        
+        # 결과를 Pydantic 모델로 변환
+        operation_results = [
+            op_schemas.OperationResult(
+                status=r.get("status", "unknown"),
+                message=r.get("message", ""),
+                item_id=r.get("item_id")
+            ) for r in results
+        ]
+        
+        return {
+            "message": message,
+            "undoAvailable": False,  # 삭제는 일반적으로 undo 불가 (복구 어려움)
+            "results": operation_results
+        }
+        
+    except Exception as e:
+        logger.error(f"Error executing delete operation: {e}")
+        return {
+            "message": f"파일 삭제 중 오류가 발생했습니다: {str(e)}",
+            "undoAvailable": False
+        }
 
 
 async def execute_rename_logic(operation: dict, user_options: dict, current_user: User, db: Session) -> dict:
     """이름 변경 작업 실행 로직"""
-    # TODO: 실제 파일 이름 변경 로직 구현
+    from fast_api.endpoints.documents import process_directory_operations
+    
+    # rename은 target이 배열이 아닌 단일 객체 또는 배열의 첫 번째 요소
     target = operation.get("target", {})
+    if isinstance(target, list) and len(target) > 0:
+        target = target[0]
+    
     new_name = operation.get("newName", "")
     
     logger.info(f"Renaming file to {new_name}")
     
-    return {
-        "message": f"파일 이름이 '{new_name}'으로 변경되었습니다",
-        "undoAvailable": True,
-        "undoDeadline": (datetime.now() + timedelta(minutes=10)).isoformat()
-    }
+    try:
+        # process_directory_operations 형식에 맞게 데이터 준비
+        operations = [{
+            "operation_type": "rename",
+            "item_id": target.get("id"),
+            "name": new_name  # 새로운 이름
+        }]
+        
+        # 작업 실행
+        results = await process_directory_operations(operations, current_user.id, db)
+        
+        # 결과 확인
+        if results and results[0].get("status") == "success":
+            message = f"파일 이름이 '{new_name}'으로 변경되었습니다"
+        else:
+            message = "파일 이름 변경에 실패했습니다"
+        
+        # 결과를 Pydantic 모델로 변환
+        operation_results = [
+            op_schemas.OperationResult(
+                status=r.get("status", "unknown"),
+                message=r.get("message", ""),
+                item_id=r.get("item_id")
+            ) for r in results
+        ]
+        
+        return {
+            "message": message,
+            "undoAvailable": True,
+            "undoDeadline": (datetime.now() + timedelta(minutes=10)).isoformat(),
+            "results": operation_results
+        }
+        
+    except Exception as e:
+        logger.error(f"Error executing rename operation: {e}")
+        return {
+            "message": f"파일 이름 변경 중 오류가 발생했습니다: {str(e)}",
+            "undoAvailable": False
+        }
 
 
 async def execute_create_folder_logic(operation: dict, user_options: dict, current_user: User, db: Session) -> dict:
     """폴더 생성 작업 실행 로직"""
-    # TODO: 실제 폴더 생성 로직 구현
+    from fast_api.endpoints.documents import process_directory_operations
+    
     folder_name = operation.get("folderName", "")
     parent_path = operation.get("parentPath", "/")
     
     logger.info(f"Creating folder '{folder_name}' in {parent_path}")
     
-    return {
-        "message": f"'{folder_name}' 폴더가 생성되었습니다",
-        "undoAvailable": True,
-        "undoDeadline": (datetime.now() + timedelta(minutes=10)).isoformat()
-    }
+    try:
+        # process_directory_operations 형식에 맞게 데이터 준비
+        operations = [{
+            "operation_type": "create",
+            "name": folder_name,
+            "path": parent_path,
+            "target_path": parent_path  # create 작업은 path 또는 target_path 사용
+        }]
+        
+        # 작업 실행
+        results = await process_directory_operations(operations, current_user.id, db)
+        
+        # 결과 확인
+        if results and results[0].get("status") == "success":
+            message = f"'{folder_name}' 폴더가 생성되었습니다"
+        else:
+            message = "폴더 생성에 실패했습니다"
+        
+        # 결과를 Pydantic 모델로 변환
+        operation_results = [
+            op_schemas.OperationResult(
+                status=r.get("status", "unknown"),
+                message=r.get("message", ""),
+                item_id=r.get("item_id")
+            ) for r in results
+        ]
+        
+        return {
+            "message": message,
+            "undoAvailable": True,
+            "undoDeadline": (datetime.now() + timedelta(minutes=10)).isoformat(),
+            "results": operation_results
+        }
+        
+    except Exception as e:
+        logger.error(f"Error executing create folder operation: {e}")
+        return {
+            "message": f"폴더 생성 중 오류가 발생했습니다: {str(e)}",
+            "undoAvailable": False
+        }
 
 
 async def execute_search_logic(operation: dict, user_options: dict, current_user: User, db: Session) -> dict:
     """검색 작업 실행 로직"""
-    # TODO: 실제 검색 로직 구현
+    from rag.document_service import process_query
+    from rag.llm import get_llms_answer
+    from db.database import engine
+    
     search_term = operation.get("searchTerm", "")
     
     logger.info(f"Searching for: {search_term}")
     
-    return {
-        "message": f"'{search_term}' 검색이 완료되었습니다",
-        "undoAvailable": False  # 검색은 undo 불필요
-    }
+    try:
+        # RAG 검색 실행
+        # process_query는 유사한 문서 청크들을 반환
+        docs = process_query(current_user.id, search_term, engine)
+        
+        # LLM을 통해 자연스러운 답변 생성
+        answer = get_llms_answer(docs, search_term)
+        
+        # 검색된 문서 정보 추출
+        found_documents = []
+        for doc in docs:
+            if hasattr(doc, 'metadata') and doc.metadata:
+                found_documents.append({
+                    "name": doc.metadata.get('document_name', '알 수 없음'),
+                    "path": doc.metadata.get('document_path', '/')
+                })
+        
+        # 중복 제거
+        unique_documents = []
+        seen = set()
+        for doc in found_documents:
+            doc_key = (doc['name'], doc['path'])
+            if doc_key not in seen:
+                seen.add(doc_key)
+                unique_documents.append(doc)
+        
+        # Pydantic 모델로 변환
+        search_documents = [
+            op_schemas.SearchDocument(
+                name=doc["name"],
+                path=doc["path"]
+            ) for doc in unique_documents
+        ]
+        
+        search_result_data = op_schemas.SearchResultData(
+            answer=answer,
+            documents=search_documents,
+            documentCount=len(unique_documents)
+        )
+        
+        return {
+            "message": f"'{search_term}' 검색이 완료되었습니다",
+            "undoAvailable": False,  # 검색은 undo 불필요
+            "searchResults": search_result_data
+        }
+        
+    except Exception as e:
+        logger.error(f"Error executing search operation: {e}")
+        return {
+            "message": f"검색 중 오류가 발생했습니다: {str(e)}",
+            "undoAvailable": False
+        }
 
 
 async def execute_summarize_logic(operation: dict, user_options: dict, current_user: User, db: Session) -> dict:
     """요약 작업 실행 로직"""
-    # TODO: 실제 문서 요약 로직 구현
+    from langchain_openai import ChatOpenAI
+    from langchain_core.prompts import PromptTemplate
+    from db import crud
+    import boto3
+    from config.settings import S3_BUCKET_NAME, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION
+    
     targets = operation.get("targets", [])
     
     logger.info(f"Summarizing {len(targets)} documents")
     
-    return {
-        "message": f"{len(targets)}개 문서의 요약이 완료되었습니다",
-        "undoAvailable": False  # 요약은 undo 불필요
-    }
+    try:
+        # S3 클라이언트 초기화
+        s3_client = boto3.client(
+            's3',
+            aws_access_key_id=AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+            region_name=AWS_DEFAULT_REGION
+        )
+        
+        # 각 문서의 내용을 가져와서 요약
+        summaries = []
+        
+        for target in targets:
+            target_id = target.get("id")
+            target_name = target.get("name", "문서")
+            
+            # 파일인 경우에만 처리 (폴더는 건너뛰기)
+            if target.get("type") == "folder":
+                continue
+            
+            # S3 키 가져오기
+            s3_key = crud.get_s3_key_by_id(db, target_id)
+            
+            if not s3_key:
+                logger.warning(f"S3 key not found for document {target_id}")
+                continue
+            
+            # S3에서 파일 내용 가져오기
+            try:
+                response = s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=s3_key)
+                file_content = response['Body'].read()
+                
+                # 파일 타입에 따라 텍스트 추출
+                file_extension = target_name.split('.')[-1].lower()
+                
+                if file_extension == 'pdf':
+                    from rag.file_load import load_pdf
+                    documents = await load_pdf(file_content)
+                elif file_extension == 'docx':
+                    from rag.file_load import load_docx
+                    documents = await load_docx(file_content)
+                elif file_extension in ['hwp', 'hwpx']:
+                    from rag.file_load import load_hwp
+                    documents = await load_hwp(file_content, file_extension)
+                else:
+                    logger.warning(f"Unsupported file type: {file_extension}")
+                    continue
+                
+                # 문서 내용 합치기
+                full_text = "\n".join(documents)
+                
+                # 텍스트가 너무 길면 잘라내기
+                if len(full_text) > 10000:
+                    full_text = full_text[:10000] + "..."
+                
+                # LLM으로 요약
+                llm = ChatOpenAI(
+                    temperature=0.3,
+                    max_tokens=500,
+                    model_name="gpt-4o-mini"
+                )
+                
+                prompt = PromptTemplate.from_template(
+                    """다음 문서의 내용을 한국어로 요약해주세요. 핵심 내용을 중심으로 3-5개의 문장으로 요약하세요.
+                    
+                    문서명: {document_name}
+                    
+                    내용:
+                    {content}
+                    
+                    요약:"""
+                )
+                
+                chain = prompt | llm
+                summary = chain.invoke({
+                    "document_name": target_name,
+                    "content": full_text
+                })
+                
+                summaries.append({
+                    "name": target_name,
+                    "summary": summary.content if hasattr(summary, 'content') else str(summary)
+                })
+                
+            except Exception as e:
+                logger.error(f"Error summarizing document {target_name}: {e}")
+                summaries.append({
+                    "name": target_name,
+                    "summary": f"요약 중 오류 발생: {str(e)}"
+                })
+        
+        # 결과 메시지 생성
+        if len(summaries) == 0:
+            message = "요약할 수 있는 문서가 없습니다"
+        else:
+            message = f"{len(summaries)}개 문서의 요약이 완료되었습니다"
+        
+        # Pydantic 모델로 변환
+        summary_data_list = [
+            op_schemas.SummaryData(
+                name=summary["name"],
+                summary=summary["summary"]
+            ) for summary in summaries
+        ]
+        
+        return {
+            "message": message,
+            "undoAvailable": False,  # 요약은 undo 불필요
+            "summaries": summary_data_list
+        }
+        
+    except Exception as e:
+        logger.error(f"Error executing summarize operation: {e}")
+        return {
+            "message": f"문서 요약 중 오류가 발생했습니다: {str(e)}",
+            "undoAvailable": False
+        }
 
 
 # ===== Undo 로직 헬퍼 함수들 =====
@@ -1487,6 +1898,11 @@ async def execute_undo_logic(operation_type: str, undo_data: dict, reason: str, 
     Returns:
         dict: undo 결과 정보
     """
+    # operation_type이 제대로 전달되지 않은 경우 undo_data에서 추출
+    if not operation_type and undo_data:
+        operation = undo_data.get("operation", {})
+        operation_type = operation.get("type")
+    
     logger.info(f"Executing undo logic for type: {operation_type}, reason: {reason}")
     
     try:
@@ -1497,56 +1913,183 @@ async def execute_undo_logic(operation_type: str, undo_data: dict, reason: str, 
         elif operation_type == "create_folder":
             return await undo_create_folder_logic(undo_data, reason, current_user, db)
         else:
-            return {
-                "success": False,
-                "error": f"'{operation_type}' 작업은 되돌리기를 지원하지 않습니다"
-            }
+            return op_schemas.UndoResult(
+                success=False,
+                error=f"'{operation_type}' 작업은 되돌리기를 지원하지 않습니다"
+            ).dict()
             
     except Exception as e:
         logger.error(f"Error undoing {operation_type} operation: {e}")
-        return {
-            "success": False,
-            "error": f"되돌리기 중 오류가 발생했습니다: {str(e)}"
-        }
+        return op_schemas.UndoResult(
+            success=False,
+            error=f"되돌리기 중 오류가 발생했습니다: {str(e)}"
+        ).dict()
 
 
 async def undo_move_logic(undo_data: dict, reason: str, current_user: User, db: Session) -> dict:
     """이동 작업 되돌리기 로직"""
-    # TODO: 실제 파일 이동 되돌리기 로직 구현
-    original_location = undo_data.get("original_location", "/")
-    files = undo_data.get("files", [])
+    from fast_api.endpoints.documents import process_directory_operations
+    from db import crud
     
-    logger.info(f"Undoing move operation: moving {len(files)} files back to {original_location}")
+    # undo_data에서 필요한 정보 추출
+    operation = undo_data.get("operation", {})
+    targets = operation.get("targets", [])
+    original_destination = operation.get("destination", "/")
     
-    return {
-        "success": True,
-        "message": f"{len(files)}개 파일이 원래 위치로 되돌려졌습니다"
-    }
+    logger.info(f"Undoing move operation: moving {len(targets)} files back from {original_destination}")
+    
+    try:
+        # 각 파일의 원래 위치 찾기
+        operations = []
+        for target in targets:
+            target_id = target.get("id")
+            target_name = target.get("name")
+            original_path = target.get("path", "/")
+            
+            # 원래 경로에서 부모 디렉토리 추출
+            if original_path == "/" or original_path == f"/{target_name}":
+                original_parent_path = "/"
+            else:
+                # 파일명을 제거하여 부모 경로 얻기
+                path_parts = original_path.rstrip('/').split('/')
+                if path_parts[-1] == target_name:
+                    path_parts = path_parts[:-1]
+                original_parent_path = '/'.join(path_parts) if path_parts else '/'
+            
+            operations.append({
+                "operation_type": "move",
+                "item_id": target_id,
+                "name": target_name,
+                "target_path": original_parent_path,
+                "path": original_parent_path
+            })
+        
+        # 작업 실행
+        results = await process_directory_operations(operations, current_user.id, db)
+        
+        # 결과 확인
+        success_count = sum(1 for r in results if r.get("status") == "success")
+        
+        if success_count == len(targets):
+            return op_schemas.UndoResult(
+                success=True,
+                message=f"{len(targets)}개 파일이 원래 위치로 되돌려졌습니다"
+            ).dict()
+        else:
+            return op_schemas.UndoResult(
+                success=False,
+                error=f"일부 파일을 되돌리는데 실패했습니다 (성공: {success_count}/{len(targets)})"
+            ).dict()
+            
+    except Exception as e:
+        logger.error(f"Error undoing move operation: {e}")
+        return op_schemas.UndoResult(
+            success=False,
+            error=f"이동 작업 되돌리기 중 오류가 발생했습니다: {str(e)}"
+        ).dict()
 
 
 async def undo_rename_logic(undo_data: dict, reason: str, current_user: User, db: Session) -> dict:
     """이름 변경 작업 되돌리기 로직"""
-    # TODO: 실제 파일 이름 되돌리기 로직 구현
-    original_name = undo_data.get("original_name", "")
-    current_name = undo_data.get("current_name", "")
+    from fast_api.endpoints.documents import process_directory_operations
+    from db import crud
     
-    logger.info(f"Undoing rename operation: changing '{current_name}' back to '{original_name}'")
+    # undo_data에서 필요한 정보 추출
+    operation = undo_data.get("operation", {})
+    target = operation.get("target", {})
+    if isinstance(target, list) and len(target) > 0:
+        target = target[0]
     
-    return {
-        "success": True,
-        "message": f"파일 이름이 '{original_name}'으로 되돌려졌습니다"
-    }
+    new_name = operation.get("newName", "")
+    target_id = target.get("id")
+    original_name = target.get("name", "")
+    
+    logger.info(f"Undoing rename operation: changing '{new_name}' back to '{original_name}'")
+    
+    try:
+        # 이름을 원래대로 되돌리기
+        operations = [{
+            "operation_type": "rename",
+            "item_id": target_id,
+            "name": original_name  # 원래 이름으로 되돌리기
+        }]
+        
+        # 작업 실행
+        results = await process_directory_operations(operations, current_user.id, db)
+        
+        # 결과 확인
+        if results and results[0].get("status") == "success":
+            return op_schemas.UndoResult(
+                success=True,
+                message=f"파일 이름이 '{original_name}'으로 되돌려졌습니다"
+            ).dict()
+        else:
+            return op_schemas.UndoResult(
+                success=False,
+                error="파일 이름을 되돌리는데 실패했습니다"
+            ).dict()
+            
+    except Exception as e:
+        logger.error(f"Error undoing rename operation: {e}")
+        return op_schemas.UndoResult(
+            success=False,
+            error=f"이름 변경 작업 되돌리기 중 오류가 발생했습니다: {str(e)}"
+        ).dict()
 
 
 async def undo_create_folder_logic(undo_data: dict, reason: str, current_user: User, db: Session) -> dict:
     """폴더 생성 작업 되돌리기 로직"""
-    # TODO: 실제 폴더 삭제 로직 구현
-    folder_path = undo_data.get("folder_path", "")
-    folder_name = undo_data.get("folder_name", "")
+    from fast_api.endpoints.documents import process_directory_operations
+    from db import crud
+    
+    # undo_data에서 필요한 정보 추출
+    operation = undo_data.get("operation", {})
+    folder_name = operation.get("folderName", "")
+    parent_path = operation.get("parentPath", "/")
+    
+    # 생성된 폴더의 전체 경로 계산
+    if parent_path == "/":
+        folder_path = f"/{folder_name}"
+    else:
+        folder_path = f"{parent_path}/{folder_name}"
     
     logger.info(f"Undoing create folder operation: deleting folder '{folder_name}' at {folder_path}")
     
-    return {
-        "success": True,
-        "message": f"생성된 폴더 '{folder_name}'가 삭제되었습니다"
-    }
+    try:
+        # 폴더의 ID 찾기
+        folder_id = crud.get_directory_id_by_path(db, folder_path)
+        
+        if not folder_id:
+            return op_schemas.UndoResult(
+                success=False,
+                error=f"삭제할 폴더를 찾을 수 없습니다: {folder_path}"
+            ).dict()
+        
+        # 폴더 삭제
+        operations = [{
+            "operation_type": "delete",
+            "item_id": folder_id,
+            "name": folder_name
+        }]
+        
+        # 작업 실행
+        results = await process_directory_operations(operations, current_user.id, db)
+        
+        # 결과 확인
+        if results and results[0].get("status") == "success":
+            return op_schemas.UndoResult(
+                success=True,
+                message=f"생성된 폴더 '{folder_name}'가 삭제되었습니다"
+            ).dict()
+        else:
+            return op_schemas.UndoResult(
+                success=False,
+                error="폴더를 삭제하는데 실패했습니다"
+            ).dict()
+            
+    except Exception as e:
+        logger.error(f"Error undoing create folder operation: {e}")
+        return op_schemas.UndoResult(
+            success=False,
+            error=f"폴더 생성 작업 되돌리기 중 오류가 발생했습니다: {str(e)}"
+        ).dict()

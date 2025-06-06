@@ -12,3 +12,12 @@ def stop_debugger():
             raise Exception("사용자에 의해 강제 종료되었습니다.")
         elif key.lower() == 'g':
             break
+
+
+def redis_store_test(operation_id):
+    from services.operation_store import get_operation_store
+    operation_store = get_operation_store()
+
+    print(f"TTL 확인:{operation_store.get_remaining_ttl(operation_id)}")
+    print(f"--------------------------------")
+    print(f"작업 정보 확인:{operation_store.get_operation(operation_id)}")
