@@ -317,7 +317,7 @@ const FileDisplay = ({
   };
 
   // ✅ 다운로드 핸들러
-  const handleDownloadSelected = async () => {
+  const handleDownloadSelected = useCallback(async () => {
     if (selectedItems.length === 0) {
       showNotification('다운로드할 파일을 선택해주세요.');
       return;
@@ -351,7 +351,7 @@ const FileDisplay = ({
       setShowDownloadProgress(false);
       showNotification('다운로드 중 오류가 발생했습니다.');
     }
-  };
+  }, [selectedItems, onDownloadItems, downloadState.isActive]);
 
   // ✅ 다운로드 취소 핸들러
   const handleCancelDownload = () => {

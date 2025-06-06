@@ -202,24 +202,24 @@ function App() {
         
         // 100ms마다 진행률 업데이트 (너무 자주 업데이트하면 성능 저하)
         if (currentTime - lastUpdateTime >= 100) {
-          const progress = totalSize > 0 ? Math.round((receivedSize / totalSize) * 100) : 0;
-          const elapsedTime = (currentTime - startTime) / 1000; // 초 단위
-          const speed = receivedSize / elapsedTime; // bytes/sec
+          const currentReceived = receivedSize;  // 변수 캡처
+          const currentTotal = totalSize;
+          const currentElapsed = (currentTime - startTime) / 1000;
+          const currentSpeed = currentReceived / currentElapsed;
+          const progress = currentTotal > 0 ? Math.round((currentReceived / currentTotal) * 100) : 0;
           
-          // FileDisplay로 진행률 정보 전달
           setDownloadState(prev => ({
             ...prev,
             progress,
             fileName: file.name,
-            receivedSize,
-            totalSize,
-            speed,
-            elapsedTime
+            receivedSize: currentReceived,
+            totalSize: currentTotal,
+            speed: currentSpeed,
+            elapsedTime: currentElapsed
           }));
           
           lastUpdateTime = currentTime;
-          
-          console.log(`진행률: ${progress}%, 속도: ${formatBytes(speed)}/s`);
+          console.log(`진행률: ${progress}%, 속도: ${formatBytes(currentSpeed)}/s`);
         }
       }
       
@@ -315,25 +315,25 @@ function App() {
         
         // 100ms마다 진행률 업데이트
         if (currentTime - lastUpdateTime >= 100) {
-          const progress = totalSize > 0 ? Math.round((receivedSize / totalSize) * 100) : 0;
-          const elapsedTime = (currentTime - startTime) / 1000; // 초 단위
-          const speed = receivedSize / elapsedTime; // bytes/sec
+          const currentReceived = receivedSize;  // 변수 캡처
+          const currentTotal = totalSize;
+          const currentElapsed = (currentTime - startTime) / 1000;
+          const currentSpeed = currentReceived / currentElapsed;
+          const progress = currentTotal > 0 ? Math.round((currentReceived / currentTotal) * 100) : 0;
           
-          // FileDisplay로 진행률 정보 전달
           setDownloadState(prev => ({
             ...prev,
             progress,
             fileName: `${files.length}개 파일`,
-            receivedSize,
-            totalSize,
-            speed,
-            elapsedTime,
+            receivedSize: currentReceived,
+            totalSize: currentTotal,
+            speed: currentSpeed,
+            elapsedTime: currentElapsed,
             isZip: true
           }));
-                    
+                      
           lastUpdateTime = currentTime;
-          
-          console.log(`ZIP 진행률: ${progress}%, 속도: ${formatBytes(speed)}/s`);
+          console.log(`ZIP 진행률: ${progress}%, 속도: ${formatBytes(currentSpeed)}/s`);
         }
       }
       
@@ -377,21 +377,6 @@ function App() {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-  };
-
-  // 남은 시간 계산 유틸리티 함수
-  const formatRemainingTime = (speed, remainingBytes) => {
-    if (speed === 0) return '계산 중...';
-    
-    const remainingSeconds = remainingBytes / speed;
-    
-    if (remainingSeconds < 60) {
-      return `${Math.round(remainingSeconds)}초`;
-    } else if (remainingSeconds < 3600) {
-      return `${Math.round(remainingSeconds / 60)}분`;
-    } else {
-      return `${Math.round(remainingSeconds / 3600)}시간`;
-    }
   };
 
   // 테마 토글 핸들러
