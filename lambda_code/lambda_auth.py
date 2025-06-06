@@ -43,7 +43,7 @@ def health_check():
     """헬스체크 엔드포인트"""
     return {"status": "healthy", "service": "auth", "timestamp": datetime.utcnow()}
 
-@app.post("/auth/register", response_model=UserResponse)
+@app.post("/fast_api/auth/register", response_model=UserResponse)
 def register(user: UserCreate, db: Session = Depends(get_db)):
     """회원가입 엔드포인트"""
     try:
@@ -58,7 +58,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         logger.error(f"Registration error: {e}")
         raise HTTPException(status_code=500, detail="회원가입 처리 중 오류가 발생했습니다.")
 
-@app.post("/auth/token", response_model=Token)
+@app.post("/fast_api/auth/token", response_model=Token)
 def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()], 
     db: Session = Depends(get_db)
@@ -90,7 +90,7 @@ def login_for_access_token(
         logger.error(f"Login error: {e}")
         raise HTTPException(status_code=500, detail="로그인 처리 중 오류가 발생했습니다.")
 
-@app.get("/auth/me", response_model=UserResponse)
+@app.get("/fast_api/auth/me", response_model=UserResponse)
 def read_users_me(current_user: User = Depends(get_current_user)):
     """현재 사용자 정보 조회 엔드포인트"""
     try:
@@ -100,7 +100,7 @@ def read_users_me(current_user: User = Depends(get_current_user)):
         logger.error(f"User info retrieval error: {e}")
         raise HTTPException(status_code=500, detail="사용자 정보 조회 중 오류가 발생했습니다.")
 
-@app.post("/auth/refresh", response_model=Token)
+@app.post("/fast_api/auth/refresh", response_model=Token)
 def refresh_token(current_user: User = Depends(get_current_user)):
     """토큰 갱신 엔드포인트"""
     try:

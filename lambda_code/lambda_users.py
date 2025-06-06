@@ -41,15 +41,34 @@ def health_check():
     """헬스체크 엔드포인트"""
     return {"status": "healthy", "service": "users", "timestamp": datetime.utcnow()}
 
-@app.get("/users/me", response_model=UserResponse)
-def get_current_user_info(current_user: User = Depends(get_current_user)):
-    """현재 사용자 정보 조회"""
+@app.get("/fast_api/users", response_model=list[UserResponse])
+def get_users(
+    skip: int = 0, 
+    limit: int = 100, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    """사용자 목록 조회 엔드포인트"""
     try:
-        logger.info(f"User info requested: {current_user.username}")
-        return current_user
+        logger.info(f"Getting users with skip={skip}, limit={limit} by user: {current_user.username}")
+        
+        # 관리자 권한 체크 (필요시 주석 해제)
+        # if not current_user.is_admin:
+        #     logger.warning(f"Non-admin user {current_user.username} attempted to access user list")
+        #     raise HTTPException(status_code=403, detail="관리자만 접근할 수 있습니다.")
+        
+        users = db.query(User).offset(skip).limit(limit).all()
+        logger.info(f"Successfully retrieved {len(users)} users")
+        return users
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"User info retrieval error: {e}")
-        raise HTTPException(status_code=500, detail="사용자 정보 조회 중 오류가 발생했습니다.")
+        logger.error(f"Error retrieving users: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail="사용자 목록을 가져오는 중 오류가 발생했습니다."
+        )
 
 # @app.put("/users/me", response_model=UserResponse)
 # def update_current_user(
