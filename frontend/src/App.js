@@ -40,7 +40,13 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // 다운로드 관련
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadState, setDownloadState] = useState({
+    isActive: false,
+    progress: 0,
+    fileName: '',
+    error: null,
+    abortController: null
+  });
 
   const [notification, setNotification] = useState({ visible: false, message: '' });
 
@@ -71,8 +77,27 @@ function App() {
       return;
     }
 
+    // 큰 파일 다운로드 전 확인
+    const selectedFiles = files.filter(file => selectedFileIds.includes(file.id));
+    const totalSize = selectedFiles.reduce((sum, file) => sum + (file.size || 0), 0);
+    
+    if (totalSize > 100 * 1024 * 1024) { // 100MB 이상
+      const formatBytes = (bytes) => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+      };
+      
+      const confirm = window.confirm(
+        `선택한 파일의 총 크기가 ${formatBytes(totalSize)}입니다. 다운로드하시겠습니까?`
+      );
+      if (!confirm) return;
+    }
+
     try {
-      setIsDownloading(true);
+      setDownloadState(prev => ({ ...prev, isActive: true, error: null }));
       const token = localStorage.getItem("token");
 
       // 선택된 파일 정보 가져오기
@@ -106,36 +131,25 @@ function App() {
       } else {
         showNotification('다운로드 중 오류가 발생했습니다. 다시 시도해주세요.');
       }
-      
-      // 진행률 모달이 열려있다면 닫기
-      if (window.updateDownloadProgress) {
-        window.updateDownloadProgress({
-          progress: 0,
-          receivedSize: 0,
-          totalSize: 0,
-          speed: 0,
-          fileName: '',
-          elapsedTime: 0,
-          isZip: false,
-          error: true
-        });
-      }
     } finally {
-      setIsDownloading(false);
-      
-      // AbortController 정리 (안전장치)
-      if (window.downloadAbortController) {
-        delete window.downloadAbortController;
-      }
+      setDownloadState(prev => ({ ...prev, isActive: false }));
     }
   };
+
+  useEffect(() => { //****
+    return () => {
+      if (downloadState.abortController) {
+        downloadState.abortController.abort();
+      }
+    };
+  }, [downloadState.abortController]);
 
   const downloadSingleFile = async (file, token) => {
     console.log(`단일 파일 다운로드 시작: ${file.name}`);
     
     // AbortController 생성
     const abortController = new AbortController();
-    window.downloadAbortController = abortController;
+    setDownloadState(prev => ({ ...prev, abortController }));
     
     try {
       const response = await fetch(`${API_BASE_URL}/documents/${file.id}/download`, {
@@ -147,7 +161,12 @@ function App() {
       });
 
       if (!response.ok) {
-        throw new Error(`다운로드 실패: ${response.status} ${response.statusText}`);
+        const errorMessage = response.status === 404 
+          ? '파일을 찾을 수 없습니다.' 
+          : response.status === 403 
+          ? '파일 다운로드 권한이 없습니다.'
+          : `다운로드 실패 (${response.status})`;
+        throw new Error(errorMessage);
       }
 
       // Content-Length 헤더에서 파일 크기 가져오기
@@ -187,17 +206,16 @@ function App() {
           const elapsedTime = (currentTime - startTime) / 1000; // 초 단위
           const speed = receivedSize / elapsedTime; // bytes/sec
           
-          // 진행률 정보를 FileDisplay로 전달
-          if (window.updateDownloadProgress) {
-            window.updateDownloadProgress({
-              progress,
-              receivedSize,
-              totalSize,
-              speed,
-              fileName: file.name,
-              elapsedTime
-            });
-          }
+          // FileDisplay로 진행률 정보 전달
+          setDownloadState(prev => ({
+            ...prev,
+            progress,
+            fileName: file.name,
+            receivedSize,
+            totalSize,
+            speed,
+            elapsedTime
+          }));
           
           lastUpdateTime = currentTime;
           
@@ -227,13 +245,14 @@ function App() {
       if (error.name === 'AbortError' || error.message.includes('취소')) {
         console.log(`파일 다운로드 취소됨: ${file.name}`);
         throw new Error('다운로드가 취소되었습니다.');
+      } else if (error.message.includes('Failed to fetch')) {
+        throw new Error('네트워크 연결을 확인해주세요.');
       } else {
         console.error(`파일 다운로드 오류 (${file.name}):`, error);
         throw error;
       }
     } finally {
-      // AbortController 정리
-      delete window.downloadAbortController;
+      setDownloadState(prev => ({ ...prev, abortController: null }));
     }
   };
 
@@ -242,7 +261,7 @@ function App() {
     
     // AbortController 생성
     const abortController = new AbortController();
-    window.downloadAbortController = abortController;
+    setDownloadState(prev => ({ ...prev, abortController }));
     
     try {
       // 서버에 ZIP 생성 요청
@@ -300,19 +319,18 @@ function App() {
           const elapsedTime = (currentTime - startTime) / 1000; // 초 단위
           const speed = receivedSize / elapsedTime; // bytes/sec
           
-          // 진행률 정보를 FileDisplay로 전달
-          if (window.updateDownloadProgress) {
-            window.updateDownloadProgress({
-              progress,
-              receivedSize,
-              totalSize,
-              speed,
-              fileName: `${files.length}개 파일 압축`,
-              elapsedTime,
-              isZip: true
-            });
-          }
-          
+          // FileDisplay로 진행률 정보 전달
+          setDownloadState(prev => ({
+            ...prev,
+            progress,
+            fileName: `${files.length}개 파일`,
+            receivedSize,
+            totalSize,
+            speed,
+            elapsedTime,
+            isZip: true
+          }));
+                    
           lastUpdateTime = currentTime;
           
           console.log(`ZIP 진행률: ${progress}%, 속도: ${formatBytes(speed)}/s`);
@@ -345,7 +363,7 @@ function App() {
       }
     } finally {
       // AbortController 정리
-      delete window.downloadAbortController;
+      setDownloadState(prev => ({ ...prev, abortController: null }));
     }
   };
 
@@ -1203,7 +1221,12 @@ function App() {
           selectedItems={selectedItems}
           onSelectedItemsChange={handleSelectedItemsChange}
           onDownloadItems={handleDownloadItems}
-          isDownloading={isDownloading}
+          downloadState={downloadState}
+          onDownloadCancel={() => {
+            if (downloadState.abortController) {
+              downloadState.abortController.abort();
+            }
+          }}
         />
       </div>
       

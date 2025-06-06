@@ -18,7 +18,8 @@ const FileDisplay = ({
   selectedItems: parentSelectedItems = [],
   onSelectedItemsChange,
   onDownloadItems,
-  isDownloading
+  downloadState = { isActive: false },
+  onDownloadCancel
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -82,18 +83,31 @@ const FileDisplay = ({
     };
   }, []);
 
-  // ✅ 다운로드 진행률 업데이트 함수 (전역으로 등록)
+  // 다운로드 상태 동기화
   useEffect(() => {
-    // 전역 함수로 등록하여 App.js에서 호출할 수 있도록 함
-    window.updateDownloadProgress = (progressData) => {
-      setDownloadProgress(progressData);
-    };
-    
-    // 컴포넌트 언마운트 시 정리
-    return () => {
-      delete window.updateDownloadProgress;
-    };
-  }, []);
+    if (downloadState.isActive && !showDownloadProgress) {
+      setShowDownloadProgress(true);
+    } else if (!downloadState.isActive && downloadProgress.progress >= 100) {
+      setTimeout(() => {
+        setShowDownloadProgress(false);
+      }, 1000);
+    }
+  }, [downloadState.isActive, showDownloadProgress, downloadProgress.progress]);
+
+  // App.js에서 전달받은 downloadState를 local downloadProgress에 동기화
+  useEffect(() => {
+    if (downloadState.isActive && downloadState.progress !== undefined) {
+      setDownloadProgress({
+        progress: downloadState.progress || 0,
+        receivedSize: downloadState.receivedSize || 0,
+        totalSize: downloadState.totalSize || 0,
+        speed: downloadState.speed || 0,
+        fileName: downloadState.fileName || '',
+        elapsedTime: downloadState.elapsedTime || 0,
+        isZip: downloadState.isZip || false
+      });
+    }
+  }, [downloadState]);
 
   // 부모의 selectedItems가 변경될 때 로컬 상태 업데이트
   useEffect(() => {
@@ -314,18 +328,7 @@ const FileDisplay = ({
     try {
       // 다운로드 진행률 모달 표시
       setShowDownloadProgress(true);
-      setDownloadProgress({
-        progress: 0,
-        receivedSize: 0,
-        totalSize: 0,
-        speed: 0,
-        fileName: selectedItems.length === 1 ? 
-          files.find(f => f.id === selectedItems[0])?.name || '파일' : 
-          `${selectedItems.length}개 파일`,
-        elapsedTime: 0,
-        isZip: selectedItems.length > 1
-      });
-
+      
       // App.js의 다운로드 함수 호출
       await onDownloadItems(selectedItems);
       
@@ -352,11 +355,10 @@ const FileDisplay = ({
 
   // ✅ 다운로드 취소 핸들러
   const handleCancelDownload = () => {
-    // 다운로드 취소 로직 (AbortController 사용)
-    if (window.downloadAbortController) {
-      window.downloadAbortController.abort();
+    // 부모 컴포넌트의 취소 함수 호출
+    if (onDownloadCancel) {
+      onDownloadCancel();
     }
-    
     setShowDownloadProgress(false);
     setDownloadProgress({
       progress: 0,
@@ -839,8 +841,8 @@ const FileDisplay = ({
     handleCutItems, 
     handlePasteItems, 
     handleDeleteSelectedItems,
-    handleDownloadSelected, // 새로 추가
-    isDownloading // 새로 추가
+    handleDownloadSelected,
+    downloadState.isActive
   ]);
 
   // 드래그 선택을 위한 이벤트 리스너 추가
@@ -1399,7 +1401,7 @@ const FileDisplay = ({
         <button 
           className="mobile-action-btn download-btn" 
           onClick={handleDownloadSelected}
-          disabled={isLoading || isLocalLoading || selectedItems.length === 0 || isDownloading}
+          disabled={isLoading || isLocalLoading || selectedItems.length === 0 || downloadState.isActive}
           aria-label="다운로드"
         >
           <span className="mobile-action-icon">⬇️</span>
@@ -1444,23 +1446,6 @@ const FileDisplay = ({
         <div className="path-navigator">
           {renderBreadcrumbs()}
         </div>
-
-        {/* 다운로드 프로그레스 바 */}
-        {downloadProgress.visible && (
-          <div className="download-progress-overlay">
-            <div className="download-progress-modal">
-              <h3>다운로드 진행 중</h3>
-              <div className="progress-bar-container">
-                <div 
-                  className="progress-bar" 
-                  style={{ width: `${downloadProgress.percent}%` }}
-                ></div>
-              </div>
-              <p className="progress-message">{downloadProgress.message}</p>
-              <div className="progress-percent">{downloadProgress.percent}%</div>
-            </div>
-          </div>
-        )}
         
         {/* 모바일 환경에서 꾹 누르기 힌트 표시 */}
         {isMobile && (
@@ -1584,10 +1569,10 @@ const FileDisplay = ({
             <button 
               className="download-btn" 
               onClick={handleDownloadSelected}
-              disabled={selectedItems.length === 0 || isLoading || isLocalLoading || isDownloading}
+              disabled={selectedItems.length === 0 || isLoading || isLocalLoading || downloadState.isActive}
               title={selectedItems.length === 0 ? '다운로드할 항목을 선택하세요' : `${selectedItems.length}개 항목 다운로드`}
             >
-              {isDownloading ? '다운로드 중...' : `다운로드${selectedItems.length > 0 ? ` (${selectedItems.length})` : ''}`}
+              {downloadState.isActive ? '다운로드 중...' : `다운로드${selectedItems.length > 0 ? ` (${selectedItems.length})` : ''}`}
             </button>
             <div className="upload-dropdown" ref={uploadButtonRef}>
               <button
@@ -1922,7 +1907,7 @@ const FileDisplay = ({
           <button 
             className="mobile-action-bar-btn download-btn"
             onClick={handleDownloadSelected}
-            disabled={isLoading || isLocalLoading || isDownloading}
+            disabled={isLoading || isLocalLoading || downloadState.isActive}
           >
             다운로드
           </button>
