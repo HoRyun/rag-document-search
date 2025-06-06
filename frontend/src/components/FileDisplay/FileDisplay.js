@@ -351,7 +351,7 @@ const FileDisplay = ({
       setShowDownloadProgress(false);
       showNotification('다운로드 중 오류가 발생했습니다.');
     }
-  }, [selectedItems, onDownloadItems, downloadState.isActive]);
+  }, [selectedItems, onDownloadItems]);
 
   // ✅ 다운로드 취소 핸들러
   const handleCancelDownload = () => {
