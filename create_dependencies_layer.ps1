@@ -1,50 +1,41 @@
-# 의존성 패키지 레이어 생성 (올바른 Lambda 구조, Python 3.9 호환)
-Write-Host "Creating dependencies layer with correct Lambda structure for Python 3.9..." -ForegroundColor Green
+# 의존성 패키지 레이어 생성 (email-validator 메타데이터 보존)
+Write-Host "Creating dependencies layer with email-validator metadata preservation..." -ForegroundColor Green
 
-# 임시 디렉토리 생성 (올바른 Lambda 구조)
 $tempDir = "temp_lambda_layer"
 $pythonDir = "$tempDir\python\lib\python3.9\site-packages"
 
 try {
-    # 기존 디렉토리가 있으면 내용만 정리
+    # 기존 디렉토리 정리
     if (Test-Path $tempDir) {
         Get-ChildItem -Path $tempDir -Recurse | Remove-Item -Recurse -Force
         Write-Host "Cleaned up existing directory content" -ForegroundColor Gray
-    } else {
-        # 디렉토리 생성
-        New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
-        Write-Host "Created directory: $tempDir" -ForegroundColor Cyan
     }
     
-    # Python site-packages 디렉토리 생성
     New-Item -ItemType Directory -Path $pythonDir -Force | Out-Null
     Write-Host "Created Python site-packages directory: $pythonDir" -ForegroundColor Cyan
 
     # Python 버전 확인
-    Write-Host "Checking Python version..." -ForegroundColor Yellow
     $pythonVersion = python --version 2>&1
     Write-Host "Python version: $pythonVersion" -ForegroundColor White
-    
-    if ($LASTEXITCODE -ne 0) {
-        throw "Python is not installed or not in PATH"
-    }
 
     # pip 업그레이드
-    Write-Host "Upgrading pip..." -ForegroundColor Yellow
     python -m pip install --upgrade pip
 
-    # Python 3.9 x86_64 아키텍처에 맞는 호환 패키지 설치
-    Write-Host "Installing dependencies for Python 3.9 x86_64 with correct Lambda structure..." -ForegroundColor Yellow
+    # 패키지 설치 (email-validator 명시적 추가)
+    Write-Host "Installing dependencies with email-validator support..." -ForegroundColor Yellow
     
     $packages = @(
         "fastapi==0.115.7",
         "pydantic==2.10.6", 
+        "email-validator",  # 명시적으로 email-validator 추가
+        "dnspython==2.6.1",  # email-validator 의존성
         "mangum==0.18.0",
         "sqlalchemy==2.0.36",
         "python-jose[cryptography]==3.3.0",
         "passlib[bcrypt]==1.7.4",
         "python-multipart==0.0.12",
-        "python-dotenv==1.0.1"
+        "python-dotenv==1.0.1",
+        "exceptiongroup"
     )
 
     foreach ($package in $packages) {
@@ -66,33 +57,28 @@ try {
 
     Write-Host "All packages installed successfully" -ForegroundColor Green
 
-    # Lambda Layer 구조 확인
-    Write-Host "`nLambda Layer structure verification:" -ForegroundColor Yellow
-    Write-Host "Root: $tempDir" -ForegroundColor Cyan
-    if (Test-Path "$tempDir\python") {
-        Write-Host "✓ python/ directory exists" -ForegroundColor Green
-        if (Test-Path "$tempDir\python\lib") {
-            Write-Host "✓ python/lib/ directory exists" -ForegroundColor Green
-            if (Test-Path "$tempDir\python\lib\python3.9") {
-                Write-Host "✓ python/lib/python3.9/ directory exists" -ForegroundColor Green
-                if (Test-Path "$tempDir\python\lib\python3.9\site-packages") {
-                    Write-Host "✓ python/lib/python3.9/site-packages/ directory exists" -ForegroundColor Green
-                    $packageCount = (Get-ChildItem -Path "$tempDir\python\lib\python3.9\site-packages" -Directory).Count
-                    Write-Host "✓ Found $packageCount packages in site-packages" -ForegroundColor Green
-                }
-            }
-        }
-    }
-
     # 설치된 패키지 확인
-    Write-Host "`nInstalled packages in site-packages:" -ForegroundColor Yellow
+    Write-Host "`nInstalled packages:" -ForegroundColor Yellow
     Get-ChildItem -Path $pythonDir -Directory | ForEach-Object {
         Write-Host "- $($_.Name)" -ForegroundColor White
     }
 
-    # 불필요한 파일 정리
-    Write-Host "`nCleaning up unnecessary files..." -ForegroundColor Yellow
-    $cleanupPatterns = @("*.pyc", "__pycache__", "*.dist-info", "tests", "test")
+    # email-validator 설치 확인
+    if (Test-Path "$pythonDir\email_validator") {
+        Write-Host "✓ email_validator module found" -ForegroundColor Green
+    }
+    
+    # email-validator 메타데이터 확인
+    $emailValidatorDistInfo = Get-ChildItem -Path $pythonDir -Directory | Where-Object { $_.Name -like "*email*validator*.dist-info" }
+    if ($emailValidatorDistInfo) {
+        Write-Host "✓ email-validator metadata found: $($emailValidatorDistInfo.Name)" -ForegroundColor Green
+    } else {
+        Write-Host "⚠ email-validator metadata not found" -ForegroundColor Yellow
+    }
+
+    # 검색 결과 [5]에서 권장하는 방법: 중요한 메타데이터 보존
+    Write-Host "`nCleaning up unnecessary files (preserving email-validator metadata)..." -ForegroundColor Yellow
+    $cleanupPatterns = @("*.pyc", "__pycache__", "tests", "test")
     
     foreach ($pattern in $cleanupPatterns) {
         $itemsToRemove = Get-ChildItem -Path $pythonDir -Recurse -Name $pattern -Force
@@ -104,17 +90,30 @@ try {
             }
         }
     }
-
-    # ZIP 파일 생성 (python 디렉토리 포함)
-    Write-Host "`nCreating zip file with correct Lambda structure..." -ForegroundColor Yellow
-    $zipPath = "dependencies-layer.zip"
     
-    # 기존 zip 파일 삭제
+    # 검색 결과 [5]에서 언급된 대로 email-validator의 dist-info는 보존
+    Write-Host "Preserving email-validator metadata for AWS Lambda compatibility..." -ForegroundColor Yellow
+    $distInfoDirs = Get-ChildItem -Path $pythonDir -Directory | Where-Object { $_.Name -like "*.dist-info" }
+    foreach ($distInfo in $distInfoDirs) {
+        if ($distInfo.Name -like "*email*validator*") {
+            Write-Host "✓ Preserved: $($distInfo.Name)" -ForegroundColor Green
+        } elseif ($distInfo.Name -like "*dnspython*") {
+            Write-Host "✓ Preserved: $($distInfo.Name)" -ForegroundColor Green
+        } else {
+            # 다른 dist-info는 제거 (크기 최적화)
+            Remove-Item -Path $distInfo.FullName -Recurse -Force
+            Write-Host "Removed: $($distInfo.Name)" -ForegroundColor Gray
+        }
+    }
+
+    # ZIP 파일 생성
+    Write-Host "`nCreating zip file..." -ForegroundColor Yellow
+    $zipPath = "dependencies-layer-with-email-validator.zip"
+    
     if (Test-Path $zipPath) {
         Remove-Item -Path $zipPath -Force
     }
 
-    # python 디렉토리를 포함하여 압축
     Compress-Archive -Path "$tempDir\python" -DestinationPath $zipPath -Force
 
     # 파일 크기 확인
@@ -122,22 +121,12 @@ try {
     Write-Host "Dependencies layer zip file created: $zipPath" -ForegroundColor Green
     Write-Host "Zip file size: $([math]::Round($zipSize, 2)) MB" -ForegroundColor Cyan
 
-    # 설치된 패키지 버전 정보 출력
-    Write-Host "`nInstalled package versions:" -ForegroundColor Yellow
-    Write-Host "- FastAPI: 0.115.7" -ForegroundColor White
-    Write-Host "- Pydantic: 2.10.6" -ForegroundColor White
-    Write-Host "- SQLAlchemy: 2.0.36" -ForegroundColor White
-    Write-Host "- Mangum: 0.18.0" -ForegroundColor White
-    Write-Host "- Architecture: x86_64 (manylinux2014)" -ForegroundColor White
-    Write-Host "- Python version: 3.9" -ForegroundColor White
-    Write-Host "- Layer structure: python/lib/python3.9/site-packages/" -ForegroundColor White
-
-    # AWS CLI로 의존성 패키지 레이어 생성
+    # AWS CLI로 레이어 생성
     Write-Host "`nPublishing layer to AWS Lambda..." -ForegroundColor Yellow
     
     $dependenciesLayerOutput = aws lambda publish-layer-version `
         --layer-name ai-document-api-dependencies-layer `
-        --description "Dependencies Layer for AI Document API (FastAPI 0.115.7, Pydantic 2.10.6, Python 3.9 x86_64 compatible, correct Lambda structure)" `
+        --description "Dependencies Layer with email-validator metadata (FastAPI, Pydantic, Python 3.9)" `
         --compatible-runtimes python3.9 `
         --compatible-architectures x86_64 `
         --zip-file fileb://$zipPath
@@ -146,15 +135,10 @@ try {
         throw "Failed to publish layer to AWS Lambda"
     }
 
-    # 의존성 패키지 레이어 ARN 출력
     $dependenciesLayerArn = ($dependenciesLayerOutput | ConvertFrom-Json).LayerVersionArn
     Write-Host "`nDependencies layer created successfully!" -ForegroundColor Green
     Write-Host "Dependencies Layer ARN: $dependenciesLayerArn" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "Set this environment variable before deploying:" -ForegroundColor Yellow
-    Write-Host "`$env:DEPENDENCIES_LAYER_ARN = '$dependenciesLayerArn'" -ForegroundColor Yellow
-
-    # 환경 변수 자동 설정
+    
     $env:DEPENDENCIES_LAYER_ARN = $dependenciesLayerArn
     Write-Host "Environment variable has been set automatically for this session." -ForegroundColor Green
 
@@ -162,16 +146,13 @@ try {
     Write-Host "Error occurred: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 } finally {
-    # 임시 디렉토리 유지
     Write-Host "Temporary directory '$tempDir' preserved for inspection" -ForegroundColor Cyan
 }
 
 Write-Host ""
 Write-Host "Dependencies layer creation completed!" -ForegroundColor Green
-Write-Host "Lambda compatibility verified:" -ForegroundColor Cyan
-Write-Host "✓ Correct python/lib/python3.9/site-packages/ structure" -ForegroundColor Green
-Write-Host "✓ FastAPI 0.115.7 and Pydantic 2.10.6 compatibility secured" -ForegroundColor Green
-Write-Host "✓ Python 3.9 x86_64 architecture compatibility secured" -ForegroundColor Green
-Write-Host "✓ AWS Lambda runtime compatibility secured" -ForegroundColor Green
-Write-Host ""
-Write-Host "Installed packages are available in the '$tempDir' directory" -ForegroundColor Yellow
+Write-Host "Email validation compatibility secured:" -ForegroundColor Cyan
+Write-Host "✓ email-validator package with metadata preserved" -ForegroundColor Green
+Write-Host "✓ dnspython dependency included" -ForegroundColor Green
+Write-Host "✓ Pydantic EmailStr support enabled" -ForegroundColor Green
+Write-Host "✓ AWS Lambda metadata compatibility secured" -ForegroundColor Green

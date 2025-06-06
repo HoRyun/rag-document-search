@@ -17,6 +17,9 @@ package/
 #cursor 파일
 .cursor/*
 
+#venv
+lambda-py39-env/
+
 #layer 파일
 .aws-sam/
 .serverless/

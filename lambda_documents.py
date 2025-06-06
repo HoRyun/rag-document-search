@@ -18,7 +18,7 @@ if os.environ.get('AWS_EXECUTION_ENV') is not None:
     # 여러 레이어 경로를 순서대로 추가
     layer_paths = [
         '/opt/python',
-        '/opt/python/lib/python3.11/site-packages',
+        '/opt/python/lib/python3.9/site-packages',
         '/opt'
     ]
     

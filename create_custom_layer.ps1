@@ -24,6 +24,11 @@ try {
     }
     Write-Host "✓ Found backend directory: $backendPath" -ForegroundColor Green
 
+    # 필요한 추가 패키지 설치
+    Write-Host "Installing additional required packages..." -ForegroundColor Yellow
+    python -m pip install --no-cache-dir --target $pythonDir email-validator
+    Write-Host "✓ Installed email-validator package" -ForegroundColor Green
+    
     # 커스텀 모듈 복사 (backend 디렉토리에서)
     Write-Host "Copying custom modules from backend directory..." -ForegroundColor Yellow
     $modules = @("db", "config", "fast_api")

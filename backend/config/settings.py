@@ -45,12 +45,12 @@ if TEST_MODE:
 # 로컬 Windows 환경에서 사용할 URL
 elif os.name == 'nt':  # Windows 환경
     # Amazon RDS 환경에서 사용할 URL
-    DATABASE_URL = f"postgresql+psycopg://{RDS_USER}:{RDS_PASSWORD}@{RDS_ENDPOINT}:5432/{RDS_DB_NAME}?client_encoding=utf8"
+    DATABASE_URL = f"postgresql+psycopg2://{RDS_USER}:{RDS_PASSWORD}@{RDS_ENDPOINT}:5432/{RDS_DB_NAME}?client_encoding=utf8"
     # 프로그램 종료 시 까지 이 주소를 유지
     os.environ['DATABASE_URL'] = DATABASE_URL
 else:
     # Docker 환경에서 사용할 URL
-    DATABASE_URL = f"postgresql+psycopg://{RDS_USER}:{RDS_PASSWORD}@{RDS_ENDPOINT}:5432/{RDS_DB_NAME}?client_encoding=utf8"
+    DATABASE_URL = f"postgresql+psycopg2://{RDS_USER}:{RDS_PASSWORD}@{RDS_ENDPOINT}:5432/{RDS_DB_NAME}?client_encoding=utf8"
     # Docker 환경 변수 설정
     os.environ['DOCKER_ENV'] = 'true'
 
