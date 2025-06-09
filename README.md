@@ -85,7 +85,7 @@ docker-compose up --build
 ## CI/CD 및 배포
 
 - **GitHub Actions**를 통한 자동화된 CI/CD 파이프라인 구축
-- `main`, `develop-backend`, `develop-cloud` 브랜치 등에서 푸시 시
+- `main`, `develop-frontend`, `develop-backend`, `develop-cloud` 브랜치 등에서 푸시 시
     - 테스트 → Docker 이미지 빌드 → ECR 푸시 → ECS Fargate 무중단 배포
 - 워크플로 파일은 `.github/workflows/`에 위치
 
