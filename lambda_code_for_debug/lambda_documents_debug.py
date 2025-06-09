@@ -2,8 +2,13 @@ import json
 import logging
 import sys
 import os
+from datetime import datetime
 from typing import Annotated
-from datetime import timedelta
+
+from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from mangum import Mangum
+from sqlalchemy.orm import Session
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -43,10 +48,7 @@ postgresql_status = setup_psycopg2()
 
 # 외부 의존성 import
 try:
-    from fastapi import FastAPI, Depends, HTTPException, status
-    from fastapi.middleware.cors import CORSMiddleware
-    from mangum import Mangum
-    from sqlalchemy.orm import Session
+    from sqlalchemy import text
     logger.info("✓ Successfully imported external dependencies")
 except ImportError as e:
     logger.error(f"✗ Failed to import external dependencies: {e}")
@@ -56,8 +58,8 @@ except ImportError as e:
 custom_modules = {}
 try:
     from db.database import get_db
-    from db.models import User, Document
-    from db.schemas import DocumentStructureResponse
+    from db.models import User
+    from db import crud
     custom_modules['db'] = "✓ All db modules imported successfully"
     logger.info("✓ db modules imported successfully")
 except ImportError as e:
@@ -77,7 +79,7 @@ except ImportError as e:
 # FastAPI 앱 생성
 app = FastAPI(
     title="AI Document API - Documents",
-    description="Document Management API for AI Document Management",
+    description="Document management service for AI Document Management System",
     version="1.0.0"
 )
 
@@ -92,7 +94,7 @@ app.add_middleware(
 
 @app.get("/")
 def root():
-    """헬스체크 엔드포인트"""
+    """루트 엔드포인트"""
     return {
         "message": "AI Document API - Documents service is running", 
         "status": "healthy",
@@ -104,6 +106,11 @@ def root():
             "custom": custom_modules
         }
     }
+
+@app.get("/health")
+def health_check():
+    """헬스체크 엔드포인트"""
+    return {"status": "healthy", "service": "documents", "timestamp": datetime.utcnow()}
 
 @app.get("/debug/environment")
 def debug_environment():
@@ -154,47 +161,98 @@ def debug_psycopg2_detailed():
     
     return debug_info
 
-@app.get("/fast_api/documents/structure", response_model=DocumentStructureResponse)
-async def documents_structure(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """문서 구조 조회 엔드포인트"""
-    try:
-        logger.info(f"Fetching documents for user: {current_user.username}")
-        documents = db.query(Document).filter(Document.user_id == current_user.id).all()
-        
-        structure = {
-            "documents": [
-                {
-                    "id": doc.id,
-                    "title": doc.title,
-                    "content": doc.content[:100] + "..." if len(doc.content) > 100 else doc.content,
-                    "created_at": doc.created_at,
-                    "updated_at": doc.updated_at
-                } for doc in documents
-            ]
-        }
-        
-        logger.info(f"Successfully retrieved {len(documents)} documents for user {current_user.username}")
-        return DocumentStructureResponse(**structure)
-        
-    except Exception as e:
-        logger.error(f"Error retrieving documents: {e}")
-        raise HTTPException(
-            status_code=500, 
-            detail="문서 구조를 가져오는 중 오류가 발생했습니다."
-        )
-
-@app.get("/fast_api/documents/count")
-def get_documents_count(
-    db: Session = Depends(get_db), 
-    current_user: User = Depends(get_current_user)
+@app.get("/fast_api/documents")
+def list_items(
+    path: str = Query("/", description="현재 경로"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
-    """사용자 문서 수 조회 엔드포인트"""
+    """지정된 경로의 파일 및 폴더 목록을 반환"""
     try:
-        count = db.query(Document).filter(Document.user_id == current_user.id).count()
-        return {"total_documents": count, "user": current_user.username}
+        filtered_items = []
+        user_id = current_user.id
+
+        # 루트 디렉토리가 존재하지 않으면 생성
+        if not crud.get_directory_by_id(db, "root"):
+            crud.create_directory(db, "root", "/", True, None, datetime.now())
+
+        selected_path = path
+
+        # 커넥션 풀에서 직접 연결 가져오기
+        with db.connection() as connection:
+            # 파일 목록 쿼리
+            file_query = text("""
+                SELECT id, name, 'file' as type, path 
+                FROM directories 
+                WHERE path LIKE :selected_path || '/%' 
+                AND path NOT LIKE :selected_path || '/%/%' 
+                AND is_directory = FALSE
+                AND owner_id = :user_id
+            """)
+            file_result = connection.execute(file_query, {"selected_path": selected_path, "user_id": user_id}).mappings().fetchall()
+            
+            # 디렉토리 목록 쿼리
+            dir_query = text("""
+                SELECT id, name, 'folder' as type, path 
+                FROM directories 
+                WHERE path LIKE :selected_path || '/%' 
+                AND path NOT LIKE :selected_path || '/%/%' 
+                AND is_directory = TRUE
+                AND id <> 'root'
+                AND owner_id = :user_id
+            """)
+            dir_result = connection.execute(dir_query, {"selected_path": selected_path, "user_id": user_id}).mappings().fetchall()
+
+        # 가져온 정보를 filtered_items에 추가
+        filtered_items.extend([dict(item) for item in file_result])
+        filtered_items.extend([dict(item) for item in dir_result])
+        
+        logger.info(f"Retrieved {len(filtered_items)} items for user: {current_user.username} at path: {path}")
+        return {"items": filtered_items}
     except Exception as e:
-        logger.error(f"Error counting documents: {e}")
-        raise HTTPException(status_code=500, detail="문서 수를 가져오는 중 오류가 발생했습니다.")
+        logger.error(f"Error listing items: {e}")
+        raise HTTPException(status_code=500, detail=f"Error listing items: {str(e)}")
+
+@app.get("/fast_api/documents/structure")
+async def get_filesystem_structure(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """전체 파일 시스템 구조 반환"""
+    try:
+        user_id = current_user.id
+
+        # 루트 디렉토리가 존재하지 않으면 생성
+        if not crud.get_directory_by_id(db, "root"):
+            crud.create_directory(db, "root", "/", True, None, datetime.now())
+
+        # 디렉토리만 필터링
+        directories = crud.get_only_directory(db, user_id)
+
+        # 최상위 디렉토리 이름(root) 찾기
+        root = next((d['name'] for d in directories if d['parent_id'] == "root"), None)
+        if not root:
+            logger.warning(f"No root directory found for user: {current_user.username}")
+
+        # 새 리스트에 수정된 객체 생성
+        your_result = []
+        for d in directories:
+            # 루트 디렉토리는 제외
+            if d['id'] == "root":
+                continue
+            your_result.append({
+                'id': d['id'],
+                'name': d['name'],
+                'path': d['path']
+            })
+        
+        directories = your_result
+
+        logger.info(f"Retrieved {len(directories)} directories for user: {current_user.username}")
+        return {"directories": directories}
+    except Exception as e:
+        logger.error(f"Error fetching filesystem structure: {e}")
+        raise HTTPException(status_code=500, detail=f"Error fetching filesystem structure: {str(e)}")
 
 # 전역 예외 핸들러
 @app.exception_handler(Exception)
