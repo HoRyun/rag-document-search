@@ -4,6 +4,11 @@ from datetime import datetime
 from sqlalchemy import select, func, delete, text
 
 """인덱스
+
+인덱스는 임시로 작성한 정보이다.
+gpt에게 이 소스 코드를 주고 각 함수의 실제 행위를 설명하라고 해서 각 함수에 작성된 주석과 실제 코드의 내용이 맞는지 확인해야 함.
+
+
 아이템의 id로 해당 아이템 레코드에서 is_directory 필드의 값을 가져온다.
 (select 문은 이 코드 구조를 기반으로 수정하기.(안정적인 코드이기 때문이다.))
 get_file_is_directory_by_id
@@ -72,7 +77,15 @@ def add_documents(db: Session, filename: str, s3_key: str, upload_time: datetime
     db.refresh(db_document)
     return db_document
 
+# 문서 ID로 문서 정보 가져오기
+def get_document_by_id(db: Session, document_id: int):
+    """문서 ID로 documents 테이블에서 문서 정보를 가져온다."""
+    return db.query(models.Document).filter(models.Document.id == document_id).first()
 
+# 사용자 ID로 모든 문서 가져오기
+def get_documents_by_user_id(db: Session, user_id: int):
+    """사용자 ID로 해당 사용자의 모든 문서를 가져온다."""
+    return db.query(models.Document).filter(models.Document.user_id == user_id).all()
 
 # 문서 청크를 저장하는 함수
 def add_document_chunk(db: Session, document_id: int, content: str, embedding=None):
