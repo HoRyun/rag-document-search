@@ -59,7 +59,7 @@ Retrieval-Augmented Generation(RAG) 기술을 활용한 문서 검색 및 질의
 - **DB 관리**: 벡터 검색 및 RAG 데이터는 AWS RDS PostgreSQL에서 관리
 
 ---
-
+ 
 ## 설치 및 실행
 
 ### 1. 사전 요구사항
@@ -94,7 +94,7 @@ docker-compose up --build
 ## 환경 변수 및 시크릿 관리
 
 - 민감정보(API Key 등)는 코드에 직접 포함하지 않고,
-AWS Secrets Manager, GitHub Secrets 또는 환경변수로 안전하게 관리
+GitHub Secrets 또는 환경변수로 안전하게 관리
 
 ---
  
