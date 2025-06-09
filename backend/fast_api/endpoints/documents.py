@@ -18,6 +18,7 @@ from rag.llm import get_llms_answer
 from config.settings import AWS_SECRET_ACCESS_KEY,S3_BUCKET_NAME,AWS_ACCESS_KEY_ID,AWS_DEFAULT_REGION  # 설정 임포트
 import os
 import logging
+from urllib.parse import quote
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -355,13 +356,17 @@ async def download_single_file(
                 logger.error(f"파일 스트리밍 중 오류: {str(e)}")
                 raise HTTPException(status_code=500, detail="파일 다운로드 중 오류가 발생했습니다.")
         
+        # 한글 파일명 처리 (RFC 6266 표준)
+        filename_ascii = filename.encode('ascii', 'ignore').decode('ascii')
+        filename_encoded = quote(filename.encode('utf-8'))
+
         # 5. StreamingResponse로 파일 전달
         return StreamingResponse(
             file_iterator(),
             media_type=content_type,
             headers={
                 "Content-Length": str(file_size),
-                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Disposition": f'attachment; filename="{filename_ascii}"; filename*=UTF-8"{filename_encoded}"',
                 "Cache-Control": "no-cache"
             }
         )
@@ -495,12 +500,16 @@ async def download_multiple_files_as_zip(
                 logger.error(f"ZIP 생성 중 오류: {str(e)}")
                 raise HTTPException(status_code=500, detail="ZIP 파일 생성 중 오류가 발생했습니다.")
         
+        # 한글 ZIP 파일명 처리
+        zip_name_ascii = zip_name.encode('ascii', 'ignore').decode('ascii')
+        zip_name_encoded = quote(zip_name.encode('utf-8'))        
+
         # 4. StreamingResponse로 ZIP 파일 전달
         return StreamingResponse(
             zip_stream_generator(),
             media_type="application/zip",
             headers={
-                "Content-Disposition": f'attachment; filename="{zip_name}"',
+                "Content-Disposition": f'attachment; filename="{zip_name_ascii}"; filename*=UTF-8"{zip_name_encoded}"',
                 "Cache-Control": "no-cache",
                 "Transfer-Encoding": "chunked"
             }
