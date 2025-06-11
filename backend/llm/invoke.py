@@ -11,78 +11,69 @@ import traceback
 from fast_api.endpoints import op_schemas
 from debug import debugging
 
-def get_operation_type(command: str) -> dict:
+def get_operation_type(command: str) -> str:
     """
     명령어를 받아서 해당 명령어의 타입을 반환한다.
-    키워드 매칭을 통해 작업 타입을 결정합니다.
-    
-    Returns:
-        dict: {'value': str, 'value_type': str(optional)}
-        value: delete, rename, create_folder, move, copy, summarize, search, error 중 하나
-        value_type: error인 경우에만 할당 ('err-1' 또는 'err-2')
-            - err-1: 부정표현 또는 파일관련이지만 매칭안됨
-            - err-2: 파일과 관련없는 명령
     """
-    # 부정 표현 확인 (한국어는 대소문자 구분 없음)
-    negative_words = ["하지마", "말아", "안해", "못해", "금지"]
-    has_negative = any(neg in command for neg in negative_words)
-    
-    # 부정 표현이 있는 경우 err-1 반환
-    if has_negative:
-        print(f"부정 표현 감지: 'error' (err-1) 반환")
-        return {"value": "error", "value_type": "err-1"}
-    
-    # 특수 처리: "정리" 키워드의 중의성 해결
-    if "정리" in command:
-        if "내용" in command or "요약" in command:
-            print(f"매칭된 키워드: '내용+정리' → 작업타입: 'summarize'")
-            return {"value": "summarize", "value_type": None}
-        else:
-            print(f"매칭된 키워드: '정리' → 작업타입: 'delete'")
-            return {"value": "delete", "value_type": None}
-    
-    # 각 작업 타입별 키워드 정의 (우선순위 순으로 정렬)
-    operation_keywords = {
-        "delete": ["삭제", "지우", "지워", "delete", "제거", "remove", "없애", "버려", "삭제해", "지워줘", "제거해", "없애줘", "버리", "폐기", "del", "삭제하", "지우기", "제거하"],
-        "create_folder": ["폴더생성", "폴더만들", "폴더추가", "create", "새폴더", "디렉토리생성", "폴더만드", "만들어", "생성해", "만들고", "폴더", "디렉토리", "mkdir", "폴더를", "디렉토리를", "새로운", "추가", "생성", "만들", "새로", "create_folder"],
-        "rename": ["이름변경", "이름바꾸", "이름수정", "rename", "제목변경", "제목바꾸", "수정하고", "바꿔", "변경", "수정", "바꿔줘", "변경해", "수정해", "리네임", "바꾸", "개명", "이름을", "제목을", "명칭", "바꿔주", "변경하"],
-        "move": ["이동", "옮기", "옮겨", "move", "이사", "위치변경", "옮겨달", "이동해", "이동해줘", "옮겨줘", "이사시", "위치", "이동시", "mv", "이동하", "옮기기", "이동시키", "옮겨서", "이동을"],
-        "copy": ["복사", "copy", "복제", "백업", "복사해", "복사해줘", "복제해", "복제해줘", "백업해", "cp", "카피", "복사시", "복제시", "복사하", "복제하", "백업하", "복사를", "복제를"],
-        "summarize": ["요약", "summarize", "요약해", "summary", "요약해줘", "정리해", "요약정리", "간략", "요약하", "정리하", "요약을", "내용요약", "간단히", "정리"],
-        "search": ["검색", "찾", "찾아", "search", "조회", "탐색", "찾아줘", "찾기", "검색해", "검색해줘", "찾아서", "조회해", "탐색해", "find", "look", "검색하", "찾으", "조회하", "찾을","어딨는지","어디","어디있는지","어느위치에","어느"]
-    }
-    
-    # 키워드 매칭으로 작업 타입 결정
-    for operation_type, keywords in operation_keywords.items():
-        for keyword in keywords:
-            # 한국어는 원본 그대로, 영어는 대소문자 무시하고 매칭
-            if keyword in command or keyword.lower() in command.lower():
-                
-                # rename의 경우 파일명 관련 키워드 체크
-                if operation_type == "rename":
-                    filename_keywords = ["파일명", "이름", "제목", "명", "name", "title"]
-                    has_filename_context = any(fn_keyword in command.lower() for fn_keyword in filename_keywords)
-                    
-                    if not has_filename_context:
-                        # 파일명 관련 키워드가 없으면 에러로 처리
-                        print(f"rename 키워드 매칭되었지만 파일명 관련 키워드 없음: 'error' (err-1) 반환")
-                        return {"value": "error", "value_type": "err-1"}
-                
-                print(f"매칭된 키워드: '{keyword}' → 작업타입: '{operation_type}'")
-                return {"value": operation_type, "value_type": None}
-    
-    # 파일 관련 키워드가 있는지 확인 (관련없는 명령 vs 매칭 안됨 구분)
-    file_related_words = ["파일", "문서", "폴더", "디렉토리", "file", "folder", "document", "dir"]
-    has_file_context = any(word in command.lower() for word in file_related_words)
-    
-    if has_file_context:
-        # 파일 관련이지만 매칭 안됨 - err-1
-        print(f"파일 관련이지만 매칭 안됨: 'error' (err-1) 반환")
-        return {"value": "error", "value_type": "err-1"}
-    else:
-        # 파일과 관련없는 명령 - err-2
-        print(f"관련없는 명령: 'error' (err-2) 반환")
-        return {"value": "error", "value_type": "err-2"}
+    prompt = PromptTemplate.from_template(
+        """
+        <Instructions>
+You must analyze <User's command> and determine what task the user wants to perform.
+The task the user requests is always one of the following:
+
+* move
+* copy
+* delete
+* rename
+* create_folder
+* search
+* summarize
+
+If <User's command> matches one of the above tasks, output it in the following format:
+For example, if the user's desired task is move, output:
+<operation.type>move</operation.type>
+
+If <User's command> is incompatible with this system or cannot be understood, output:
+<operation.type>error</operation.type>
+
+Summary of your duties:
+
+1. Identify the task the user wants to perform.
+2. Respond according to the specified output format.
+
+Note:
+Write only the output.
+        </Instructions>
+        <User's command> {command} </User's command>
+        
+        Answer:
+    """
+    )
+
+    # OpenAI 모델 객체를 생성한다.
+    llm = ChatOpenAI(
+    temperature=0.1,
+    max_tokens=100,
+    model_name="gpt-4o-mini",)
+
+    # 체인 생성
+    chain = (
+        {"command": RunnablePassthrough()}
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+
+    # 체인 실행
+    try:
+        result = chain.invoke(command)
+        print(f"Operation type: {result}")
+        # 모델 출력을 파싱하여 operation_type을 추출
+        operation_type = result.split("<operation.type>")[1].split("</operation.type>")[0]
+        return operation_type
+    except Exception as e:
+        print(f"Error in get_operation_type: {e}")
+        return "error"
 
 
 

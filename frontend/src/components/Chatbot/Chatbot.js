@@ -322,6 +322,11 @@ const Chatbot = ({
           setMessages(prev => prev.filter(msg => msg.id !== 'typing'));
           addMessage(t('chatbot.operations.failed'));
         }
+        
+
+        // ===== 임시 에러 처리 =====
+        addMessage('죄송합니다, 현재 명령을 처리할 수 없습니다. 잠시 후 다시 시도해주세요.');
+        // ===== 임시 주석 처리 끝 =====       
       }
       
     } catch (error) {
