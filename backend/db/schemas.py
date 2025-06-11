@@ -69,3 +69,9 @@ class DirectoryBase(BaseModel):
     name: str
     path: str
     is_directory: bool
+
+# class ChatLog(BaseModel):
+#     id: int
+#     content: str
+#     sender: str
+#     owner_id: int

@@ -493,7 +493,6 @@ const Chatbot = ({
     }
   };
   
-  // 가이드 관련 함수들
   const handleGuideClose = () => {
     setShowGuide(false);
   };

@@ -141,10 +141,17 @@ def get_parent_id_by_path(db: Session, path: str):
 def get_file_info_by_s3_key(db: Session, s3_key: str):
     return db.query(models.Document).filter(models.Document.s3_key == s3_key).first()
 
-# 동일한 파일 이름이 존재하는 지 확인
+# # 동일한 파일 이름이 존재하는 지 확인 수정 전
+# def get_file_info_by_filename(db: Session, filename: str):
+#     """Document 테이블에 filename이 존재하면 해당 레코드를 반환한다."""
+#     return db.query(models.Document).filter(models.Document.filename == filename).first()
+
+# 동일한 파일 이름이 존재하는 지 확인 수정 후
 def get_file_info_by_filename(db: Session, filename: str):
     """Document 테이블에 filename이 존재하면 해당 레코드를 반환한다."""
-    return db.query(models.Document).filter(models.Document.filename == filename).first()
+    stmt = select(models.Document).where(models.Document.filename == filename)
+    result = db.execute(stmt).scalar_one_or_none()
+    return result
 
 # 동일한 디렉토리 이름이 존재하는 지 확인
 def get_directory_info_by_name(db: Session, directory_name: str):

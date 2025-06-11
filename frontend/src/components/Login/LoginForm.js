@@ -3,7 +3,7 @@ import axios from "axios";
 import { useTranslation } from "../../hooks/useTranslation";
 import "./LoginForm.css";
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://rag-alb-547296323.ap-northeast-2.elb.amazonaws.com/fast_api";
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000/fast_api";
 
 const LoginForm = ({ onLoginSuccess, onShowRegister }) => {
   const { t } = useTranslation();
