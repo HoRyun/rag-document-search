@@ -289,7 +289,7 @@ export const loadTranslationResources = async (language) => {
 export const I18nProvider = LanguageProvider;
 
 // 기본 export
-export default {
+const i18nModule = {
   I18N_CONFIG,
   formatters,
   LANGUAGE_CONSTANTS,
@@ -301,3 +301,5 @@ export default {
   loadTranslationResources,
   I18nProvider
 };
+
+export default i18nModule;

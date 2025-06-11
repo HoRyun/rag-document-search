@@ -22,7 +22,7 @@ const FileDisplay = ({
   downloadState = { isActive: false },
   onDownloadCancel
 }) => {
-  const { t, formatFileSize, formatDate } = useTranslation();
+  const { t, formatFileSize } = useTranslation();
   
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);

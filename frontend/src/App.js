@@ -16,7 +16,7 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://rag-alb-54729
 
 // 메인 앱 컴포넌트 (다국어 지원 적용)
 function AppContent() {
-  const { t, formatFileSize, formatDate } = useTranslation();
+  const { t, formatFileSize } = useTranslation();
   
   const [files, setFiles] = useState([]);
   const [directories, setDirectories] = useState([]);
@@ -373,10 +373,6 @@ function AppContent() {
       // AbortController 정리
       setDownloadState(prev => ({ ...prev, abortController: null }));
     }
-  };
-
-  const formatBytes = (bytes, decimals = 1) => {
-    return formatFileSize(bytes, decimals);
   };
 
   // 테마 토글 핸들러
