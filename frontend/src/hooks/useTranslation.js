@@ -1,11 +1,12 @@
+import { useCallback, useMemo } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 // 번역 리소스 import
 import koTranslations from '../i18n/locales/ko.json';
 import enTranslations from '../i18n/locales/en.json';
 
-// 번역 리소스 맵
-const translations = {
+// 번역 리소스 맵 - 컴포넌트 외부로 이동 (불변 객체)
+const TRANSLATIONS = {
   ko: koTranslations,
   en: enTranslations
 };
@@ -28,15 +29,15 @@ const interpolate = (template, variables = {}) => {
   });
 };
 
-// 번역 훅
+// 번역 훅 - useCallback으로 최적화
 export const useTranslation = () => {
   const { currentLanguage } = useLanguage();
   
-  // 번역 함수
-  const t = (key, variables = {}) => {
+  // 번역 함수 - useCallback으로 메모이제이션
+  const t = useCallback((key, variables = {}) => {
     try {
       // 현재 언어의 번역 리소스 가져오기
-      const currentTranslations = translations[currentLanguage];
+      const currentTranslations = TRANSLATIONS[currentLanguage];
       
       if (!currentTranslations) {
         console.warn(`Translation resource not found for language: ${currentLanguage}`);
@@ -49,7 +50,7 @@ export const useTranslation = () => {
       if (translatedValue === null || translatedValue === undefined) {
         // 영어로 폴백 시도 (한국어에 없는 경우)
         if (currentLanguage !== 'en') {
-          const fallbackValue = getNestedValue(translations.en, key);
+          const fallbackValue = getNestedValue(TRANSLATIONS.en, key);
           if (fallbackValue !== null) {
             console.warn(`Translation missing for key '${key}' in ${currentLanguage}, using English fallback`);
             return interpolate(fallbackValue, variables);
@@ -68,10 +69,10 @@ export const useTranslation = () => {
       console.error(`Error translating key '${key}':`, error);
       return key;
     }
-  };
+  }, [currentLanguage]); // currentLanguage만 의존성으로
 
-  // 복수형 처리 함수 (한국어는 복수형이 없지만 영어 지원)
-  const tn = (key, count, variables = {}) => {
+  // 복수형 처리 함수 - useCallback으로 메모이제이션
+  const tn = useCallback((key, count, variables = {}) => {
     const baseKey = count === 1 ? `${key}.singular` : `${key}.plural`;
     const fallbackKey = key;
     
@@ -84,36 +85,36 @@ export const useTranslation = () => {
     }
     
     return result;
-  };
+  }, [t]);
 
-  // 날짜 형식화 함수
-  const formatDate = (date, options = {}) => {
+  // 언어별 기본 옵션 - useMemo로 메모이제이션
+  const dateFormatOptions = useMemo(() => ({
+    ko: {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    },
+    en: {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    }
+  }), []);
+
+  // 날짜 형식화 함수 - useCallback으로 메모이제이션
+  const formatDate = useCallback((date, options = {}) => {
     if (!date) return '';
     
     const dateObject = date instanceof Date ? date : new Date(date);
     
-    // 언어별 기본 옵션
-    const defaultOptions = {
-      ko: {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      },
-      en: {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      }
-    };
-
     const locale = currentLanguage === 'ko' ? 'ko-KR' : 'en-US';
-    const formatOptions = { ...defaultOptions[currentLanguage], ...options };
+    const formatOptions = { ...dateFormatOptions[currentLanguage], ...options };
 
     try {
       return new Intl.DateTimeFormat(locale, formatOptions).format(dateObject);
@@ -121,10 +122,10 @@ export const useTranslation = () => {
       console.error('Date formatting error:', error);
       return dateObject.toLocaleDateString();
     }
-  };
+  }, [currentLanguage, dateFormatOptions]);
 
-  // 숫자 형식화 함수
-  const formatNumber = (number, options = {}) => {
+  // 숫자 형식화 함수 - useCallback으로 메모이제이션
+  const formatNumber = useCallback((number, options = {}) => {
     if (typeof number !== 'number') return number;
     
     const locale = currentLanguage === 'ko' ? 'ko-KR' : 'en-US';
@@ -135,10 +136,10 @@ export const useTranslation = () => {
       console.error('Number formatting error:', error);
       return number.toString();
     }
-  };
+  }, [currentLanguage]);
 
-  // 파일 크기 형식화 함수 (다국어 지원)
-  const formatFileSize = (bytes, decimals = 1) => {
+  // 파일 크기 형식화 함수 - useCallback으로 메모이제이션
+  const formatFileSize = useCallback((bytes, decimals = 1) => {
     if (bytes === 0) {
       return currentLanguage === 'ko' ? '0 바이트' : '0 Bytes';
     }
@@ -157,10 +158,10 @@ export const useTranslation = () => {
     );
     
     return `${formattedNumber} ${sizes[i]}`;
-  };
+  }, [currentLanguage, formatNumber]);
 
-  // 상대적 시간 형식화 함수
-  const formatRelativeTime = (date) => {
+  // 상대적 시간 형식화 함수 - useCallback으로 메모이제이션
+  const formatRelativeTime = useCallback((date) => {
     if (!date) return '';
     
     const dateObject = date instanceof Date ? date : new Date(date);
@@ -202,10 +203,11 @@ export const useTranslation = () => {
       month: 'short', 
       day: 'numeric' 
     });
-  };
+  }, [currentLanguage, formatDate]);
 
-  return {
-    t,           // 기본 번역 함수
+  // 메모이제이션된 반환 객체
+  const returnValue = useMemo(() => ({
+    t,           // 안정된 참조를 가진 번역 함수
     tn,          // 복수형 번역 함수
     formatDate,  // 날짜 형식화
     formatNumber, // 숫자 형식화
@@ -214,7 +216,17 @@ export const useTranslation = () => {
     currentLanguage, // 현재 언어
     isKorean: currentLanguage === 'ko',
     isEnglish: currentLanguage === 'en'
-  };
+  }), [
+    t, 
+    tn, 
+    formatDate, 
+    formatNumber, 
+    formatFileSize, 
+    formatRelativeTime, 
+    currentLanguage
+  ]);
+
+  return returnValue;
 };
 
 export default useTranslation;
