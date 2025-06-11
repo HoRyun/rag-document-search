@@ -24,7 +24,7 @@ const Sidebar = ({ className, directories, currentPath, setCurrentPath, onRefres
       
       setExpandedFolders(newExpanded);
     }
-  }, [currentPath]); // expandedFolders 의존성 제거
+  }, [currentPath, expandedFolders]);
 
   const handleDirectoryClick = (path) => {
     setCurrentPath(path);

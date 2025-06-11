@@ -386,19 +386,6 @@ const FileDisplay = ({
     showNotification(t('download.cancelled'));
   };
 
-  // ✅ 바이트를 읽기 쉬운 형태로 변환하는 유틸리티 함수
-  const formatBytes = (bytes, decimals = 1) => {
-    if (bytes === 0) return '0 Bytes';
-    
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-  };
-
   // ✅ 남은 시간 계산 함수
   const formatRemainingTime = (speed, remainingBytes) => {
     if (speed === 0 || remainingBytes === 0) {

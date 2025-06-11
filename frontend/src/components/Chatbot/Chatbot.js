@@ -39,14 +39,12 @@ const Chatbot = ({
   
   const messagesEndRef = useRef(null);
   
-  // 초기 메시지 설정 - 컴포넌트 마운트 시에만 실행
   useEffect(() => {
     setMessages([
       { id: 1, text: t('chatbot.welcome'), sender: 'bot' }
     ]);
-  }, []); // 빈 의존성 배열로 한 번만 실행
-  
-  // 언어 변경 시 환영 메시지 업데이트 - t 함수 의존성 제거
+  }, []);
+
   useEffect(() => {
     setMessages(prev => {
       if (prev.length > 0 && prev[0].sender === 'bot' && prev[0].id === 1) {
@@ -59,7 +57,8 @@ const Chatbot = ({
       }
       return prev;
     });
-  }, [currentLanguage]); // t 함수 제거, currentLanguage만 의존성으로
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentLanguage]);
   
   // 챗봇이 닫히면 가이드도 함께 닫기
   useEffect(() => {
