@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List
 from pydantic import BaseModel
@@ -7,7 +7,7 @@ from datetime import datetime
 import uuid
 import json
 import boto3
-
+ 
 # 메서드 import
 from debug import debugging
 from db.database import get_db, engine
@@ -18,6 +18,7 @@ from rag.llm import get_llms_answer
 from config.settings import AWS_SECRET_ACCESS_KEY,S3_BUCKET_NAME,AWS_ACCESS_KEY_ID,AWS_DEFAULT_REGION  # 설정 임포트
 import os
 import logging
+from urllib.parse import quote
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -178,7 +179,7 @@ async def upload_document(
     
     # path는 사용자가 유저 인터페이스 창에서 선택한 경로이다.
     current_upload_path = path
-
+    # debugging.stop_debugger()
     try:
         results = {
             "success": True,
@@ -277,13 +278,248 @@ async def query_document(
     # debugging.stop_debugger()
     user_id = current_user.id
 
-    docs = process_query(user_id,query,engine)
+    pass
+
+
+    # docs = process_query(user_id,query,engine)
     
-    answer = get_llms_answer(docs, query)
+    # answer = get_llms_answer(docs, query)
 
 
-    return {"answer": answer} 
+    # return {"answer": answer} 
 
+# 단일 파일 다운로드 엔드포인트 생성 위치
+
+@router.get("/{document_id}/download")
+async def download_single_file(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """단일 파일 다운로드"""
+    from db import crud
+    try:
+        # 1. 사용자 권한 확인
+        user_id = current_user.id
+        
+        # 파일 ID 타입 확인 및 변환
+        try:
+            doc_id = int(document_id) if isinstance(document_id, str) else document_id
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="유효하지 않은 파일 ID입니다.")
+        
+        # 2. 다운로드에 필요한 파일 정보 준비
+        # documents 테이블에서 파일 정보 가져오기
+        document = crud.get_document_by_id(db, doc_id)
+        if not document:
+            raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
+        
+        # 파일 소유자 확인 (권한 검증)
+        if document.user_id != user_id:
+            raise HTTPException(status_code=403, detail="파일 다운로드 권한이 없습니다.")
+        
+        # S3 정보 추출
+        s3_key = document.s3_key
+        filename = document.filename
+        
+        logger.info(f"단일 파일 다운로드 시작: {filename} (사용자: {user_id})")
+        
+        # 3. S3에서 파일 존재 확인
+        try:
+            # S3 객체 메타데이터 가져오기 (파일 존재 및 크기 확인)
+            s3_response = s3_client.head_object(Bucket=S3_BUCKET_NAME, Key=s3_key)
+            file_size = s3_response['ContentLength']
+            content_type = s3_response.get('ContentType', 'application/octet-stream')
+        except s3_client.exceptions.NoSuchKey:
+            logger.error(f"S3에서 파일을 찾을 수 없습니다: {s3_key}")
+            raise HTTPException(status_code=404, detail="파일이 S3에 존재하지 않습니다.")
+        except Exception as e:
+            logger.error(f"S3 파일 확인 중 오류: {str(e)}")
+            raise HTTPException(status_code=500, detail="파일 확인 중 오류가 발생했습니다.")
+        
+        # 4. 스트리밍 다운로드 함수 정의
+        def file_iterator(chunk_size: int = 8192):
+            """S3에서 파일을 청크 단위로 읽어서 스트리밍"""
+            try:
+                # S3에서 파일 스트림 가져오기
+                s3_object = s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=s3_key)
+                stream = s3_object['Body']
+                
+                # 청크 단위로 읽어서 yield
+                while True:
+                    chunk = stream.read(chunk_size)
+                    if not chunk:
+                        break
+                    yield chunk
+                        
+            except Exception as e:
+                logger.error(f"파일 스트리밍 중 오류: {str(e)}")
+                raise HTTPException(status_code=500, detail="파일 다운로드 중 오류가 발생했습니다.")
+        
+        # 한글 파일명 처리 (RFC 6266 표준)
+        filename_ascii = filename.encode('ascii', 'ignore').decode('ascii')
+        filename_encoded = quote(filename.encode('utf-8'))
+
+        # 5. StreamingResponse로 파일 전달
+        return StreamingResponse(
+            file_iterator(),
+            media_type=content_type,
+            headers={
+                "Content-Length": str(file_size),
+                "Content-Disposition": f'attachment; filename="{filename_ascii}"; filename*=UTF-8"{filename_encoded}"',
+                "Cache-Control": "no-cache"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"단일 파일 다운로드 중 예상치 못한 오류: {str(e)}")
+        raise HTTPException(status_code=500, detail="파일 다운로드 중 오류가 발생했습니다.")
+
+
+# 다중 파일 ZIP 다운로드 엔드포인트 생성 위치
+
+class DownloadZipRequest(BaseModel):
+    fileIds: List[str]  # 문자열 배열로 변경하여 호환성 향상
+    zipName: str = "selected_files.zip"
+
+@router.post("/download-zip")
+async def download_multiple_files_as_zip(
+    request_data: DownloadZipRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """다중 파일을 ZIP으로 압축하여 다운로드"""
+    from db import crud
+    import zipfile
+    import io
+    import asyncio
+    
+    try:
+        # 1. 사용자 권한 확인
+        user_id = current_user.id
+        file_ids = request_data.fileIds
+        zip_name = request_data.zipName
+        
+        if not file_ids:
+            raise HTTPException(status_code=400, detail="다운로드할 파일을 선택해주세요.")
+        
+        # 파일 ID들을 정수로 변환
+        try:
+            int_file_ids = [int(fid) for fid in file_ids]
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="유효하지 않은 파일 ID가 포함되어 있습니다.")
+        
+        logger.info(f"ZIP 다운로드 시작: {len(int_file_ids)}개 파일 (사용자: {user_id})")
+        
+        # 2. 모든 파일 정보 가져오기 및 권한 확인
+        documents = []
+        for file_id in int_file_ids:
+            document = crud.get_document_by_id(db, file_id)
+            if not document:
+                logger.warning(f"파일 ID {file_id}를 찾을 수 없습니다.")
+                continue
+            
+            # 파일 소유자 확인
+            if document.user_id != user_id:
+                logger.warning(f"파일 ID {file_id}에 대한 권한이 없습니다.")
+                continue
+                
+            documents.append(document)
+        
+        if not documents:
+            raise HTTPException(status_code=404, detail="다운로드 가능한 파일이 없습니다.")
+        
+        # 3. ZIP 스트림 생성 함수 (실시간 압축 및 전송)
+        async def zip_stream_generator():
+            """파일들을 실시간으로 압축하면서 스트리밍"""
+            try:
+                # 메모리 내 ZIP 파일 생성
+                zip_buffer = io.BytesIO()
+                
+                with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                    
+                    for i, document in enumerate(documents):
+                        # 끊김 감지 - 클라이언트가 연결을 끊었는지 확인
+                        if await request.is_disconnected():
+                            logger.info("클라이언트 연결이 끊어졌습니다. ZIP 생성을 중단합니다.")
+                            break
+                        
+                        try:
+                            # S3에서 파일 다운로드
+                            s3_response = s3_client.get_object(
+                                Bucket=S3_BUCKET_NAME, 
+                                Key=document.s3_key
+                            )
+                            file_data = s3_response['Body'].read()
+                            
+                            # ZIP에 파일 추가 (파일명 중복 방지)
+                            filename = document.filename
+                            # 동일한 파일명이 있을 경우 번호 추가
+                            counter = 1
+                            original_filename = filename
+                            while filename in [info.filename for info in zip_file.infolist()]:
+                                name, ext = os.path.splitext(original_filename)
+                                filename = f"{name}_{counter}{ext}"
+                                counter += 1
+                            
+                            zip_file.writestr(filename, file_data)
+                            logger.info(f"ZIP에 파일 추가: {filename} ({i+1}/{len(documents)})")
+                            
+                        except s3_client.exceptions.NoSuchKey:
+                            logger.warning(f"S3에서 파일을 찾을 수 없습니다: {document.s3_key}")
+                            continue
+                        except Exception as e:
+                            logger.error(f"파일 {document.filename} 처리 중 오류: {str(e)}")
+                            continue
+                
+                # ZIP 파일 완성 후 스트리밍
+                zip_buffer.seek(0)
+                
+                # 8KB 청크 단위로 전송
+                chunk_size = 8192
+                while True:
+                    # 끊김 감지
+                    if await request.is_disconnected():
+                        logger.info("클라이언트 연결이 끊어졌습니다. ZIP 전송을 중단합니다.")
+                        break
+                    
+                    chunk = zip_buffer.read(chunk_size)
+                    if not chunk:
+                        break
+                    yield chunk
+                
+                logger.info(f"ZIP 다운로드 완료: {zip_name}")
+                
+            except asyncio.CancelledError:
+                logger.info("ZIP 생성이 취소되었습니다.")
+                raise
+            except Exception as e:
+                logger.error(f"ZIP 생성 중 오류: {str(e)}")
+                raise HTTPException(status_code=500, detail="ZIP 파일 생성 중 오류가 발생했습니다.")
+        
+        # 한글 ZIP 파일명 처리
+        zip_name_ascii = zip_name.encode('ascii', 'ignore').decode('ascii')
+        zip_name_encoded = quote(zip_name.encode('utf-8'))        
+
+        # 4. StreamingResponse로 ZIP 파일 전달
+        return StreamingResponse(
+            zip_stream_generator(),
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f'attachment; filename="{zip_name_ascii}"; filename*=UTF-8"{zip_name_encoded}"',
+                "Cache-Control": "no-cache",
+                "Transfer-Encoding": "chunked"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"ZIP 다운로드 중 예상치 못한 오류: {str(e)}")
+        raise HTTPException(status_code=500, detail="ZIP 다운로드 중 오류가 발생했습니다.")
 
 # -----------------------------------------
 # -----------------------------------------
@@ -1060,7 +1296,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                 # 경로
                                 child_new_path = crud.get_file_path_by_id(db, child_directory).replace(parent_path_of_target,"")
                                 # parent_id
-                                    # 본인 path에서 “/” + <본인 name>을 찾아 “”으로 교체한 값이 directories테이블의 path필드값에 존재하면 그 존재하는 레코드의 id값으로 설정.
+                                    # 본인 path에서 "/"+<본인 name>을 찾아 ""으로 교체한 값이 directories테이블의 path필드값에 존재하면 그 존재하는 레코드의 id값으로 설정.
                                 child_new_parent_id = crud.get_directory_id_by_path(db,child_new_path.replace("/"+child_original_name,""))
                                 
                                 # 저장될 데이터를 일반화
@@ -1188,7 +1424,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                 # 경로
                                 child_new_path = crud.get_file_path_by_id(db, child_directory).replace(parent_path_of_target,target_destination_path,1)
                                 # parent_id
-                                    # 본인 path에서 “/” + <본인 name>을 찾아 “”으로 교체한 값이 directories테이블의 path필드값에 존재하면 그 존재하는 레코드의 id값으로 설정.
+                                    # 본인 path에서 "/"+<본인 name>을 찾아 ""으로 교체한 값이 directories테이블의 path필드값에 존재하면 그 존재하는 레코드의 id값으로 설정.
                                 child_new_parent_id = crud.get_directory_id_by_path(db,child_new_path.replace("/"+child_original_name,"",1))
                                 
                                 # 저장될 데이터를 일반화
