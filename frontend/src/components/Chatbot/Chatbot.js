@@ -58,7 +58,7 @@ const Chatbot = ({
       return prev;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentLanguage, t]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentLanguage]); // eslint-disable-line react-hooks/exhaustive-deps
   
   // 챗봇이 닫히면 가이드도 함께 닫기
   useEffect(() => {
