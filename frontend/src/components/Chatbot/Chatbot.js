@@ -58,7 +58,7 @@ const Chatbot = ({
       return prev;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentLanguage, t]); //나중에 수정, 무한루프 버그있는데 훅 수정하고 다시 커밋함
+  }, [currentLanguage, t]); // eslint-disable-line react-hooks/exhaustive-deps
   
   // 챗봇이 닫히면 가이드도 함께 닫기
   useEffect(() => {
