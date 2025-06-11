@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
+from typing import Optional
 
 import logging
 from datetime import datetime
@@ -27,7 +28,8 @@ logger = logging.getLogger(__name__)
 async def stage_operation(
     request: op_schemas.StageOperationRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    accept_language: Optional[str] = Header(default=None, alias="Accept-Language")
 ):
     """
     자연어 명령을 분석하고 작업을 준비하는 엔드포인트
@@ -36,12 +38,18 @@ async def stage_operation(
         request: 사용자 명령과 컨텍스트 정보
         current_user: 현재 인증된 사용자
         db: 데이터베이스 세션
+        accept_language: Accept-Language header
     
     Returns:
         OperationResponse: 준비된 작업 정보
     """
     logger.info(f"Stage operation request from user {current_user.id}: {request.command}")
-    # debugging.stop_debugger()
+    # Extract language from Accept-Language header (default to 'ko')
+    language = accept_language.split(',')[0].strip().lower() if accept_language else 'ko'
+    logger.debug(f"🈯 Detected language from header: {language}")
+
+    # TODO: Pass `language` to downstream logic (LLM prompt, i18n, etc.) as needed.
+
     # command 값 접근
     command = request.command
 
