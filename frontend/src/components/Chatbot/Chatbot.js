@@ -43,7 +43,7 @@ const Chatbot = ({
     setMessages([
       { id: 1, text: t('chatbot.welcome'), sender: 'bot' }
     ]);
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     setMessages(prev => {
@@ -57,8 +57,7 @@ const Chatbot = ({
       }
       return prev;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentLanguage]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentLanguage, t]);
   
   // 챗봇이 닫히면 가이드도 함께 닫기
   useEffect(() => {
