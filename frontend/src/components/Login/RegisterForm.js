@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import axios from "axios";
+import { useTranslation } from "../../hooks/useTranslation";
 import "./RegisterForm.css";
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://rag-alb-547296323.ap-northeast-2.elb.amazonaws.com/fast_api";
 
 const RegisterForm = ({ onRegisterSuccess, onShowLogin }) => {
+  const { t } = useTranslation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
@@ -27,7 +29,7 @@ const RegisterForm = ({ onRegisterSuccess, onShowLogin }) => {
       onRegisterSuccess();
     } catch (error) {
       console.error("Registration error:", error);
-      setError("회원가입에 실패했습니다. 다른 사용자 이름을 시도해주세요.");
+      setError(t('auth.register.error'));
     } finally {
       setIsLoading(false);
     }
@@ -37,46 +39,46 @@ const RegisterForm = ({ onRegisterSuccess, onShowLogin }) => {
     <div className="register-container">
       <div className="register-form">
         <div className="register-header">
-          <h2>회원가입</h2>
-          <p>새 계정을 생성하여 파일 관리 시스템을 이용하세요</p>
+          <h2>{t('auth.register.title')}</h2>
+          <p>{t('auth.register.subtitle')}</p>
         </div>
 
         {error && <div className="error-message">{error}</div>}
 
         <form onSubmit={handleRegister}>
           <div className="form-group">
-            <label htmlFor="username">사용자 이름</label>
+            <label htmlFor="username">{t('auth.register.username')}</label>
             <input
               type="text"
               id="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
-              placeholder="사용자 이름을 입력하세요"
+              placeholder={t('auth.register.usernamePlaceholder')}
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="email">이메일</label>
+            <label htmlFor="email">{t('auth.register.email')}</label>
             <input
               type="email"
               id="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              placeholder="이메일을 입력하세요"
+              placeholder={t('auth.register.emailPlaceholder')}
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">비밀번호</label>
+            <label htmlFor="password">{t('auth.register.password')}</label>
             <input
               type="password"
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              placeholder="비밀번호를 입력하세요"
+              placeholder={t('auth.register.passwordPlaceholder')}
             />
           </div>
 
@@ -85,14 +87,14 @@ const RegisterForm = ({ onRegisterSuccess, onShowLogin }) => {
             className="register-button"
             disabled={isLoading}
           >
-            {isLoading ? "가입 중..." : "가입하기"}
+            {isLoading ? t('auth.register.registerInProgress') : t('auth.register.registerButton')}
           </button>
         </form>
 
         <div className="register-footer">
-          <p>이미 계정이 있으신가요?</p>
+          <p>{t('auth.register.hasAccount')}</p>
           <button onClick={onShowLogin} className="login-link">
-            로그인
+            {t('auth.register.signIn')}
           </button>
         </div>
       </div>

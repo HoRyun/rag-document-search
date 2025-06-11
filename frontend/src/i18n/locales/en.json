@@ -1,0 +1,277 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "close": "Close",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search",
+    "refresh": "Refresh",
+    "home": "Home",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "yes": "Yes",
+    "no": "No",
+    "ok": "OK",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Info",
+    "suffix": ""
+  },
+  "header": {
+    "title": "FileManager",
+    "searchPlaceholder": "Search files...",
+    "menu": "Menu",
+    "user": "User",
+    "logout": "Logout",
+    "language": "Language",
+    "theme": {
+      "light": "Light Mode",
+      "dark": "Dark Mode"
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Login",
+      "subtitle": "Welcome to the File Management System",
+      "username": "Username",
+      "password": "Password",
+      "usernamePlaceholder": "Enter your username",
+      "passwordPlaceholder": "Enter your password",
+      "loginButton": "Login",
+      "loginInProgress": "Logging in...",
+      "noAccount": "Don't have an account?",
+      "signUp": "Sign Up",
+      "error": "Login failed. Please check your username and password."
+    },
+    "register": {
+      "title": "Sign Up",
+      "subtitle": "Create a new account to use the file management system",
+      "username": "Username",
+      "email": "Email",
+      "password": "Password",
+      "usernamePlaceholder": "Enter your username",
+      "emailPlaceholder": "Enter your email",
+      "passwordPlaceholder": "Enter your password",
+      "registerButton": "Sign Up",
+      "registerInProgress": "Signing up...",
+      "hasAccount": "Already have an account?",
+      "signIn": "Sign In",
+      "error": "Registration failed. Please try a different username."
+    }
+  },
+  "sidebar": {
+    "title": "Directories",
+    "refresh": "Refresh",
+    "close": "Close"
+  },
+  "fileDisplay": {
+    "toolbar": {
+      "copy": "Copy",
+      "cut": "Cut",
+      "paste": "Paste",
+      "rename": "Rename",
+      "move": "Move",
+      "delete": "Delete",
+      "download": "Download"
+    },
+    "actions": {
+      "newFolder": "New Folder",
+      "upload": "Upload",
+      "uploadFiles": "Upload Files",
+      "uploadFolder": "Upload Folder",
+      "downloading": "Downloading...",
+      "uploading": "Uploading..."
+    },
+    "empty": {
+      "title": "This folder is empty",
+      "description": "Drag and drop files or folders here, or use the upload button",
+      "mobileDescription": "Use the upload button to add files"
+    },
+    "selected": {
+      "count": "Selected files: {{count}}",
+      "files": "Download {{count}} items"
+    },
+    "dragDrop": {
+      "message": "Drop files or folders here to upload",
+      "notSupported": "File drag and drop is not supported on mobile. Please use the upload button."
+    },
+    "contextMenu": {
+      "rename": "Rename",
+      "copyPath": "Copy Path",
+      "copy": "Copy",
+      "move": "Move",
+      "delete": "Delete",
+      "paste": "Paste",
+      "newFolder": "New Folder",
+      "selectedMove": "Move Selected Items",
+      "selectedDelete": "Delete Selected Items",
+      "selectedDownload": "Download Selected Items",
+      "cancel": "Cancel"
+    },
+    "modal": {
+      "newFolder": {
+        "title": "Create New Folder",
+        "label": "Folder name:",
+        "placeholder": "Enter new folder name",
+        "create": "Create"
+      },
+      "rename": {
+        "title": "Rename",
+        "label": "New name:",
+        "placeholder": "Enter new name",
+        "change": "Change"
+      },
+      "move": {
+        "title": "Move Items",
+        "description": "Moving {{count}} items",
+        "label": "Target path:",
+        "move": "Move"
+      }
+    },
+    "mobile": {
+      "hint": "Long press items to display option menu"
+    }
+  },
+  "download": {
+    "title": "Downloading File...",
+    "zipTitle": "Compressing Files...",
+    "progress": {
+      "size": "Size",
+      "speed": "Speed",
+      "remaining": "Remaining Time",
+      "elapsed": "Elapsed Time",
+      "calculating": "Calculating..."
+    },
+    "complete": "Complete",
+    "cancel": "Cancel",
+    "error": "An error occurred during download",
+    "cancelled": "Download was cancelled",
+    "notification": {
+      "complete": "\"{{fileName}}\" download completed.",
+      "zipComplete": "{{count}} files downloaded as ZIP.",
+      "selectFiles": "Please select files to download.",
+      "networkError": "Download failed due to network error. Please check your internet connection.",
+      "permissionError": "You don't have permission to download this file.",
+      "notFound": "File not found.",
+      "failed": "Download failed. Please try again."
+    }
+  },
+  "upload": {
+    "success": "Successfully uploaded {{count}} files.",
+    "error": "An error occurred during file upload",
+    "folderNotSupported": "Folder upload is not supported in this browser."
+  },
+  "chatbot": {
+    "title": "Smart File Management Assistant",
+    "toggle": "File Assistant",
+    "placeholder": "Command file operations in natural language or ask questions about documents...",
+    "send": "Send",
+    "sending": "Processing...",
+    "close": "Close",
+    "welcome": "Hello! I'm your file management assistant. I can help you with various tasks like searching, moving, copying, and deleting files. Type \"help\" for command examples.",
+    "searching": "Searching...",
+    "noAnswerFound": "Sorry, I couldn't find an answer.",
+    "guide": {
+      "title": "Document Assistant User Guide",
+      "intro": "The document assistant helps you manage files and folders using natural language commands. Refer to the example commands below to efficiently manage your documents!",
+      "showMessage": "Displaying command guide. Here you can check various command examples.",
+      "categories": {
+        "search": "File Search",
+        "move": "File Move",
+        "copy": "File Copy",
+        "delete": "File Delete",
+        "createFolder": "Folder Creation",
+        "summarize": "Document Summary"
+      },
+      "tips": {
+        "title": "Useful Tips",
+        "items": [
+          "Mention specific file names for more accurate results.",
+          "Use expressions like \"all\", \"entire\", \"files in this folder\" to process multiple files at once.",
+          "Always check the preview before executing commands.",
+          "You can also ask questions about documents. Example: \"Which document contains marketing strategy content?\""
+        ]
+      },
+      "tryExample": "Try Example"
+    },
+    "status": {
+      "current": "Current Status:",
+      "path": "Path",
+      "totalFiles": "Total Files",
+      "selectedFiles": "Selected Files",
+      "selectedList": "Selected Files:",
+      "selectedCount": "{{count}} selected"
+    },
+    "operations": {
+      "undo": "Undo Operation",
+      "undoRecent": "Undoable Operations:",
+      "undoSuccess": "Operation successfully undone.",
+      "undoFailed": "Undo operation failed: {{error}}",
+      "undoing": "Undoing operation...",
+      "undoAvailable": "💡 This operation can be undone until {{time}}. Try saying \"undo last operation\".",
+      "cancelled": "Operation was cancelled.",
+      "cancelFailed": "Failed to cancel operation.",
+      "executing": "Executing operation...",
+      "completed": "Operation completed successfully.",
+      "failed": "An error occurred during operation execution.",
+      "executionFailed": "Operation execution failed: {{error}}",
+      "processing": "Processing command.",
+      "userRequest": "User request",
+      "localProcessing": "(Local processing)",
+      "localProcessingComplete": "Operation completed. (Local processing)",
+      "localCompleted": "Local operation completed: {{action}}",
+      "confirmMove": "Move selected file \"{{files}}\" to \"{{destination}}\" path?",
+      "confirmCopy": "Copy selected file \"{{files}}\" to \"{{destination}}\" path?",
+      "confirmDelete": "Delete selected file \"{{files}}\"?",
+      "confirmRename": "Rename selected file \"{{files}}\" to \"{{newName}}\"?",
+      "confirmSummarize": "Summarize {{count}} selected files?",
+      "confirmGeneric": "Process operation on {{count}} selected files.",
+      "confirmCreateFolder": "Create \"{{name}}\" folder at current location ({{path}})?",
+      "searchResults": "Search results for \"{{term}}\".",
+      "searchResultsList": "Search results ({{count}} items):\n{{results}}",
+      "noSearchResults": "No search results found.",
+      "confirmMoveGeneric": "Move file to \"{{destination}}\" path?",
+      "confirmCopyGeneric": "Copy file to \"{{destination}}\" path?",
+      "confirmDeleteGeneric": "Delete file?",
+      "confirmRenameGeneric": "Rename file to \"{{newName}}\"?",
+      "localMoveCompleted": "Local operation completed: Moved {{count}} files to \"{{destination}}\" path.",
+      "localCopyCompleted": "Local operation completed: Copied {{count}} files to \"{{destination}}\" path.",
+      "localDeleteCompleted": "Local operation completed: Deleted {{count}} files."
+    }
+  },
+  "notifications": {
+    "fileRenamed": "\"{{oldName}}\" renamed to \"{{newName}}\"",
+    "filesMoved": "{{count}} items moved",
+    "filesCopied": "{{count}} items copied",
+    "filesDeleted": "Selected items deleted",
+    "folderCreated": "Folder created",
+    "operationCancelled": "Operation cancelled",
+    "operationFailed": "An error occurred during operation execution",
+    "clipboardCopied": "\"{{name}}\" copied",
+    "clipboardCut": "\"{{name}}\" cut",
+    "multipleItemsCopied": "{{count}} items copied",
+    "multipleItemsCut": "{{count}} items cut"
+  },
+  "errors": {
+    "general": "An error occurred.",
+    "network": "Please check your network connection.",
+    "unauthorized": "Unauthorized access.",
+    "notFound": "The requested item was not found.",
+    "serverError": "A server error occurred.",
+    "fileNotFound": "File not found.",
+    "folderNotFound": "Folder not found.",
+    "permissionDenied": "Permission denied.",
+    "operationFailed": "Operation execution failed."
+  },
+  "confirmations": {
+    "deleteFile": "Are you sure you want to delete \"{{name}}\"?",
+    "deleteMultiple": "Are you sure you want to delete {{count}} selected items?",
+    "replaceFile": "\"{{name}}\" already exists. Do you want to replace it?",
+    "largeDowmload": "The total size of selected files is {{size}}. Do you want to download?"
+  }
+}

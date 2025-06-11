@@ -88,7 +88,7 @@
   }
   
   .user-actions {
-    gap: 5px;
+    gap: 8px;
   }
   
   .user-actions button {
@@ -116,6 +116,10 @@
     display: none;
   }
   
+  .user-actions {
+    gap: 6px;
+  }
+  
   .user-actions button {
     padding: 6px 8px;
     font-size: 12px;
@@ -141,6 +145,15 @@
   .search-bar input {
     padding: 6px 8px;
     font-size: 12px;
+  }
+  
+  .user-actions {
+    gap: 4px;
+  }
+  
+  .user-actions button {
+    padding: 5px 6px;
+    font-size: 11px;
   }
   
   /* 메뉴와 사용자 버튼 숨김, 드롭다운 메뉴로 대체 가능 */

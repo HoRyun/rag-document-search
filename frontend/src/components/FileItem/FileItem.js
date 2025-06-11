@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from '../../hooks/useTranslation';
 import './FileItem.css';
 
 const FileItem = ({ 
@@ -12,6 +13,7 @@ const FileItem = ({
   isSelected,
   isMobile = false // 모바일 환경 여부 프롭스 추가
 }) => {
+  const { t } = useTranslation();
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState('');
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -187,7 +189,7 @@ const FileItem = ({
   // 삭제 처리
   const handleDelete = () => {
     if (onDelete) {
-      if (window.confirm(`"${file.name}"을(를) 삭제하시겠습니까?`)) {
+      if (window.confirm(t('confirmations.deleteFile', { name: file.name }))) {
         onDelete();
       }
     }
@@ -312,19 +314,19 @@ const FileItem = ({
           )}
           
           <div className="context-menu-item" onClick={handleRenameStart}>
-            이름 변경
+            {t('fileDisplay.contextMenu.rename')}
           </div>
           <div className="context-menu-item" onClick={handleCopyPath}>
-            경로 복사
+            {t('fileDisplay.contextMenu.copyPath')}
           </div>
           <div className="context-menu-item" onClick={handleCopy}>
-            복사
+            {t('fileDisplay.contextMenu.copy')}
           </div>
           <div className="context-menu-item" onClick={handleMove}>
-            이동
+            {t('fileDisplay.contextMenu.move')}
           </div>
           <div className="context-menu-item delete-item" onClick={handleDelete}>
-            삭제
+            {t('fileDisplay.contextMenu.delete')}
           </div>
           
           {isMobile && (
@@ -332,7 +334,7 @@ const FileItem = ({
               className="context-menu-item cancel-item" 
               onClick={() => setShowContextMenu(false)}
             >
-              취소
+              {t('fileDisplay.contextMenu.cancel')}
             </div>
           )}
         </div>

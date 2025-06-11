@@ -1,6 +1,7 @@
-// ===== 수정된 Chatbot.js (백엔드 우선, 폴백 제거) =====
+// ===== 다국어 지원 강화된 Chatbot.js =====
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from '../../hooks/useTranslation';
 import './Chatbot.css';
 import ChatbotGuide from './ChatbotGuide';
 
@@ -15,7 +16,7 @@ const Chatbot = ({
   toggleChatbot, 
   onQuery, 
   isQuerying,
-  // 새로 추가되는 props들 (기존 App.js에서 전달)
+  // 기존 App.js에서 전달받는 props들
   files = [],
   directories = [],
   selectedItems = [],
@@ -23,20 +24,42 @@ const Chatbot = ({
   onRefreshFiles,
   onShowNotification
 }) => {
-  const [messages, setMessages] = useState([
-    { id: 1, text: '안녕하세요! 파일 관리 도우미입니다. 파일 검색, 이동, 복사, 삭제 등 다양한 작업을 도와드릴 수 있습니다. 명령어 예시가 필요하시면 "도움말"이라고 입력해보세요.', sender: 'bot' },
-  ]);
+  const { t, currentLanguage } = useTranslation();
+  
+  const [messages, setMessages] = useState([]);
   
   const [newMessage, setNewMessage] = useState('');
   const [showGuide, setShowGuide] = useState(false);
   
-  // ===== 새로 추가되는 상태들 =====
+  // 작업 관련 상태들
   const [currentOperation, setCurrentOperation] = useState(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [isProcessingCommand, setIsProcessingCommand] = useState(false);
   const [recentOperations, setRecentOperations] = useState([]);
   
   const messagesEndRef = useRef(null);
+  
+  // 초기 메시지 설정 - 컴포넌트 마운트 시에만 실행
+  useEffect(() => {
+    setMessages([
+      { id: 1, text: t('chatbot.welcome'), sender: 'bot' }
+    ]);
+  }, []); // 빈 의존성 배열로 한 번만 실행
+  
+  // 언어 변경 시 환영 메시지 업데이트 - t 함수 의존성 제거
+  useEffect(() => {
+    setMessages(prev => {
+      if (prev.length > 0 && prev[0].sender === 'bot' && prev[0].id === 1) {
+        const newMessages = [...prev];
+        newMessages[0] = { 
+          ...newMessages[0], 
+          text: t('chatbot.welcome') 
+        };
+        return newMessages;
+      }
+      return prev;
+    });
+  }, [currentLanguage]); // t 함수 제거, currentLanguage만 의존성으로
   
   // 챗봇이 닫히면 가이드도 함께 닫기
   useEffect(() => {
@@ -71,7 +94,7 @@ const Chatbot = ({
     setNewMessage(e.target.value);
   };
 
-  // 백엔드 응답에 따른 메시지 생성 함수
+  // 백엔드 응답에 따른 메시지 생성 함수 (다국어 지원)
   const generateResponseText = (analysisResult, context) => {
     const { operation } = analysisResult;
     const { selectedFiles } = context;
@@ -82,40 +105,52 @@ const Chatbot = ({
       
       switch (operation?.type) {
         case OPERATION_TYPES.MOVE:
-          return `선택된 파일 "${fileNames}"을(를) "${operation.destination}" 경로로 이동하시겠습니까?`;
+          return t('chatbot.operations.confirmMove', { 
+            files: fileNames, 
+            destination: operation.destination 
+          });
         case OPERATION_TYPES.COPY:
-          return `선택된 파일 "${fileNames}"을(를) "${operation.destination}" 경로로 복사하시겠습니까?`;
+          return t('chatbot.operations.confirmCopy', { 
+            files: fileNames, 
+            destination: operation.destination 
+          });
         case OPERATION_TYPES.DELETE:
-          return `선택된 파일 "${fileNames}"을(를) 삭제하시겠습니까?`;
+          return t('chatbot.operations.confirmDelete', { files: fileNames });
         case OPERATION_TYPES.RENAME:
-          return `선택된 파일 "${fileNames}"의 이름을 "${operation.newName}"으로 변경하시겠습니까?`;
+          return t('chatbot.operations.confirmRename', { 
+            files: fileNames, 
+            newName: operation.newName 
+          });
         case OPERATION_TYPES.SUMMARIZE:
-          return `선택된 ${selectedFiles.length}개 파일을 요약하시겠습니까?`;
+          return t('chatbot.operations.confirmSummarize', { count: selectedFiles.length });
         default:
-          return `선택된 ${selectedFiles.length}개 파일에 대한 작업을 처리합니다.`;
+          return t('chatbot.operations.confirmGeneric', { count: selectedFiles.length });
       }
     } else {
       // 선택된 파일이 없을 때 기본 응답
       switch (operation?.type) {
         case OPERATION_TYPES.CREATE_FOLDER:
-          return `현재 위치(${context.currentPath})에 "${operation.folderName}" 폴더를 생성하시겠습니까?`;
+          return t('chatbot.operations.confirmCreateFolder', { 
+            path: context.currentPath, 
+            name: operation.folderName 
+          });
         case OPERATION_TYPES.SEARCH:
-          return `"${operation.searchTerm}"에 대한 검색 결과입니다.`;
+          return t('chatbot.operations.searchResults', { term: operation.searchTerm });
         case OPERATION_TYPES.MOVE:
-          return `파일을 "${operation.destination}" 경로로 이동하시겠습니까?`;
+          return t('chatbot.operations.confirmMoveGeneric', { destination: operation.destination });
         case OPERATION_TYPES.COPY:
-          return `파일을 "${operation.destination}" 경로로 복사하시겠습니까?`;
+          return t('chatbot.operations.confirmCopyGeneric', { destination: operation.destination });
         case OPERATION_TYPES.DELETE:
-          return `파일을 삭제하시겠습니까?`;
+          return t('chatbot.operations.confirmDeleteGeneric');
         case OPERATION_TYPES.RENAME:
-          return `파일 이름을 "${operation.newName}"으로 변경하시겠습니까?`;
+          return t('chatbot.operations.confirmRenameGeneric', { newName: operation.newName });
         default:
-          return '명령을 처리합니다.';
+          return t('chatbot.operations.processing');
       }
     }
   };
   
-  // ===== 수정된 handleSubmit 함수 =====
+  // 수정된 handleSubmit 함수 (언어 정보 포함)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (newMessage.trim() === '' || isQuerying || isProcessingCommand) return;
@@ -125,147 +160,153 @@ const Chatbot = ({
     const userCommand = newMessage;
     setNewMessage('');
     
-    // 도움말 명령어 처리 (백엔드 요청 전에만 처리)
-    if (userCommand.toLowerCase().includes('도움말') || 
-        userCommand.toLowerCase().includes('도와줘') || 
-        userCommand.toLowerCase().includes('명령어') || 
-        userCommand.toLowerCase().includes('사용법')) {
+    // 도움말 명령어 처리 (다국어 지원)
+    const helpKeywords = {
+      ko: ['도움말', '도와줘', '명령어', '사용법', 'help'],
+      en: ['help', 'guide', 'commands', 'usage', 'how to']
+    };
+    
+    const currentHelpKeywords = helpKeywords[currentLanguage] || helpKeywords.ko;
+    const isHelpCommand = currentHelpKeywords.some(keyword => 
+      userCommand.toLowerCase().includes(keyword.toLowerCase())
+    );
+    
+    if (isHelpCommand) {
       setShowGuide(true);
-      addMessage('명령어 가이드를 표시합니다. 여기서 다양한 명령어 예시를 확인하실 수 있습니다.');
+      addMessage(t('chatbot.guide.showMessage'));
       return;
     }
     
     setIsProcessingCommand(true);
     
     try {
-      // ===== 개선된 컨텍스트 정보 준비 =====
+      // 개선된 컨텍스트 정보 준비 (언어 정보 포함)
       const context = {
         currentPath,
         selectedFiles: selectedItems.map(id => files.find(f => f.id === id)).filter(Boolean),
         availableFolders: directories,
-        allFiles: files
+        allFiles: files,
+        language: currentLanguage // 언어 정보 추가
       };
 
-      // 디버깅 로그 추가
-      console.log('=== Chatbot 컨텍스트 정보 ===');
+      // 디버깅 로그
+      console.log('=== Chatbot 다국어 컨텍스트 정보 ===');
+      console.log('현재 언어:', currentLanguage);
       console.log('현재 경로:', currentPath);
       console.log('선택된 파일 ID들:', selectedItems);
       console.log('선택된 파일 객체들:', context.selectedFiles);
-      console.log('전체 파일 수:', files.length);
       console.log('사용자 명령:', userCommand);
-      console.log('==========================');
+      console.log('=============================');
       
       // 백엔드 요청 시도
       let analysisResult;
       const useBackendFallback = process.env.REACT_APP_USE_BACKEND_FALLBACK === 'true';
       
       try {
+        // CommandProcessor에 언어 정보도 함께 전달
         analysisResult = await CommandProcessor.analyzeCommand(userCommand, context);
         
-        // 백엔드 성공 시 폴백 코드 사용하지 않음
         if (analysisResult && analysisResult.success) {
-          console.log('✅ 백엔드 처리 성공, 폴백 사용 안함');
+          console.log('✅ 백엔드 처리 성공 (언어:', currentLanguage, ')');
           
-          // 백엔드 결과로 응답 생성
           let responseText = generateResponseText(analysisResult, context);
           addMessage(responseText);
           
-          // 확인이 필요한 작업인 경우 미리보기 모달 표시
           if (analysisResult.requiresConfirmation) {
             setCurrentOperation(analysisResult);
             setShowPreviewModal(true);
           } else {
-            // 확인이 필요없는 작업은 바로 실행
             if (analysisResult.operationId) {
               await executeOperation(analysisResult.operationId, {});
             } else {
-              // 로컬 처리 결과 표시 (검색 등)
               if (analysisResult.type === 'DOCUMENT_SEARCH') {
                 if (analysisResult.results && analysisResult.results.length > 0) {
-                  const resultText = `검색 결과 (${analysisResult.results.length}개):\n${analysisResult.results.map(file => `• ${file.name}`).join('\n')}`;
+                  const resultText = t('chatbot.operations.searchResultsList', { 
+                    count: analysisResult.results.length,
+                    results: analysisResult.results.map(file => `• ${file.name}`).join('\n')
+                  });
                   addMessage(resultText);
                 } else {
-                  addMessage('검색 결과가 없습니다.');
+                  addMessage(t('chatbot.operations.noSearchResults'));
                 }
               }
             }
           }
           
-          return; // 백엔드 성공 시 여기서 종료
+          return;
         }
       } catch (error) {
         console.error('❌ 백엔드 요청 실패:', error);
         
-        // 백엔드 실패 시 폴백 처리 여부 확인
         if (useBackendFallback) {
           console.log('🔄 로컬 폴백 처리 시작');
           
           try {
-            // 로컬 폴백 시도
             analysisResult = CommandProcessor.processMessage(userCommand, files, directories, context);
             
             if (analysisResult && analysisResult.success) {
               console.log('✅ 로컬 폴백 처리 성공');
               
-              // 폴백 결과로 응답 생성
               let responseText = generateResponseText(analysisResult, context);
-              addMessage(responseText + ' (로컬 처리)');
+              addMessage(responseText + ' ' + t('chatbot.operations.localProcessing'));
               
-              // 확인이 필요한 작업인 경우 미리보기 모달 표시
               if (analysisResult.requiresConfirmation) {
-                analysisResult.isLocalFallback = true; // 로컬 폴백임을 표시
+                analysisResult.isLocalFallback = true;
                 setCurrentOperation(analysisResult);
                 setShowPreviewModal(true);
               } else {
-                // 확인이 필요없는 작업은 바로 처리
                 if (analysisResult.type === 'DOCUMENT_SEARCH') {
                   if (analysisResult.results && analysisResult.results.length > 0) {
-                    const resultText = `검색 결과 (${analysisResult.results.length}개):\n${analysisResult.results.map(file => `• ${file.name}`).join('\n')}`;
+                    const resultText = t('chatbot.operations.searchResultsList', { 
+                      count: analysisResult.results.length,
+                      results: analysisResult.results.map(file => `• ${file.name}`).join('\n')
+                    });
                     addMessage(resultText);
                   } else {
-                    addMessage('검색 결과가 없습니다.');
+                    addMessage(t('chatbot.operations.noSearchResults'));
                   }
                 }
               }
               
-              return; // 로컬 폴백 성공 시 여기서 종료
+              return;
             }
           } catch (fallbackError) {
             console.error('❌ 로컬 폴백도 실패:', fallbackError);
           }
         }
         
-        // 백엔드 실패하고 폴백도 실패하거나 사용하지 않을 때 상태 확인 및 RAG 처리
+        // 상태 확인 명령 처리 (다국어 지원)
+        const statusKeywords = {
+          ko: ['상태', '현재', '선택된'],
+          en: ['status', 'current', 'selected']
+        };
         
-        // 1. 상태 확인 명령인지 검사 (백엔드 실패 후에만)
-        if (userCommand.toLowerCase().includes('상태') || 
-            userCommand.toLowerCase().includes('현재') ||
-            (userCommand.toLowerCase().includes('선택된') && 
-             !userCommand.toLowerCase().includes('옮겨') &&
-             !userCommand.toLowerCase().includes('이동') &&
-             !userCommand.toLowerCase().includes('복사') &&
-             !userCommand.toLowerCase().includes('삭제'))) {
+        const currentStatusKeywords = statusKeywords[currentLanguage] || statusKeywords.ko;
+        const isStatusCommand = currentStatusKeywords.some(keyword => 
+          userCommand.toLowerCase().includes(keyword.toLowerCase())
+        ) && !userCommand.toLowerCase().includes(currentLanguage === 'ko' ? '이동' : 'move');
+        
+        if (isStatusCommand) {
+          const statusMessage = t('chatbot.status.current') + '\n' +
+            t('chatbot.status.path') + ': ' + currentPath + '\n' +
+            t('chatbot.status.totalFiles') + ': ' + files.length + '\n' +
+            t('chatbot.status.selectedFiles') + ': ' + selectedItems.length +
+            (selectedItems.length > 0 ? '\n\n' + t('chatbot.status.selectedList') + '\n' +
+              selectedItems.map(id => {
+                const file = files.find(f => f.id === id);
+                return file ? `• ${file.name}` : `• [ID:${id}]`;
+              }).join('\n') : '');
           
-          const statusMessage = `
-현재 상태:
-📂 경로: ${currentPath}
-📄 전체 파일: ${files.length}개
-✅ 선택된 파일: ${selectedItems.length}개
-${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => {
-  const file = files.find(f => f.id === id);
-  return file ? `• ${file.name}` : `• [ID:${id}]`;
-}).join('\n')}` : ''}
-          `;
           addMessage(statusMessage.trim());
           return;
         }
         
-        // 2. 일반적인 RAG 질의로 처리 (백엔드 실패 후에만)
-        console.log('🔄 RAG 질의로 폴백 처리');
+        // RAG 질의로 처리 (언어 정보 포함)
+        console.log('🔄 RAG 질의로 폴백 처리 (언어:', currentLanguage, ')');
         
         const typingMessage = {
           id: 'typing',
-          text: '검색 중...',
+          text: t('chatbot.searching'),
           sender: 'bot',
           isTyping: true
         };
@@ -273,31 +314,27 @@ ${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => 
         setMessages(prev => [...prev, typingMessage]);
         
         try {
-          const answer = await onQuery(userCommand);
+          // onQuery에 언어 정보도 함께 전달
+          const answer = await onQuery(userCommand, currentLanguage);
           
-          // 'typing' 메시지 제거
           setMessages(prev => prev.filter(msg => msg.id !== 'typing'));
-          
-          // 봇 응답 추가
-          addMessage(answer || '죄송합니다, 답변을 찾을 수 없습니다.');
+          addMessage(answer || t('chatbot.noAnswerFound'));
           
         } catch (ragError) {
-          // RAG 오류 처리
           setMessages(prev => prev.filter(msg => msg.id !== 'typing'));
-          addMessage('죄송합니다, 오류가 발생했습니다.');
+          addMessage(t('chatbot.operations.failed'));
         }
       }
       
     } catch (error) {
       console.error('명령 처리 중 오류:', error);
-      addMessage('명령 처리 중 오류가 발생했습니다. 다시 시도해주세요.');
+      addMessage(t('chatbot.operations.failed'));
     } finally {
       setIsProcessingCommand(false);
     }
   };
   
-  // ===== 새로 추가되는 작업 실행 함수들 =====
-  
+  // 작업 실행 함수 (다국어 지원)
   const executeOperation = async (operationId, userOptions = {}) => {
     try {
       setIsProcessingCommand(true);
@@ -307,14 +344,12 @@ ${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => 
       if (executionResult.success) {
         const result = executionResult.result;
         
-        // 성공 메시지 추가
-        addMessage(result.message || '작업이 성공적으로 완료되었습니다.', 'bot', {
+        addMessage(result.message || t('chatbot.operations.completed'), 'bot', {
           operationId,
           canUndo: result.undoAvailable,
           undoDeadline: result.undoDeadline
         });
 
-        // 실행된 작업 기록
         setRecentOperations(prev => [
           {
             id: operationId,
@@ -323,91 +358,87 @@ ${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => 
             undoDeadline: result.undoDeadline,
             description: result.message
           },
-          ...prev.slice(0, 4) // 최근 5개만 유지
+          ...prev.slice(0, 4)
         ]);
 
-        // FileDisplay 새로고침
         if (onRefreshFiles) {
           onRefreshFiles();
         }
 
-        // 성공 알림
         if (onShowNotification) {
-          onShowNotification(result.message || '작업이 완료되었습니다.');
+          onShowNotification(result.message || t('chatbot.operations.completed'));
         }
 
-        // 되돌리기 가능한 작업의 경우 안내 메시지
         if (result.undoAvailable) {
           setTimeout(() => {
-            addMessage(
-              `💡 이 작업은 ${new Date(result.undoDeadline).toLocaleTimeString()}까지 되돌릴 수 있습니다. "방금 작업 되돌리기"라고 말씀해보세요.`, 
-              'bot'
-            );
+            addMessage(t('chatbot.operations.undoAvailable', { 
+              time: new Date(result.undoDeadline).toLocaleTimeString() 
+            }), 'bot');
           }, 1000);
         }
 
       } else {
-        addMessage(`작업 실행 실패: ${executionResult.error}`);
+        addMessage(t('chatbot.operations.executionFailed', { error: executionResult.error }));
       }
 
     } catch (error) {
       console.error('작업 실행 오류:', error);
-      addMessage('작업 실행 중 오류가 발생했습니다.');
+      addMessage(t('chatbot.operations.failed'));
     } finally {
       setIsProcessingCommand(false);
     }
   };
 
-  // 미리보기 모달 확인
+  // 미리보기 모달 확인 (다국어 지원)
   const handlePreviewConfirm = async (userOptions) => {
     if (!currentOperation) return;
 
     setShowPreviewModal(false);
-    addMessage('작업을 실행합니다...');
+    addMessage(t('chatbot.operations.executing'));
 
     if (currentOperation.operationId) {
-      // 백엔드 작업 실행
       await executeOperation(currentOperation.operationId, userOptions);
     } else if (currentOperation.isLocalFallback) {
-      // 로컬 폴백 작업 실행
       try {
         await handleLocalOperation(currentOperation, userOptions);
       } catch (error) {
         console.error('로컬 작업 실행 오류:', error);
-        addMessage('작업 실행 중 오류가 발생했습니다.');
+        addMessage(t('chatbot.operations.failed'));
       }
     } else {
-      // 기타 로컬 작업 처리
       try {
         await handleLocalOperation(currentOperation, userOptions);
       } catch (error) {
         console.error('로컬 작업 실행 오류:', error);
-        addMessage('작업 실행 중 오류가 발생했습니다.');
+        addMessage(t('chatbot.operations.failed'));
       }
     }
     
     setCurrentOperation(null);
   };
 
-  // 로컬 작업 처리 함수 (실제 App.js 핸들러 연동 필요)
+  // 로컬 작업 처리 함수 (다국어 지원)
   const handleLocalOperation = async (operation, userOptions) => {
-    // 실제 구현에서는 App.js의 핸들러 함수들을 호출해야 함
-    // 현재는 시뮬레이션만 수행
-    
     const { operation: op } = operation;
     
     switch (op?.type) {
       case OPERATION_TYPES.MOVE:
-        addMessage(`로컬 작업 완료: ${op.targets.length}개 파일을 "${op.destination}" 경로로 이동했습니다.`);
+        addMessage(t('chatbot.operations.localMoveCompleted', { 
+          count: op.targets.length, 
+          destination: op.destination 
+        }));
         break;
       case OPERATION_TYPES.COPY:
-        addMessage(`로컬 작업 완료: ${op.targets.length}개 파일을 "${op.destination}" 경로로 복사했습니다.`);
+        addMessage(t('chatbot.operations.localCopyCompleted', { 
+          count: op.targets.length, 
+          destination: op.destination 
+        }));
         break;
       case OPERATION_TYPES.DELETE:
-        addMessage(`로컬 작업 완료: ${op.targets.length}개 파일을 삭제했습니다.`);
+        addMessage(t('chatbot.operations.localDeleteCompleted', { count: op.targets.length }));
         break;
       default:
-        addMessage(`로컬 작업 완료: ${operation.previewAction}`);
+        addMessage(t('chatbot.operations.localCompleted', { action: operation.previewAction }));
     }
     
     if (onRefreshFiles) {
@@ -415,11 +446,11 @@ ${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => 
     }
     
     if (onShowNotification) {
-      onShowNotification('작업이 완료되었습니다. (로컬 처리)');
+      onShowNotification(t('chatbot.operations.localProcessingComplete'));
     }
   };
 
-  // 미리보기 모달 취소
+  // 미리보기 모달 취소 (다국어 지원)
   const handlePreviewCancel = async () => {
     if (!currentOperation) return;
 
@@ -427,47 +458,44 @@ ${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => 
       if (currentOperation.operationId) {
         await CommandProcessor.cancelOperation(currentOperation.operationId);
       }
-      addMessage('작업이 취소되었습니다.');
+      addMessage(t('chatbot.operations.cancelled'));
     } catch (error) {
-      addMessage('작업 취소 중 오류가 발생했습니다.');
+      addMessage(t('chatbot.operations.cancelFailed'));
     } finally {
       setShowPreviewModal(false);
       setCurrentOperation(null);
     }
   };
 
-  // 작업 되돌리기
+  // 작업 되돌리기 (다국어 지원)
   const handleUndoOperation = async (operationId) => {
     try {
       setIsProcessingCommand(true);
-      addMessage('작업을 되돌리고 있습니다...');
+      addMessage(t('chatbot.operations.undoing'));
 
-      const undoResult = await CommandProcessor.undoOperation(operationId, '사용자 요청');
+      const undoResult = await CommandProcessor.undoOperation(operationId, t('chatbot.operations.userRequest'));
 
       if (undoResult.success) {
-        addMessage('작업이 성공적으로 되돌려졌습니다.');
+        addMessage(t('chatbot.operations.undoSuccess'));
         
-        // 되돌린 작업을 기록에서 제거
         setRecentOperations(prev => prev.filter(op => op.id !== operationId));
         
-        // FileDisplay 새로고침
         if (onRefreshFiles) {
           onRefreshFiles();
         }
       } else {
-        addMessage(`작업 되돌리기 실패: ${undoResult.error}`);
+        addMessage(t('chatbot.operations.undoFailed', { error: undoResult.error }));
       }
 
     } catch (error) {
       console.error('작업 되돌리기 오류:', error);
-      addMessage('작업 되돌리기 중 오류가 발생했습니다.');
+      addMessage(t('chatbot.operations.undoFailed', { error: error.message }));
     } finally {
       setIsProcessingCommand(false);
     }
   };
   
-  // ===== 기존 가이드 관련 함수들 유지 =====
-  
+  // 가이드 관련 함수들
   const handleGuideClose = () => {
     setShowGuide(false);
   };
@@ -477,7 +505,7 @@ ${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => 
     setShowGuide(false);
   };
 
-  // ===== 메시지 렌더링 (되돌리기 버튼 포함) =====
+  // 메시지 렌더링 (되돌리기 버튼 포함)
   const renderMessage = (message) => {
     return (
       <div key={message.id} className={`message ${message.sender === 'bot' ? 'bot' : 'user'} ${message.isTyping ? 'typing' : ''}`}>
@@ -488,14 +516,13 @@ ${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => 
           </div>
         )}
         
-        {/* 되돌리기 가능한 작업에 대한 버튼 */}
         {message.data?.canUndo && new Date() < new Date(message.data.undoDeadline) && (
           <button 
             className="undo-btn"
             onClick={() => handleUndoOperation(message.data.operationId)}
             disabled={isProcessingCommand}
           >
-            작업 되돌리기
+            {t('chatbot.operations.undo')}
           </button>
         )}
       </div>
@@ -504,7 +531,7 @@ ${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => 
 
   return (
     <div className="chatbot-wrapper">
-      {/* 명령어 가이드 (기존 로직 유지) */}
+      {/* 명령어 가이드 */}
       {isOpen && showGuide && (
         <div className="chatbot-guide-panel">
           <ChatbotGuide
@@ -517,10 +544,12 @@ ${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => 
       {isOpen ? (
         <div className="enhanced-chatbot-container open">
           <div className="chatbot-header">
-            <h3>🤖 스마트 파일 관리 도우미</h3>
+            <h3>🤖 {t('chatbot.title')}</h3>
             <div className="header-status">
               {selectedItems.length > 0 && (
-                <span className="selected-count">{selectedItems.length}개 선택됨</span>
+                <span className="selected-count">
+                  {t('chatbot.status.selectedCount', { count: selectedItems.length })}
+                </span>
               )}
             </div>
             <button className="close-btn" onClick={toggleChatbot}>×</button>
@@ -543,7 +572,7 @@ ${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => 
           <form className="chatbot-input" onSubmit={handleSubmit}>
             <input
               type="text"
-              placeholder="파일 작업을 자연어로 명령하거나 문서에 대해 질문해보세요..."
+              placeholder={t('chatbot.placeholder')}
               value={newMessage}
               onChange={handleInputChange}
               disabled={isQuerying || isProcessingCommand}
@@ -553,14 +582,14 @@ ${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => 
               disabled={newMessage.trim() === '' || isQuerying || isProcessingCommand}
               className={(isQuerying || isProcessingCommand) ? 'loading' : ''}
             >
-              {(isQuerying || isProcessingCommand) ? '처리 중...' : '전송'}
+              {(isQuerying || isProcessingCommand) ? t('chatbot.sending') : t('chatbot.send')}
             </button>
           </form>
 
           {/* 최근 작업 되돌리기 패널 */}
           {recentOperations.filter(op => op.canUndo && new Date() < new Date(op.undoDeadline)).length > 0 && (
             <div className="recent-operations">
-              <h4>되돌리기 가능한 작업:</h4>
+              <h4>{t('chatbot.operations.undoRecent')}</h4>
               {recentOperations
                 .filter(op => op.canUndo && new Date() < new Date(op.undoDeadline))
                 .map(operation => (
@@ -571,7 +600,7 @@ ${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => 
                       onClick={() => handleUndoOperation(operation.id)}
                       disabled={isProcessingCommand}
                     >
-                      되돌리기
+                      {t('chatbot.operations.undo')}
                     </button>
                   </div>
                 ))
@@ -581,7 +610,7 @@ ${selectedItems.length > 0 ? `\n선택된 파일들:\n${selectedItems.map(id => 
         </div>
       ) : (
         <button className="chatbot-toggle" onClick={toggleChatbot}>
-          🤖 파일 도우미
+          🤖 {t('chatbot.toggle')}
         </button>
       )}
 

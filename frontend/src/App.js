@@ -6,17 +6,20 @@ import FileDisplay from "./components/FileDisplay/FileDisplay";
 import Chatbot from "./components/Chatbot/Chatbot";
 import LoginForm from "./components/Login/LoginForm";
 import RegisterForm from "./components/Login/RegisterForm";
+import { I18nProvider, initializeI18n } from "./i18n";
+import { useTranslation } from "./hooks/useTranslation";
 import "./App.css";
 import "./Theme.css";
 
 // API 기본 URL 설정
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://rag-alb-547296323.ap-northeast-2.elb.amazonaws.com/fast_api";
 
-function App() {
+// 메인 앱 컴포넌트 (다국어 지원 적용)
+function AppContent() {
+  const { t, formatFileSize, formatDate } = useTranslation();
+  
   const [files, setFiles] = useState([]);
-  const [directories, setDirectories] = useState([
-    { id: "home", name: "Home", path: "/" },
-  ]);
+  const [directories, setDirectories] = useState([]);
   const [currentPath, setCurrentPath] = useState("/");
   const [chatbotOpen, setChatbotOpen] = useState(false);
 
@@ -50,13 +53,10 @@ function App() {
 
   const [notification, setNotification] = useState({ visible: false, message: '' });
 
-  // 컴포넌트 마운트 시 로그인 상태 확인 및 테마 설정 불러오기
+  // 컴포넌트 마운트 시 한 번만 실행되는 초기화
   useEffect(() => {
-    // 토큰이 있으면 사용자 정보 가져오기
-    const token = localStorage.getItem("token");
-    if (token) {
-      fetchUserInfo(token);
-    }
+    // 다국어 시스템 초기화
+    initializeI18n();
     
     // 저장된 테마 설정 불러오기
     const savedTheme = localStorage.getItem("theme");
@@ -64,7 +64,23 @@ function App() {
       setIsDarkMode(true);
       document.documentElement.setAttribute("data-theme", "dark");
     }
+  }, []); // 빈 의존성 배열로 한 번만 실행
+
+  // 컴포넌트 마운트 시 로그인 상태 확인
+  useEffect(() => {
+    // 토큰이 있으면 사용자 정보 가져오기
+    const token = localStorage.getItem("token");
+    if (token) {
+      fetchUserInfo(token);
+    }
   }, []);
+
+  // directories 초기값을 설정하는 별도 useEffect
+  useEffect(() => {
+    if (directories.length === 0) {
+      setDirectories([{ id: "home", name: t('common.home'), path: "/" }]);
+    }
+  }, [t, directories.length]); // t와 directories.length만 의존성으로 추가
 
   const handleSelectedItemsChange = (newSelectedItems) => {
     setSelectedItems(newSelectedItems);
@@ -73,7 +89,7 @@ function App() {
 
   const handleDownloadItems = async (selectedFileIds) => {
     if (!selectedFileIds || selectedFileIds.length === 0) {
-      console.warn('다운로드할 파일이 선택되지 않았습니다.');
+      console.warn(t('download.notification.selectFiles'));
       return;
     }
 
@@ -82,16 +98,8 @@ function App() {
     const totalSize = selectedFiles.reduce((sum, file) => sum + (file.size || 0), 0);
     
     if (totalSize > 100 * 1024 * 1024) { // 100MB 이상
-      const formatBytes = (bytes) => {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-      };
-      
       const confirm = window.confirm(
-        `선택한 파일의 총 크기가 ${formatBytes(totalSize)}입니다. 다운로드하시겠습니까?`
+        t('confirmations.largeDowmload', { size: formatFileSize(totalSize) })
       );
       if (!confirm) return;
     }
@@ -121,22 +129,22 @@ function App() {
       
       // 에러 타입에 따른 사용자 알림
       if (error.message.includes('취소')) {
-        showNotification('다운로드가 취소되었습니다.');
+        showNotification(t('download.cancelled'));
       } else if (error.message.includes('네트워크')) {
-        showNotification('네트워크 오류로 다운로드에 실패했습니다. 인터넷 연결을 확인해주세요.');
+        showNotification(t('download.notification.networkError'));
       } else if (error.message.includes('권한')) {
-        showNotification('파일 다운로드 권한이 없습니다.');
+        showNotification(t('download.notification.permissionError'));
       } else if (error.message.includes('404')) {
-        showNotification('파일을 찾을 수 없습니다.');
+        showNotification(t('download.notification.notFound'));
       } else {
-        showNotification('다운로드 중 오류가 발생했습니다. 다시 시도해주세요.');
+        showNotification(t('download.notification.failed'));
       }
     } finally {
       setDownloadState(prev => ({ ...prev, isActive: false }));
     }
   };
 
-  useEffect(() => { //****
+  useEffect(() => {
     return () => {
       if (downloadState.abortController) {
         downloadState.abortController.abort();
@@ -157,15 +165,15 @@ function App() {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
-        signal: abortController.signal // AbortController 신호 추가
+        signal: abortController.signal
       });
 
       if (!response.ok) {
         const errorMessage = response.status === 404 
-          ? '파일을 찾을 수 없습니다.' 
+          ? t('download.notification.notFound')
           : response.status === 403 
-          ? '파일 다운로드 권한이 없습니다.'
-          : `다운로드 실패 (${response.status})`;
+          ? t('download.notification.permissionError')
+          : t('download.notification.failed');
         throw new Error(errorMessage);
       }
 
@@ -188,7 +196,7 @@ function App() {
         // 취소 신호 확인
         if (abortController.signal.aborted) {
           reader.cancel();
-          throw new Error('다운로드가 사용자에 의해 취소되었습니다.');
+          throw new Error(t('download.cancelled'));
         }
         
         const { done, value } = await reader.read();
@@ -200,9 +208,9 @@ function App() {
         
         const currentTime = Date.now();
         
-        // 100ms마다 진행률 업데이트 (너무 자주 업데이트하면 성능 저하)
+        // 100ms마다 진행률 업데이트
         if (currentTime - lastUpdateTime >= 100) {
-          const currentReceived = receivedSize;  // 변수 캡처
+          const currentReceived = receivedSize;
           const currentTotal = totalSize;
           const currentElapsed = (currentTime - startTime) / 1000;
           const currentSpeed = currentReceived / currentElapsed;
@@ -219,7 +227,7 @@ function App() {
           }));
           
           lastUpdateTime = currentTime;
-          console.log(`진행률: ${progress}%, 속도: ${formatBytes(currentSpeed)}/s`);
+          console.log(`진행률: ${progress}%, 속도: ${formatFileSize(currentSpeed)}/s`);
         }
       }
       
@@ -239,14 +247,14 @@ function App() {
       document.body.removeChild(a);
       
       console.log(`파일 다운로드 완료: ${file.name}`);
-      showNotification(`"${file.name}" 다운로드가 완료되었습니다.`);
+      showNotification(t('download.notification.complete', { fileName: file.name }));
       
     } catch (error) {
       if (error.name === 'AbortError' || error.message.includes('취소')) {
         console.log(`파일 다운로드 취소됨: ${file.name}`);
-        throw new Error('다운로드가 취소되었습니다.');
+        throw new Error(t('download.cancelled'));
       } else if (error.message.includes('Failed to fetch')) {
-        throw new Error('네트워크 연결을 확인해주세요.');
+        throw new Error(t('download.notification.networkError'));
       } else {
         console.error(`파일 다운로드 오류 (${file.name}):`, error);
         throw error;
@@ -275,11 +283,11 @@ function App() {
           fileIds: files.map(f => f.id),
           zipName: `selected_files_${new Date().getTime()}.zip`
         }),
-        signal: abortController.signal // AbortController 신호 추가
+        signal: abortController.signal
       });
 
       if (!response.ok) {
-        throw new Error(`ZIP 다운로드 실패: ${response.status} ${response.statusText}`);
+        throw new Error(t('download.notification.failed'));
       }
 
       // Content-Length 헤더에서 ZIP 파일 크기 가져오기
@@ -301,7 +309,7 @@ function App() {
         // 취소 신호 확인
         if (abortController.signal.aborted) {
           reader.cancel();
-          throw new Error('ZIP 다운로드가 사용자에 의해 취소되었습니다.');
+          throw new Error(t('download.cancelled'));
         }
         
         const { done, value } = await reader.read();
@@ -315,7 +323,7 @@ function App() {
         
         // 100ms마다 진행률 업데이트
         if (currentTime - lastUpdateTime >= 100) {
-          const currentReceived = receivedSize;  // 변수 캡처
+          const currentReceived = receivedSize;
           const currentTotal = totalSize;
           const currentElapsed = (currentTime - startTime) / 1000;
           const currentSpeed = currentReceived / currentElapsed;
@@ -324,7 +332,7 @@ function App() {
           setDownloadState(prev => ({
             ...prev,
             progress,
-            fileName: `${files.length}개 파일`,
+            fileName: t('download.zipTitle'),
             receivedSize: currentReceived,
             totalSize: currentTotal,
             speed: currentSpeed,
@@ -333,7 +341,7 @@ function App() {
           }));
                       
           lastUpdateTime = currentTime;
-          console.log(`ZIP 진행률: ${progress}%, 속도: ${formatBytes(currentSpeed)}/s`);
+          console.log(`ZIP 진행률: ${progress}%, 속도: ${formatFileSize(currentSpeed)}/s`);
         }
       }
       
@@ -351,12 +359,12 @@ function App() {
       document.body.removeChild(a);
       
       console.log(`ZIP 다운로드 완료: ${files.length}개 파일`);
-      showNotification(`${files.length}개 파일이 ZIP으로 다운로드되었습니다.`);
+      showNotification(t('download.notification.zipComplete', { count: files.length }));
       
     } catch (error) {
       if (error.name === 'AbortError' || error.message.includes('취소')) {
         console.log(`ZIP 다운로드 취소됨: ${files.length}개 파일`);
-        throw new Error('ZIP 다운로드가 취소되었습니다.');
+        throw new Error(t('download.cancelled'));
       } else {
         console.error('ZIP 다운로드 오류:', error);
         throw error;
@@ -368,15 +376,7 @@ function App() {
   };
 
   const formatBytes = (bytes, decimals = 1) => {
-    if (bytes === 0) return '0 Bytes';
-    
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    return formatFileSize(bytes, decimals);
   };
 
   // 테마 토글 핸들러
@@ -411,15 +411,6 @@ function App() {
     }, 3000);
   };
 
-  // 컴포넌트 마운트 시 로그인 상태 확인
-  useEffect(() => {
-    // 토큰이 있으면 사용자 정보 가져오기
-    const token = localStorage.getItem("token");
-    if (token) {
-      fetchUserInfo(token);
-    }
-  }, []);
-
   // 사용자 정보 가져오기
   const fetchUserInfo = async (token) => {
     try {
@@ -436,7 +427,7 @@ function App() {
     }
   };
 
-  // 디렉토리 구조 가져오기
+  // 디렉토리 구조 가져오기 - t를 의존성에서 제거하고 내부에서 직접 사용
   const fetchDirectories = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -465,7 +456,7 @@ function App() {
         // 루트 디렉토리가 없으면 추가
         if (!hasRootDir) {
           const updatedDirectories = [
-            { id: "home", name: "Home", path: "/" },
+            { id: "home", name: "Home", path: "/" }, // 일단 하드코딩으로 변경
             ...directories,
           ];
           setDirectories(updatedDirectories);
@@ -476,16 +467,16 @@ function App() {
         console.log("디렉토리 구조 가져옴:", directories);
       } else {
         // 기본 홈 디렉토리 설정
-        setDirectories([{ id: "home", name: "Home", path: "/" }]);
+        setDirectories([{ id: "home", name: "Home", path: "/" }]); // 일단 하드코딩으로 변경
       }
     } catch (error) {
       console.error("Error fetching directories:", error);
       // 기본 홈 디렉토리만 제공하고 나머지는 비움
-      setDirectories([{ id: "home", name: "Home", path: "/" }]);
+      setDirectories([{ id: "home", name: "Home", path: "/" }]); // 일단 하드코딩으로 변경
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, []); // 의존성에서 t 제거
 
   // 문서 목록 가져오기
   const fetchDocuments = useCallback(async () => {
@@ -502,14 +493,13 @@ function App() {
         console.log("루트 경로 문서 요청 (빈 문자열로 변환):", pathParam);
 
         // 루트 경로인 경우 API 요청 대신 직계 하위 폴더를, 디렉토리 정보에서 찾아 표시
-        // API가 루트 경로에서 제대로 작동하지 않을 때 사용하는 대안
         if (directories && directories.length > 0) {
-          // 루트 경로의 직계 자식 폴더 찾기 (경로가 /로 시작하고 슬래시가 1개만 있는 경로)
+          // 루트 경로의 직계 자식 폴더 찾기
           const rootSubfolders = directories
             .filter((dir) => {
-              if (dir.path === "/") return false; // 루트 자체는 제외
+              if (dir.path === "/") return false;
               const parts = dir.path.split("/").filter(Boolean);
-              return parts.length === 1; // 첫 번째 레벨의 폴더만 선택
+              return parts.length === 1;
             })
             .map((dir) => ({
               id: dir.id,
@@ -517,7 +507,6 @@ function App() {
               path: dir.path,
               isDirectory: true,
               type: "folder",
-              // 추가적인 속성이 필요하면 여기에 추가
             }));
 
           console.log(
@@ -529,7 +518,7 @@ function App() {
           if (rootSubfolders.length > 0) {
             setFiles(rootSubfolders);
             setIsLoading(false);
-            return; // API 호출 생략
+            return;
           }
         }
       }
@@ -575,12 +564,11 @@ function App() {
 
         // API 응답이 없고 루트 경로일 때 대체 로직
         if (currentPath === "/" && directories && directories.length > 0) {
-          // 위에서 작성한 로직과 동일: 디렉토리 구조에서 루트 하위 폴더 추출
           const rootSubfolders = directories
             .filter((dir) => {
-              if (dir.path === "/") return false; // 루트 자체는 제외
+              if (dir.path === "/") return false;
               const parts = dir.path.split("/").filter(Boolean);
-              return parts.length === 1; // 첫 번째 레벨의 폴더만 선택
+              return parts.length === 1;
             })
             .map((dir) => ({
               id: dir.id,
@@ -634,7 +622,6 @@ function App() {
           setFiles([]);
         }
       } else {
-        // 빈 파일 목록으로 설정
         setFiles([]);
       }
     } finally {
@@ -760,6 +747,9 @@ function App() {
       fetchDocuments();
       // 디렉토리 구조도 새로고침
       fetchDirectories();
+      
+      // 성공 알림 표시
+      showNotification(t('upload.success', { count: fileList.length }));
     } catch (error) {
       console.error("Error uploading files:", error);
 
@@ -780,7 +770,7 @@ function App() {
       console.log("오류 설정:", error.config);
       console.log("===== 업로드 오류 정보 종료 =====");
 
-      alert("파일 업로드 중 오류가 발생했습니다.");
+      showNotification(t('upload.error'));
     } finally {
       setIsLoading(false);
     }
@@ -848,9 +838,12 @@ function App() {
       fetchDocuments();
       // 디렉토리 구조도 새로고침
       fetchDirectories();
+      
+      // 성공 알림 표시
+      showNotification(t('notifications.folderCreated'));
     } catch (error) {
       console.error("Error creating folder:", error);
-      alert("폴더 생성 중 오류가 발생했습니다.");
+      showNotification(t('errors.operationFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -903,6 +896,12 @@ function App() {
       // 디렉토리 구조도 새로고침
       fetchDirectories();
       
+      // 성공 알림 표시
+      const message = operationType === "move" 
+        ? t('notifications.filesMoved', { count: 1 })
+        : t('notifications.filesCopied', { count: 1 });
+      showNotification(message);
+      
       return response.data;
     } catch (error) {
       console.error(`Error ${operationType} item:`, error);
@@ -920,7 +919,7 @@ function App() {
       console.log(`오류 설정:`, error.config);
       console.log(`===== 파일/폴더 ${operationType} 오류 정보 종료 =====`);
       
-      alert(`항목 ${operationType === "move" ? "이동" : "복사"} 중 오류가 발생했습니다.`);
+      showNotification(t('errors.operationFailed'));
       throw error;
     } finally {
       setIsLoading(false);
@@ -983,6 +982,12 @@ function App() {
       // 디렉토리 구조도 새로고침
       fetchDirectories();
       
+      // 성공 알림 표시 - 구체적인 파일명 포함
+      const file = files.find(f => f.id === itemId);
+      if (file) {
+        showNotification(t('notifications.fileRenamed', { oldName: file.name, newName }));
+      }
+      
       return response.data;
     } catch (error) {
       console.error("Error renaming item:", error);
@@ -1000,7 +1005,7 @@ function App() {
       console.log(`오류 설정:`, error.config);
       console.log(`===== 파일/폴더 이름 변경 오류 정보 종료 =====`);
       
-      alert("이름 변경 중 오류가 발생했습니다.");
+      showNotification(t('errors.operationFailed'));
       throw error;
     } finally {
       setIsLoading(false);
@@ -1051,6 +1056,9 @@ function App() {
       // 디렉토리 구조도 새로고침
       fetchDirectories();
       
+      // 성공 알림 표시
+      showNotification(t('notifications.filesDeleted'));
+      
       return response.data;
     } catch (error) {
       console.error("Error deleting item:", error);
@@ -1068,7 +1076,7 @@ function App() {
       console.log(`오류 설정:`, error.config);
       console.log(`===== 파일/폴더 삭제 오류 정보 종료 =====`);
       
-      alert("항목 삭제 중 오류가 발생했습니다.");
+      showNotification(t('errors.operationFailed'));
       throw error;
     } finally {
       setIsLoading(false);
@@ -1085,8 +1093,8 @@ function App() {
     }
   };
 
-  // 질문 처리
-  const handleQuery = async (queryText) => {
+  // 질문 처리 (언어 정보 포함)
+  const handleQuery = async (queryText, language = null) => {
     if (!queryText.trim()) return;
 
     setIsQuerying(true);
@@ -1095,6 +1103,10 @@ function App() {
       const token = localStorage.getItem("token");
       const formData = new FormData();
       formData.append("query", queryText);
+      
+      // 언어 정보 추가
+      const currentLanguage = language || localStorage.getItem('preferred-language') || 'ko';
+      formData.append("language", currentLanguage);
 
       const response = await axios.post(
         `${API_BASE_URL}/documents/query`,
@@ -1102,17 +1114,18 @@ function App() {
         {
           headers: {
             Authorization: `Bearer ${token}`,
+            'Accept-Language': currentLanguage
           },
         }
       );
 
-      const answer = response.data.answer;
-
-      // 챗봇에 표시할 응답 반환
-      return answer;
+      return response.data.answer;
     } catch (error) {
-      console.error("Error querying:", error);
-      return "문서 검색 중 오류가 발생했습니다.";
+      console.error("RAG 쿼리 오류:", error);
+      const currentLanguage = language || localStorage.getItem('preferred-language') || 'ko';
+      return currentLanguage === 'ko' ? 
+        '죄송합니다, 질문 처리 중 오류가 발생했습니다.' :
+        'Sorry, an error occurred while processing your question.';
     } finally {
       setIsQuerying(false);
     }
@@ -1172,7 +1185,12 @@ function App() {
 
   return (
     <div className="app">
-      <Header onLogout={handleLogout} username={user?.username} isDarkMode={isDarkMode} toggleTheme={toggleTheme}/>
+      <Header 
+        onLogout={handleLogout} 
+        username={user?.username} 
+        isDarkMode={isDarkMode} 
+        toggleTheme={toggleTheme}
+      />
       
       <button className="sidebar-toggle-btn" onClick={toggleSidebar}>
         ☰
@@ -1222,7 +1240,7 @@ function App() {
         isQuerying={isQuerying}
         files={files}
         directories={directories}
-        selectedItems={selectedItems} // ← 실제 상태 전달
+        selectedItems={selectedItems}
         currentPath={currentPath}
         onRefreshFiles={fetchDocuments}
         onShowNotification={showNotification}
@@ -1234,6 +1252,15 @@ function App() {
         </div>
       )}
     </div>
+  );
+}
+
+// 메인 App 컴포넌트 (I18nProvider로 감싸서 다국어 지원)
+function App() {
+  return (
+    <I18nProvider>
+      <AppContent />
+    </I18nProvider>
   );
 }
 

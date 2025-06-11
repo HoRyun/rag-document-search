@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from '../../hooks/useTranslation';
 import './Sidebar.css';
 
 const Sidebar = ({ className, directories, currentPath, setCurrentPath, onRefresh, closeSidebar }) => {
+  const { t } = useTranslation();
+  
   // 폴더 접기/펼치기 상태 관리 (기본값: 루트만 펼침)
   const [expandedFolders, setExpandedFolders] = useState({ '/': true });
   // 이전 열린 상태 기억용 저장소
@@ -21,24 +24,7 @@ const Sidebar = ({ className, directories, currentPath, setCurrentPath, onRefres
       
       setExpandedFolders(newExpanded);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // 현재 경로가 변경될 때마다 해당 경로의 상위 폴더들을 자동으로 펼침
-  useEffect(() => {
-    if (currentPath !== '/') {
-      const pathParts = currentPath.split('/').filter(Boolean);
-      const newExpanded = { ...expandedFolders };
-      
-      let currentBuildPath = '';
-      pathParts.forEach(part => {
-        currentBuildPath += '/' + part;
-        newExpanded[currentBuildPath] = true;
-      });
-      
-      setExpandedFolders(newExpanded);
-    }
-  }, [currentPath, expandedFolders]);
+  }, [currentPath]); // expandedFolders 의존성 제거
 
   const handleDirectoryClick = (path) => {
     setCurrentPath(path);
@@ -129,7 +115,7 @@ const Sidebar = ({ className, directories, currentPath, setCurrentPath, onRefres
     if (!rootDir) {
       rootDir = {
         id: 'root',
-        name: 'Home',
+        name: t('common.home'), // t 함수는 렌더링에서만 사용
         path: '/',
         children: []
       };
@@ -138,7 +124,7 @@ const Sidebar = ({ className, directories, currentPath, setCurrentPath, onRefres
     
     // 계층 구조 구성
     sortedDirs.forEach(dir => {
-      if (dir.path === '/') return; // 루트는 건너뜀
+      if (dir.path === '/') return; // 루트는 건너뛰기
       
       const parts = dir.path.split('/').filter(Boolean);
       const parentPath = parts.length === 1 ? '/' : '/' + parts.slice(0, -1).join('/');
@@ -149,7 +135,7 @@ const Sidebar = ({ className, directories, currentPath, setCurrentPath, onRefres
         // 부모 폴더가 없는 경우 가상의 부모 폴더 생성
         const parentDir = {
           id: `virtual-${parentPath}`,
-          name: parts[parts.length - 2] || 'Unknown',
+          name: parts[parts.length - 2] || '알 수 없는 폴더', // 하드코딩된 값 사용
           path: parentPath,
           children: [dirMap[dir.path]]
         };
@@ -214,10 +200,10 @@ const Sidebar = ({ className, directories, currentPath, setCurrentPath, onRefres
   return (
     <div className={`sidebar ${className || ''}`}>
       <div className="sidebar-header">
-        <h3>디렉토리</h3>
+        <h3>{t('sidebar.title')}</h3>
         <div className="sidebar-actions">
           <button className="refresh-sidebar-btn" onClick={handleRefresh}>
-            새로고침
+            {t('sidebar.refresh')}
           </button>
           <button className="close-sidebar-btn" onClick={closeSidebar}>
             ✕
