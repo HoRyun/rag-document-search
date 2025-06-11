@@ -1,10 +1,14 @@
 import React from 'react';
+import { useTranslation } from '../../hooks/useTranslation';
 import './ChatbotGuide.css';
 
 const ChatbotGuide = ({ onClose, onTryExample }) => {
-  const examples = [
+  const { t, currentLanguage } = useTranslation();
+  
+  // 언어별 예시 명령어들
+  const examples = currentLanguage === 'ko' ? [
     {
-      category: '파일 검색',
+      category: t('chatbot.guide.categories.search'),
       commands: [
         '분기별 보고서 파일을 찾아줘',
         '마케팅 폴더에 있는 제안서 어디 있어?',
@@ -13,7 +17,7 @@ const ChatbotGuide = ({ onClose, onTryExample }) => {
       ]
     },
     {
-      category: '파일 이동',
+      category: t('chatbot.guide.categories.move'),
       commands: [
         '분기별 보고서를 재무 폴더로 이동해줘',
         '이 파일을 프로젝트 폴더로 옮겨',
@@ -22,7 +26,7 @@ const ChatbotGuide = ({ onClose, onTryExample }) => {
       ]
     },
     {
-      category: '파일 복사',
+      category: t('chatbot.guide.categories.copy'),
       commands: [
         '제안서를 마케팅 폴더에 복사해줘',
         '이 문서의 사본을 만들어줘',
@@ -31,7 +35,7 @@ const ChatbotGuide = ({ onClose, onTryExample }) => {
       ]
     },
     {
-      category: '파일 삭제',
+      category: t('chatbot.guide.categories.delete'),
       commands: [
         '이전 버전 파일을 삭제해줘',
         '임시 파일들 모두 지워줘',
@@ -40,7 +44,7 @@ const ChatbotGuide = ({ onClose, onTryExample }) => {
       ]
     },
     {
-      category: '폴더 생성',
+      category: t('chatbot.guide.categories.createFolder'),
       commands: [
         '새 프로젝트 폴더 만들어줘',
         '아카이브 폴더 생성해줘',
@@ -49,7 +53,7 @@ const ChatbotGuide = ({ onClose, onTryExample }) => {
       ]
     },
     {
-      category: '문서 요약',
+      category: t('chatbot.guide.categories.summarize'),
       commands: [
         '이 보고서 요약해줘',
         '긴 문서 내용 정리해줘',
@@ -57,19 +61,73 @@ const ChatbotGuide = ({ onClose, onTryExample }) => {
         '회의록 주요 내용 요약해서 저장해줘'
       ]
     }
+  ] : [
+    {
+      category: t('chatbot.guide.categories.search'),
+      commands: [
+        'Find quarterly report files',
+        'Where is the proposal in the marketing folder?',
+        'Search for photo files',
+        'Where is the most recently modified file?'
+      ]
+    },
+    {
+      category: t('chatbot.guide.categories.move'),
+      commands: [
+        'Move quarterly report to finance folder',
+        'Move this file to project folder',
+        'Move selected documents to archive folder',
+        'Move photo files to images folder'
+      ]
+    },
+    {
+      category: t('chatbot.guide.categories.copy'),
+      commands: [
+        'Copy proposal to marketing folder',
+        'Make a copy of this document',
+        'Copy selected files to backup folder',
+        'Clone this spreadsheet to finance folder'
+      ]
+    },
+    {
+      category: t('chatbot.guide.categories.delete'),
+      commands: [
+        'Delete previous version files',
+        'Delete all temporary files',
+        'Delete unnecessary reports',
+        'Remove duplicate document files'
+      ]
+    },
+    {
+      category: t('chatbot.guide.categories.createFolder'),
+      commands: [
+        'Create new project folder',
+        'Create archive folder',
+        'Create 2024 folder in finance folder',
+        'Create new folder with client name'
+      ]
+    },
+    {
+      category: t('chatbot.guide.categories.summarize'),
+      commands: [
+        'Summarize this report',
+        'Organize long document content',
+        'Extract key points from proposal',
+        'Summarize and save meeting minutes'
+      ]
+    }
   ];
 
   return (
     <div className="chatbot-guide">
       <div className="guide-header">
-        <h2>문서 도우미 사용 가이드</h2>
+        <h2>{t('chatbot.guide.title')}</h2>
         <button className="close-guide-btn" onClick={onClose}>×</button>
       </div>
       
       <div className="guide-content">
         <p className="guide-intro">
-          문서 도우미는 자연어 명령으로 파일과 폴더를 관리할 수 있게 도와줍니다.
-          아래 예시 명령어를 참고하여 효율적으로 문서를 관리해보세요!
+          {t('chatbot.guide.intro')}
         </p>
         
         <div className="command-examples">
@@ -84,7 +142,7 @@ const ChatbotGuide = ({ onClose, onTryExample }) => {
                       className="try-btn" 
                       onClick={() => onTryExample(command)}
                     >
-                      시도해보기
+                      {t('chatbot.guide.tryExample')}
                     </button>
                   </li>
                 ))}
@@ -94,18 +152,19 @@ const ChatbotGuide = ({ onClose, onTryExample }) => {
         </div>
         
         <div className="guide-tips">
-          <h3>유용한 팁</h3>
+          <h3>{t('chatbot.guide.tips.title')}</h3>
           <ul>
-            <li>파일명을 구체적으로 언급하면 더 정확한 결과를 얻을 수 있습니다.</li>
-            <li>여러 파일을 한번에 처리하려면 "모든", "전체", "이 폴더의" 등의 표현을 사용하세요.</li>
-            <li>명령을 실행하기 전에 항상 미리보기를 확인하세요.</li>
-            <li>문서에 대한 질문도 할 수 있습니다. 예: "마케팅 전략에 대한 내용이 담긴 문서는?"</li>
+            {t('chatbot.guide.tips.items').map((tip, index) => (
+              <li key={index}>{tip}</li>
+            ))}
           </ul>
         </div>
       </div>
       
       <div className="guide-footer">
-        <button className="close-btn" onClick={onClose}>닫기</button>
+        <button className="close-btn" onClick={onClose}>
+          {t('common.close')}
+        </button>
       </div>
     </div>
   );
