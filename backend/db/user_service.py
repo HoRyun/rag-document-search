@@ -33,6 +33,8 @@ def create_user(db: Session, user: UserCreate):
     
     # 비밀번호 해싱
     hashed_password = get_password_hash(user.password)
+
+    # 새로운 사용자 모델 생성
     db_user = User(
         email=user.email, 
         username=user.username,

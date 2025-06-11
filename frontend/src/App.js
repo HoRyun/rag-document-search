@@ -12,7 +12,7 @@ import "./App.css";
 import "./Theme.css";
 
 // API 기본 URL 설정
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://rag-alb-547296323.ap-northeast-2.elb.amazonaws.com/fast_api";
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000/fast_api";
 
 // 메인 앱 컴포넌트 (다국어 지원 적용)
 function AppContent() {
