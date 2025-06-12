@@ -312,7 +312,7 @@ async def download_single_file(
         
         # 2. 다운로드에 필요한 파일 정보 준비
         # documents 테이블에서 파일 정보 가져오기
-        document = crud.get_document_by_id(db, doc_id)
+        document = crud.get_document_by_id(db, doc_id, user_id)
         if not document:
             raise HTTPException(status_code=404, detail="파일을 찾을 수 없습니다.")
         
@@ -419,7 +419,7 @@ async def download_multiple_files_as_zip(
         # 2. 모든 파일 정보 가져오기 및 권한 확인
         documents = []
         for file_id in int_file_ids:
-            document = crud.get_document_by_id(db, file_id)
+            document = crud.get_document_by_id(db, file_id, user_id)
             if not document:
                 logger.warning(f"파일 ID {file_id}를 찾을 수 없습니다.")
                 continue
