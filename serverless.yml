@@ -1,0 +1,50 @@
+service: ai-document-api
+
+provider:
+  name: aws
+  runtime: python3.9
+  region: ap-northeast-2
+  environment:
+    DATABASE_URL: ${env:DATABASE_URL}
+    SECRET_KEY: ${env:SECRET_KEY}
+    ALGORITHM: ${env:ALGORITHM}
+    ACCESS_TOKEN_EXPIRE_MINUTES: ${env:ACCESS_TOKEN_EXPIRE_MINUTES}
+
+functions:
+  auth:
+    handler: lambda_auth.handler
+    events:
+      - http:
+          path: /fast_api/auth/{proxy+}
+          method: any
+          cors: true
+    layers:
+      - ${env:DB_LAYER_ARN}
+  
+  users:
+    handler: lambda_users.handler
+    events:
+      - http:
+          path: /fast_api/users
+          method: any
+          cors: true
+    layers:
+      - ${env:DB_LAYER_ARN}
+  
+  documents:
+    handler: lambda_documents.handler
+    events:
+      - http:
+          path: /fast_api/documents/{proxy+}
+          method: any
+          cors: true
+    layers:
+      - ${env:DB_LAYER_ARN}
+
+plugins:
+  - serverless-python-requirements
+
+custom:
+  pythonRequirements:
+    dockerizePip: true
+    layer: true

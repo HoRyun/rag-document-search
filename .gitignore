@@ -24,8 +24,20 @@ package/
 #cursor 파일
 .cursor/*
 
-#zip 파일
+#venv
+lambda-py39-env/
+
+#layer 파일
+.aws-sam/
+.serverless/
+db_layer/
+common_layer/
+custom_modules_layer/
+temp_custom_layer/
+temp_lambda_layer/
+temp_postgresql_layer/
 *.zip
+temp_postgresql_pgvector_only_layer/
 
 #테스트 용 주피터 노트북
 *test.ipynb
@@ -59,7 +71,8 @@ data/faiss_db/
 .env.development.local
 .env.test.local
 .env.production.local
-.env.*
+.env.example
+config.*
 
 # 로그 파일
 *.log
