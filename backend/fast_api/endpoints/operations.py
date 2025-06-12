@@ -666,13 +666,14 @@ def process_search(command, language):
         preview=preview
     )
 
-def process_summarize(command, context):
+def process_summarize(command, context, language):
     """
     요약 작업을 처리하는 함수
     
     Args:
         command: 사용자의 자연어 명령
         context: 작업 컨텍스트 정보
+        language: 사용자 언어 ('ko' 또는 'en')
         
     Returns:
         작업 결과 정보
@@ -680,7 +681,7 @@ def process_summarize(command, context):
 
     # 데이터 준비
     operationId = "op-"+str(uuid.uuid4())
-    description = generate_summarize_description(context)
+    description = generate_summarize_description(command, context, language)
 
     # Pydantic 모델 사용
     summarize_operation = op_schemas.SummarizeOperation(
@@ -1666,48 +1667,135 @@ def generate_search_description(search_term, language):
         description = f"'{search_term}'에 대한 검색을 실행합니다."
     return description
 
-def generate_summarize_description(context):
+def generate_summarize_description(command, context, language):
     """
-    요약 작업에 대한 설명 문장을 생성하는 함수
+    LLM을 사용하여 요약 작업에 대한 설명 문장을 생성하는 함수
     
     Args:
+        command: 사용자의 자연어 명령
         context: 작업 컨텍스트 정보 (selectedFiles 포함)
+        language: 사용자 언어 ('ko' 또는 'en')
         
     Returns:
         str: "파일명의 주요 내용을 요약합니다." 또는 "선택한 X개 문서의 주요 내용을 요약합니다." 형태의 설명 문장
     """
-    # 1. selectedFiles에서 파일 이름들 추출
+    
+    # 선택된 파일이 없는 경우 처리
     if not context.selectedFiles or len(context.selectedFiles) == 0:
-        return "선택된 문서가 없습니다."
+        if language.startswith('en'):
+            return "No documents selected."
+        else:
+            return "선택된 문서가 없습니다."
+    
+    # 선택된 파일 정보를 문자열로 변환
+    selected_files_str = ""
+    files_list = []
+    for file in context.selectedFiles:
+        files_list.append(f"Name: {file.name}, Type: {file.type}")
+    selected_files_str = "\n".join(files_list)
     
     file_count = len(context.selectedFiles)
     
-    # 2. 단일 파일인 경우
-    if file_count == 1:
-        file_name = context.selectedFiles[0].get('name', '문서')
-        # 파일 확장자 제거하여 더 자연스러운 문장 생성
-        clean_name = file_name.rsplit('.', 1)[0] if '.' in file_name else file_name
-        result_desc = f"{clean_name}의 주요 내용을 요약합니다."
-    
-    # 3. 복수 파일인 경우
-    else:
-        # 파일 개수가 3개 이하인 경우 모든 파일명 나열
-        if file_count <= 3:
-            file_names = []
-            for file in context.selectedFiles:
-                file_name = file.get('name', '')
-                # 파일 확장자 제거
-                clean_name = file_name.rsplit('.', 1)[0] if '.' in file_name else file_name
-                file_names.append(clean_name)
-            
-            names_str = ', '.join(file_names)
-            result_desc = f"{names_str}의 주요 내용을 요약합니다."
+    prompt_template = """
+        <Instructions>
+        User's Language: {language}
         
-        # 파일 개수가 많은 경우 개수로 표시
-        else:
-            result_desc = f"선택한 {file_count}개 문서의 주요 내용을 요약합니다."
+You must respond in the language specified by the user's language setting:
+- If language is "ko" or starts with "ko", respond in Korean
+- If language is "en" or starts with "en", respond in English
 
-    return result_desc
+Based on the user's command and the selected files, generate a clear description of what summarization will be performed.
+
+Rules for description generation:
+1. For single file:
+   - Korean: "[파일명]의 주요 내용을 요약합니다."
+   - English: "Summarize the main content of [filename]."
+   - Remove file extensions for more natural sentences
+
+2. For multiple files (3 or fewer):
+   - Korean: "[파일명1], [파일명2]의 주요 내용을 요약합니다."
+   - English: "Summarize the main content of [filename1], [filename2]."
+   - List all file names, removing extensions
+
+3. For many files (more than 3):
+   - Korean: "선택한 {count}개 문서의 주요 내용을 요약합니다."
+   - English: "Summarize the main content of {count} selected documents."
+
+Important notes:
+- Remove file extensions from names for cleaner sentences
+- Use appropriate counting and grammar for the target language
+- Keep the description concise and informative
+- File count: {file_count}
+
+Output format:
+<description>Your description here</description>
+        </Instructions>
+        
+        <User's command>{command}</User's command>
+        
+        <Selected files (total: {file_count})>
+{selected_files}
+        </Selected files>
+        
+        <Description format>
+<description>Your description here</description>
+        </Description format>
+        
+        Answer:
+        """
+    
+    prompt = PromptTemplate.from_template(prompt_template)
+    
+    # OpenAI 모델 객체 생성
+    llm = ChatOpenAI(
+        temperature=0.1,
+        max_tokens=1000,
+        model_name="gpt-4o-mini"
+    )
+    
+    # 체인 생성
+    chain = prompt | llm | StrOutputParser()
+    
+    # 체인 실행
+    try:
+        result = chain.invoke({
+            "command": command,
+            "selected_files": selected_files_str,
+            "file_count": file_count,
+            "language": language
+        })
+        
+        # 모델 출력에서 description 추출
+        if "<description>" in result and "</description>" in result:
+            description = result.split("<description>")[1].split("</description>")[0].strip()
+            return description
+        else:
+            logger.warning(f"Could not parse description from LLM output: {result}")
+            # 기본 설명 생성
+            if language.startswith('en'):
+                if file_count == 1:
+                    return "Summarize the main content of the selected document."
+                else:
+                    return f"Summarize the main content of {file_count} selected documents."
+            else:
+                if file_count == 1:
+                    return "선택된 문서의 주요 내용을 요약합니다."
+                else:
+                    return f"선택한 {file_count}개 문서의 주요 내용을 요약합니다."
+            
+    except Exception as e:
+        logger.error(f"Error in generate_summarize_description: {e}")
+        # 기본 설명 생성
+        if language.startswith('en'):
+            if file_count == 1:
+                return "Summarize the main content of the selected document."
+            else:
+                return f"Summarize the main content of {file_count} selected documents."
+        else:
+            if file_count == 1:
+                return "선택된 문서의 주요 내용을 요약합니다."
+            else:
+                return f"선택한 {file_count}개 문서의 주요 내용을 요약합니다."
 
 
 # ===== 작업 실행 로직 헬퍼 함수들 =====
