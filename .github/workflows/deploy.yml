@@ -33,10 +33,15 @@ jobs:
           flake8 backend --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
       - name: Run unit tests
+        env:
+          TEST_MODE: "true"
+          REDIS_HOST: "localhost"
+          REDIS_PORT: "6379"
+          REDIS_DB: "0"
         run: |
           cd backend
-          export TEST_MODE=True
           pytest -xvs
+
 
   build-and-deploy-backend:
     needs: lint-and-test
