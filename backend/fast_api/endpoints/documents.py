@@ -113,7 +113,7 @@ async def list_items(
         user_id = current_user.id
 
         # 루트 디렉토리가 존재하지 않으면 생성하고, 존재하면 아무 작업도 하지 않는다.
-        if not crud.get_directory_by_id(db, "root"):
+        if not crud.get_directory_by_id(db, "root", current_user):
             # 루트 디렉토리 생성
             crud.create_directory(db, "root", "/", True, None, datetime.now())
 
@@ -151,7 +151,6 @@ async def list_items(
         filtered_items.extend([dict(item) for item in file_result])
         filtered_items.extend([dict(item) for item in dir_result])
         # </가져온 정보를 filtered_items에 추가>
-
         
         return {"items": filtered_items}
     except Exception as e:
@@ -186,24 +185,27 @@ async def upload_document(
             "message": "작업이 완료되었습니다.",
             "items": []
         }
-        
+        user_id = current_user.id
 
         # 1 & 2. 파일 업로드 처리 (디렉토리 구조 포함 또는 단일 파일)
         # 파일이 존재하는 경우에 아래 코드 실행. (operations작업과 구분.)
         if files:
             # 단일 파일인 경우
             if os.path.dirname(files[0].filename) == "":
+                debugging.stop_debugger()
                 # 파일 업로드 처리
                 file_results = await process_file_uploads(files, current_upload_path, current_user, db)
                 results["items"].extend(file_results)
             else:
                 # 디렉토리 업로드인 경우
                 # 디렉토리 업로드 처리
-                directory_results = await process_directory_uploads(current_upload_path, directory_structure, current_user, db)
+                directory_results = await process_directory_uploads(current_upload_path, directory_structure, user_id, db)
+                debugging.stop_debugger()
                 results["items"].extend(directory_results)
 
                 # 파일 업로드 처리
                 file_results = await process_file_uploads(files, current_upload_path, current_user, db)
+                debugging.stop_debugger()
                 results["items"].extend(file_results)
         
         # 3 & 4. 디렉토리 작업 처리 (생성, 이동, 삭제 등)
@@ -236,7 +238,7 @@ async def get_filesystem_structure(
 
         # 루트 디렉토리 존재여부 확인 및 생성
         # 루트 디렉토리가 존재하지 않으면 생성하고, 존재하면 아무 작업도 하지 않는다.
-        if not crud.get_directory_by_id(db, "root"):
+        if not crud.get_directory_by_id(db, "root", current_user):
             # 루트 디렉토리 생성
             crud.create_directory(db, "root", "/", True, None, datetime.now())
 
@@ -529,7 +531,7 @@ async def download_multiple_files_as_zip(
 # -----------------------------------------
 
 # 유틸 함수
-async def process_directory_uploads(current_upload_path, directory_structure, current_user, db):
+async def process_directory_uploads(current_upload_path, directory_structure, user_id, db):
     """디렉토리 업로드 처리"""
     # 라이브러리 임포트
     import json
@@ -538,14 +540,13 @@ async def process_directory_uploads(current_upload_path, directory_structure, cu
 
     # 결과가 저장될 리스트를 미리 선언
     results = []
-    user_id = current_user.id
 
     # 1. 문자열로 받은 디렉토리 구조를 파이썬 dict로 변환
     tree: Dict[str, Any] = json.loads(directory_structure)
 
     # 2. 최상위 디렉토리 처리
         # 최상위 디렉토리를 처리하는 함수 선언
-    top_dir_results, top_dir_children = process_top_directory(tree, current_upload_path, db)
+    top_dir_results, top_dir_children = process_top_directory(tree, current_upload_path, db, user_id)
  
     # Store DB : directories 테이블에 저장
     results.append(store_directory_table(db, top_dir_results, user_id))
@@ -595,27 +596,34 @@ async def process_file_uploads(files, current_upload_path, current_user, db):
 
     try:
     # 3-2. 해당 디렉토리에 포함된 파일 처리
+    # ㅈ버그 발견 : files에 파일이 2개 이상일 경우에 1번째 파일은 읽는데 성공하지만 2번째 파일부터는 파일이 닫혀서 읽을 수 없다.
         for upload_file in files:
             # 파일 이름을 추출 & 파일 이름 중복 처리.
-            file_name = set_filename(upload_file, db)
+            file_name = set_filename(upload_file, db, user_id)
+            debugging.stop_debugger()
 
-            # s3 key 생성
+            # s3 key 생성 v
             s3_key = f"uploads/{user_username}/{file_name}"
 
-            # 파일 경로 설정
+            # 파일 경로 설정 v
             file_path, file_path_dir = set_file_path(file_name, upload_file, current_upload_path)
+            debugging.stop_debugger()
 
             # file_path_dir가 db-> directories 테이블에 존재하면 그 레코드에서 id값을 가져온다.
-            parent_id = crud.get_directory_id_by_path(db, file_path_dir)
+            # 디버그 통과 v
+            parent_id = crud.get_directory_id_by_path(db, file_path_dir, user_id)
+            debugging.stop_debugger()
 
             # 파일 업로드 처리 시작
             # <파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
             file_content = await upload_file.read()
+            debugging.stop_debugger()
             
             # 문서
             
-            # s3 업로드
+            # s3 업로드 v
             s3_upload_result = await upload_file_to_s3(upload_file, s3_key, file_name, file_path)
+            debugging.stop_debugger()
             results.append(s3_upload_result)
 
             # 문서 저장
@@ -627,6 +635,7 @@ async def process_file_uploads(files, current_upload_path, current_user, db):
                         db=db,
                         s3_key=s3_key
                     )
+            debugging.stop_debugger()
 
             # 디렉토리 테이블에 저장할 데이터 준비
             directory_value_dict = {
@@ -1801,7 +1810,7 @@ def generate_unique_directory_name(db: Session, directory_name: str) -> str:
     return candidate
 
 # 최상위 디렉토리 처리
-def process_top_directory(tree, current_upload_path: str, db: Session):
+def process_top_directory(tree, current_upload_path: str, db: Session, user_id: int):
     """최상위 디렉토리 처리"""
     # 라이브러리 임포트
     import json
@@ -1818,7 +1827,7 @@ def process_top_directory(tree, current_upload_path: str, db: Session):
         # 현재 사용자가 업로드 하는 경로가 루트가 아닌 특정한 경로인 경우
         top_dir_path = current_upload_path+"/"+top_dir_name
     
-    parent_id = crud.get_directory_id_by_path(db, current_upload_path)
+    parent_id = crud.get_directory_id_by_path(db, current_upload_path, user_id)
 
     if parent_id is None:
         # 루트 위치에 업로드 하는 경우
@@ -1984,8 +1993,11 @@ def store_directory_table(db: Session, value_dict: dict, user_id: int):
             "error": str(e)
         }
     
-def set_filename(upload_file: any, db: Session):
-    """파일 이름 추출"""
+def set_filename(upload_file: any, db: Session, user_id: int):
+    """파일 이름 추출
+    
+
+    """
     from db import crud
     if os.path.dirname(upload_file.filename) == "":
         # 단일파일인 경우
@@ -1995,7 +2007,8 @@ def set_filename(upload_file: any, db: Session):
         file_name = os.path.basename(upload_file.filename)
     
     # 동일한 파일이 db에 존재하는 지 확인
-    file_info = crud.get_file_info_by_filename(db, file_name)
+    # get_file_info_by_filename()함수는 현재 접속 중인 사용자의 db에서만 검색해야 하는데, 이 함수는 전체 db에서 검색하는 것이므로 수정해야 한다.
+    file_info = crud.get_file_info_by_filename(db, file_name, user_id)
     if file_info:
         # 중복 파일명 처리
         file_name = generate_unique_filename(db, file_name)
