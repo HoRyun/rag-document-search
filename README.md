@@ -16,6 +16,7 @@ Retrieval-Augmented Generation(RAG) 기술을 활용한 문서 검색 및 질의
 
 ## 기술 스택
 
+
 ### 백엔드
 
 - **FastAPI**: 고성능 Python 기반 API 프레임워크
