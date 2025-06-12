@@ -426,27 +426,17 @@ def process_copy(command, context):
     # 데이터 준비
     operationId = "op-"+str(uuid.uuid4())
     
-    # destination 파싱. 만약 '/'로 파싱 시 'create_folder'가 존재하는 경우,
-    # destination에서 'create_folder' 문자열이 있으면 제거
-    if destination.startswith('create_folder'):
-        code_remove_ver = destination.replace('create_folder', '', 1)
-
-        # destination에 코드를 제거한 경로 데이터 저장.
-        destination = code_remove_ver
-
-        additional_desc = code_remove_ver + " 폴더를 생성합니다."
-        # 추가 설명 문장 추가.
-        description += " "+ additional_desc
-    else:
-        destination = destination
-        description = description
+    # destination에서 create_folder 접두사 제거 (실제 작업에서는 깨끗한 경로 사용)
+    clean_destination = destination
+    if destination.startswith('create_folder/'):
+        clean_destination = destination.replace('create_folder/', '', 1)
     
     warnings = [] 
     
     # Pydantic 모델 사용
     copy_operation = op_schemas.CopyOperation(
         targets=context.selectedFiles,
-        destination=destination
+        destination=clean_destination
     )
     
     preview = op_schemas.OperationPreview(
@@ -730,9 +720,8 @@ def get_destination(command, context, operation_type, language='ko'):
     else:
         available_folders_str = "No available folders"
     
-    # 언어별 프롬프트 설정
-    if language.startswith('en'):
-        prompt_template = """
+    # get_description 함수와 동일하게 한국어 버전 프롬프트는 삭제했다. 그러나 language 데이터는 프롬프트에 추가하지 않았다. 이유는 목적지 값은 번역이 필요없기 때문에.
+    prompt_template = """
         <Instructions>
 You need to extract the destination folder name that the user wants to {operation_type} files to from the user's command.
 
@@ -755,30 +744,6 @@ Output format:
         
         Answer:
         """
-    else:  # Korean (default)
-        prompt_template = """
-        <Instructions>
-사용자의 명령에서 파일을 {operation_type}하고자 하는 목적지 폴더명을 추출해야 합니다.
-
-먼저 사용자의 명령을 분석하여 어떤 목적지 폴더를 원하는지 파악하세요.
-그 다음 해당 목적지 폴더가 사용 가능한 폴더 목록에 있는지 확인하세요.
-
-목적지가 사용 가능한 폴더에 존재하면 해당 path를 반환하세요.
-목적지가 사용 가능한 폴더에 없으면 "create_folder/[폴더명]"을 반환하세요.
-특정 목적지가 언급되지 않았으면 "/"를 반환하세요.
-
-출력 형식:
-<destination>목적지_경로</destination>
-        </Instructions>
-        
-        <사용자 명령>{command}</사용자 명령>
-        
-        <사용 가능한 폴더>
-{available_folders}
-        </사용 가능한 폴더>
-        
-        답변:
-        """
     
     prompt = PromptTemplate.from_template(prompt_template)
     
@@ -797,7 +762,8 @@ Output format:
         result = chain.invoke({
             "command": command,
             "operation_type": operation_type,
-            "available_folders": available_folders_str
+            "available_folders": available_folders_str,
+            "language": language
         })
         
         # 모델 출력에서 destination 추출
@@ -842,20 +808,33 @@ def get_description(command, context, destination='/', operation_type="default",
     if destination.startswith('create_folder/'):
         clean_destination = destination.replace('create_folder/', '', 1)
     
-    # 언어별 프롬프트 설정
-    if language.startswith('en'):
-        prompt_template = """
+    prompt_template = """
         <Instructions>
+        User's Language: {language}
+        
+You must respond in the language specified by the user's language setting:
+- If language is "ko" or starts with "ko", respond in Korean
+- If language is "en" or starts with "en", respond in English
+
 Based on the user's command and the selected files, generate a short and clear description of what will happen when this {operation_type} operation is executed.
 
 The description should be:
 - Concise and informative
-- In the format "Will {operation_type} [files] to [destination]"
 - Maximum 2 sentences
+- Written in the user's specified language
 
-If destination starts with "/" it means an existing folder.
-If destination doesn't start with "/" it means a new folder will be created. In this case, please add an explanation at the very end of the answer stating that the folder name will be newly created by removing 'create\_folder/' from the <destination>. (Example: If the <destination> is 'create\_folder/New Folder' – a new folder named 'New Folder' will be created.)
+IMPORTANT - Different formats based on operation type:
 
+1. For DELETE operations:
+   - Do NOT mention destination at all
+   - Focus only on what files/folders will be deleted
+   - Format: "Will delete [files]" or "선택된 파일들을 삭제합니다"
+
+2. For other operations (move, copy, etc.):
+   - Include destination information
+   - Format: "Will {operation_type} [files] to [destination]" or "선택된 파일들을 [destination]로 {operation_type}합니다"
+   - If destination starts with "/" it means an existing folder
+   - If destination doesn't start with "/" it means a new folder will be created
 
         </Instructions>
         
@@ -874,36 +853,6 @@ If destination doesn't start with "/" it means a new folder will be created. In 
         </Description format>
         
         Answer:
-        """
-    else:  # Korean (default)
-        prompt_template = """
-        <Instructions>
-사용자의 명령과 선택된 파일들을 바탕으로 이 {operation_type} 작업이 실행될 때 어떤 일이 일어날지 짧고 명확하게 설명하세요.
-
-설명은 다음과 같아야 합니다:
-- 간결하고 정보를 잘 전달
-- "[파일들]을(를) [목적지]로 {operation_type}합니다" 형식
-- 최대 2문장
-
-목적지가 "/"로 시작하면 기존 폴더를 의미합니다.
-목적지가 "/"로 시작하지 않으면 새 폴더가 생성될 것을 의미합니다. 이 경우, 답변의 맨 끝에, <목적지>에서 'create_folder/'를 제거한 폴더의 이름을 새로 생성할 것이라는 설명을 붙이세요. (예시:<목적지>가 'create_folder/새 폴더'일 경우 - 새 폴더를 새로 생성합니다.
-        </Instructions>
-        
-        <사용자 명령>{command}</사용자 명령>
-        
-        <작업 타입>{operation_type}</작업 타입>
-        
-        <선택된 파일>
-{selected_files}
-        </선택된 파일>
-        
-        <목적지>{destination}</목적지>
-        
-        <설명 형식>
-<description>여기에 설명을 작성하세요</description>
-        </설명 형식>
-        
-        답변:
         """
     
     prompt = PromptTemplate.from_template(prompt_template)
@@ -924,7 +873,8 @@ If destination doesn't start with "/" it means a new folder will be created. In 
             "command": command,
             "operation_type": operation_type,
             "selected_files": selected_files_str,
-            "destination": clean_destination
+            "destination": clean_destination,
+            "language": language
         })
         
         # 모델 출력에서 description 추출
