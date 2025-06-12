@@ -91,10 +91,9 @@ class OperationService {
         currentPath: context.currentPath,
         selectedFiles: context.selectedFiles,
         availableFolders: context.availableFolders,
-        language: context.language || 'ko', // 언어 정보 추가
         timestamp: new Date().toISOString()
       },
-      language: context.language || 'ko' // 최상위 레벨에도 언어 정보 추가
+      language: context.language || 'ko'
     };
 
     debugLog('language', '🌍 언어 정보와 함께 작업 준비 요청', { 
