@@ -192,7 +192,7 @@ async def upload_document(
         if files:
             # 단일 파일인 경우
             if os.path.dirname(files[0].filename) == "":
-                # debugging.stop_debugger()
+                debugging.stop_debugger()
                 # 파일 업로드 처리
                 file_results = await process_file_uploads(files, current_upload_path, current_user, db)
                 results["items"].extend(file_results)
@@ -200,12 +200,12 @@ async def upload_document(
                 # 디렉토리 업로드인 경우
                 # 디렉토리 업로드 처리
                 directory_results = await process_directory_uploads(current_upload_path, directory_structure, user_id, db)
-                # debugging.stop_debugger()
+                debugging.stop_debugger()
                 results["items"].extend(directory_results)
 
                 # 파일 업로드 처리
                 file_results = await process_file_uploads(files, current_upload_path, current_user, db)
-                # debugging.stop_debugger()
+                debugging.stop_debugger()
                 results["items"].extend(file_results)
         
         # 3 & 4. 디렉토리 작업 처리 (생성, 이동, 삭제 등)
@@ -600,30 +600,30 @@ async def process_file_uploads(files, current_upload_path, current_user, db):
         for upload_file in files:
             # 파일 이름을 추출 & 파일 이름 중복 처리.
             file_name = set_filename(upload_file, db, user_id)
-            # debugging.stop_debugger()
+            debugging.stop_debugger()
 
             # s3 key 생성 v
             s3_key = f"uploads/{user_username}/{file_name}"
 
             # 파일 경로 설정 v
             file_path, file_path_dir = set_file_path(file_name, upload_file, current_upload_path)
-            # debugging.stop_debugger()
+            debugging.stop_debugger()
 
             # file_path_dir가 db-> directories 테이블에 존재하면 그 레코드에서 id값을 가져온다.
             # 디버그 통과 v
             parent_id = crud.get_directory_id_by_path(db, file_path_dir, user_id)
-            # debugging.stop_debugger()
+            debugging.stop_debugger()
 
             # 파일 업로드 처리 시작
             # <파일의 내용을 여러 번 재사용하기 위해 메모리에 로드.>
             file_content = await upload_file.read()
-            # debugging.stop_debugger()
+            debugging.stop_debugger()
             
             # 문서
             
             # s3 업로드 v
             s3_upload_result = await upload_file_to_s3(upload_file, s3_key, file_name, file_path)
-            # debugging.stop_debugger()
+            debugging.stop_debugger()
             results.append(s3_upload_result)
 
             # 문서 저장
@@ -635,7 +635,7 @@ async def process_file_uploads(files, current_upload_path, current_user, db):
                         db=db,
                         s3_key=s3_key
                     )
-            # debugging.stop_debugger()
+            debugging.stop_debugger()
 
             # 디렉토리 테이블에 저장할 데이터 준비
             directory_value_dict = {
