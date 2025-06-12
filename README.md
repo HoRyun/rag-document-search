@@ -19,6 +19,8 @@
 .\create_simple_layer.ps1
 ```
 
+
+
 이 스크립트는 다음을 수행합니다:
 - Lambda 레이어 구조에 맞는 디렉토리 생성
 - email-validator와 dnspython 패키지 설치
