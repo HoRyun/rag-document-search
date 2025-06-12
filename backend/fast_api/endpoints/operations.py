@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
+from typing import Optional
 
 import logging
 from datetime import datetime, timedelta
@@ -16,6 +17,12 @@ from services.operation_store import get_operation_store, OperationStore
 import uuid
 import re
 
+# LLM 관련 import 추가
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+
 
 router = APIRouter()
 
@@ -29,7 +36,8 @@ async def stage_operation(
     request: op_schemas.StageOperationRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-    operation_store: OperationStore = Depends(get_operation_store)
+    operation_store: OperationStore = Depends(get_operation_store),
+    accept_language: Optional[str] = Header(default=None, alias="Accept-Language")
 ):
     """
     자연어 명령을 분석하고 작업을 준비하는 엔드포인트
@@ -39,16 +47,20 @@ async def stage_operation(
         current_user: 현재 인증된 사용자
         db: 데이터베이스 세션
         operation_store: Redis 작업 저장소
+        accept_language: Accept-Language header
+
     
     Returns:
         OperationResponse: 준비된 작업 정보
     """
-    logger.info(f"Stage operation request from user {current_user.id}: {request.command}")
-    
-    # debugging.redis_store_test('op-4db0b366-fa7e-44f6-9813-5fc875dd9998')
-    # debugging.stop_debugger()
-    
     try:
+        logger.info(f"Stage operation request from user {current_user.id}: {request.command}")
+        # Extract language from Accept-Language header (default to 'ko')
+        language = accept_language.split(',')[0].strip().lower() if accept_language else 'ko'
+        logger.debug(f"🈯 Detected language from header: {language}")
+
+        # TODO: Pass `language` to downstream logic (LLM prompt, i18n, etc.) as needed.
+
         # command 값 접근
         command = request.command
 
@@ -66,21 +78,21 @@ async def stage_operation(
 
         # 타입 별 AI 호출 분기. 각 함수의 매개변수로 command, context전달.
         if operation_type == "move":
-            result = await process_move(command, context)
+            result = process_move(command, context, language)
         elif operation_type == "copy":
-            result = await process_copy(command, context)
+            result = process_copy(command, context, language)
         elif operation_type == "delete":
-            result = process_delete(command, context)
+            result = process_delete(command, context, language)
         elif operation_type == "rename":
-            result = process_rename(command, context)
+            result = process_rename(command, context, language)
         elif operation_type == "create_folder":
-            result = process_create_folder(command, context)
+            result = process_create_folder(command, context, language)
         elif operation_type == "search":
-            result = process_search(command)
+            result = process_search(command, language)
         elif operation_type == "summarize":
-            result = process_summarize(command, context)
+            result = process_summarize(command, context, language)
         elif operation_type == "error":
-            result = process_error(command, operation_type)
+            result = process_error(command, operation_type, language)
 
         # ✅ Redis에 작업 정보 저장 (error 타입 제외)
         if operation_type != "error":
@@ -347,46 +359,38 @@ async def undo_operation(
 
 # operation_type별 function 만들기
 
-async def process_move(command, context):
+def process_move(command, context, language):
     """
-    이동 작업을 처리하는 함수
+    이동 작업을 처리하는 함수 (LLM 기반으로 리팩토링됨)
     
     Args:
         command: 사용자의 자연어 명령
         context: 작업 컨텍스트 정보
-        
+        language: 사용자 언어 ('ko' 또는 'en')
     Returns:
         작업 결과 정보
     """
-    # 명령 분석
+    # LLM을 사용하여 목적지 설정
     destination = get_destination(command, context, 'move')
-    # 작업 설명 요약 생성.
-    description = get_description(context, destination, 'move')
+    # debugging.stop_debugger()
+    # LLM을 사용하여 작업 설명 생성
+    description = get_description(command, context, destination, 'move', language)
+    # debugging.stop_debugger()
 
     # 데이터 준비
     operationId = "op-"+str(uuid.uuid4())
     
-    # destination 파싱. 만약 '/'로 파싱 시 'create_folder'가 존재하는 경우,
-    # destination에서 'create_folder' 문자열이 있으면 제거
-    if destination.startswith('create_folder'):
-        code_remove_ver = destination.replace('create_folder', '', 1)
-
-        # destination에 코드를 제거한 경로 데이터 저장.
-        destination = code_remove_ver
-
-        additional_desc = code_remove_ver + " 폴더를 생성합니다."
-        # 추가 설명 문장 추가.
-        description += " "+ additional_desc
-    else:
-        destination = destination
-        description = description
+    # destination에서 create_folder 접두사 제거 (실제 작업에서는 깨끗한 경로 사용)
+    clean_destination = destination
+    if destination.startswith('create_folder/'):
+        clean_destination = destination.replace('create_folder/', '', 1)
     
     warnings = [] 
-    
+    # debugging.stop_debugger()
     # Pydantic 모델 사용
     move_operation = op_schemas.MoveOperation(
         targets=context.selectedFiles,
-        destination=destination
+        destination=clean_destination
     )
     
     preview = op_schemas.OperationPreview(
@@ -403,7 +407,7 @@ async def process_move(command, context):
         preview=preview
     )
 
-async def process_copy(command, context):
+def process_copy(command, context, language):
     """
     복사 작업을 처리하는 함수
     
@@ -422,27 +426,17 @@ async def process_copy(command, context):
     # 데이터 준비
     operationId = "op-"+str(uuid.uuid4())
     
-    # destination 파싱. 만약 '/'로 파싱 시 'create_folder'가 존재하는 경우,
-    # destination에서 'create_folder' 문자열이 있으면 제거
-    if destination.startswith('create_folder'):
-        code_remove_ver = destination.replace('create_folder', '', 1)
-
-        # destination에 코드를 제거한 경로 데이터 저장.
-        destination = code_remove_ver
-
-        additional_desc = code_remove_ver + " 폴더를 생성합니다."
-        # 추가 설명 문장 추가.
-        description += " "+ additional_desc
-    else:
-        destination = destination
-        description = description
+    # destination에서 create_folder 접두사 제거 (실제 작업에서는 깨끗한 경로 사용)
+    clean_destination = destination
+    if destination.startswith('create_folder/'):
+        clean_destination = destination.replace('create_folder/', '', 1)
     
     warnings = [] 
     
     # Pydantic 모델 사용
     copy_operation = op_schemas.CopyOperation(
         targets=context.selectedFiles,
-        destination=destination
+        destination=clean_destination
     )
     
     preview = op_schemas.OperationPreview(
@@ -496,7 +490,7 @@ def process_delete(command, context):
         preview=preview
     )
 
-def process_error(command, operation_type):
+def process_error(command, operation_type, language):
     """
     오류 상황을 처리하는 함수
     
@@ -504,6 +498,7 @@ def process_error(command, operation_type):
         command: 사용자의 자연어 명령
         context: 작업 컨텍스트 정보
         error_type: 에러 타입 (err-1 또는 err-2)
+        language: 사용자 언어 ('ko' 또는 'en')
         
     Returns:
         에러 정보를 담은 결과 객체
@@ -511,17 +506,30 @@ def process_error(command, operation_type):
     # 데이터 준비
     operation_id = "error-"+str(uuid.uuid4())
     
+    # 언어별 메시지 설정
+    is_english = language.startswith('en')
+    
     # 에러 타입별 메시지 및 가이드 설정
     if operation_type == "error":
         # 부정표현 또는 파일관련이지만 매칭안됨
-        message = "파일 관리와 관련없는 명령이거나, 명령을 이해할 수 없습니다. 다시 입력해주세요."
-        description = f"입력하신 명령 '{command}'을(를) 처리할 수 없습니다."
-        warnings = ["적절한 명령을 다시 입력해주십시오."]
+        if is_english:
+            message = "The command is not related to file management or cannot be understood. Please try again."
+            description = f"Unable to process the command '{command}'."
+            warnings = ["Please enter an appropriate command."]
+        else:
+            message = "파일 관리와 관련없는 명령이거나, 명령을 이해할 수 없습니다. 다시 입력해주세요."
+            description = f"입력하신 명령 '{command}'을(를) 처리할 수 없습니다."
+            warnings = ["적절한 명령을 다시 입력해주십시오."]
     else:
         # 기본 에러 메시지
-        message = "알 수 없는 오류가 발생했습니다."
-        description = "시스템에서 오류가 발생했습니다."
-        warnings = ["잠시 후 다시 시도해주세요."]
+        if is_english:
+            message = "An unknown error has occurred."
+            description = "A system error has occurred."
+            warnings = ["Please try again later."]
+        else:
+            message = "알 수 없는 오류가 발생했습니다."
+            description = "시스템에서 오류가 발생했습니다."
+            warnings = ["잠시 후 다시 시도해주세요."]
     
     # 로그 기록
     logger.warning(f"Error processing command: '{command}', Error type: error")
@@ -546,7 +554,7 @@ def process_error(command, operation_type):
         preview=preview
     )
 
-def process_rename(command, context):
+def process_rename(command, context, language):
     """
     이름 변경 작업을 처리하는 함수
     
@@ -560,8 +568,12 @@ def process_rename(command, context):
 
     # 데이터 준비
     operationId = "op-"+str(uuid.uuid4())
-    new_name = get_new_name(command)
-    description = generate_rename_description(context, new_name)
+    
+    # 파일의 새로운 이름을 추출하는 함수는 아래의 get
+    new_name = get_new_name(command, context, language)
+
+    # description = generate_rename_description(context, new_name)
+    description = get_description(command, context, None, 'rename', language, new_name)
     # debugging.stop_debugger()
 
     # Pydantic 모델 사용
@@ -583,7 +595,7 @@ def process_rename(command, context):
         preview=preview
     )
 
-def process_create_folder(command, context):
+def process_create_folder(command, context, language):
     """
     폴더 생성 작업을 처리하는 함수
     
@@ -595,10 +607,14 @@ def process_create_folder(command, context):
         작업 결과 정보
     """
     # 데이터 준비
+    # get_parent_path 함수 선언문과 정의문을 삭제하고 get_new_folder_name 함수의 이름을 변경-> 새로운 이름의 함수를 선언, 
+    # # 그 함수의 정의부도 새롭게 정의: 기존 get_new_folder_name 작업과 get_parent_path작업을 이 새로운 함수에서 수행하도록 리팩토링.
     operationId = "op-"+str(uuid.uuid4())
-    folder_name = get_new_folder_name(command)
-    parent_Path = get_parent_path(command, context)
-    description = generate_create_folder_description(folder_name, parent_Path)
+
+    folder_name, parent_Path = get_new_folder_name_and_parent_path(command, context)
+    # parent_Path = get_parent_path(command, context)
+
+    description = generate_create_folder_description(folder_name, parent_Path, language)
 
     # parent_Path 파싱. 만약 'create_folder'가 존재하는 경우,
     # parent_Path에서 'create_folder' 문자열이 있으면 제거
@@ -631,7 +647,7 @@ def process_create_folder(command, context):
         preview=preview
     )
 
-def process_search(command):
+def process_search(command, language):
     """
     검색 작업을 처리하는 함수
     
@@ -643,8 +659,8 @@ def process_search(command):
     """
     # 데이터 준비
     operationId = "op-"+str(uuid.uuid4())
-    search_term = get_search_term(command)
-    description = generate_search_description(search_term)
+    search_term = get_search_term(command, language)
+    description = generate_search_description(search_term, language)
 
     # Pydantic 모델 사용
     search_operation = op_schemas.SearchOperation(
@@ -664,13 +680,14 @@ def process_search(command):
         preview=preview
     )
 
-def process_summarize(command, context):
+def process_summarize(command, context, language):
     """
     요약 작업을 처리하는 함수
     
     Args:
         command: 사용자의 자연어 명령
         context: 작업 컨텍스트 정보
+        language: 사용자 언어 ('ko' 또는 'en')
         
     Returns:
         작업 결과 정보
@@ -678,7 +695,7 @@ def process_summarize(command, context):
 
     # 데이터 준비
     operationId = "op-"+str(uuid.uuid4())
-    description = generate_summarize_description(context)
+    description = generate_summarize_description(command, context, language)
 
     # Pydantic 모델 사용
     summarize_operation = op_schemas.SummarizeOperation(
@@ -704,7 +721,7 @@ def process_summarize(command, context):
 
 def get_destination(command, context, operation_type):
     """
-    목적지 경로를 결정하는 함수
+    LLM을 사용하여 목적지 경로를 결정하는 함수
     
     Args:
         command: 사용자의 자연어 명령
@@ -714,36 +731,203 @@ def get_destination(command, context, operation_type):
     Returns:
         str: 목적지 경로
     """
-
-    # 목적지 경로 추출
-    if operation_type == 'move':
-        output_destination = extract_move_destination(command, context)
-    elif operation_type == 'copy':
-        # copy 로직은 나중에 구현
-        output_destination = extract_copy_destination(command, context)
-    # ...
-
-    return output_destination
-
-def get_description(context, destination = '/', operation_type = "default", new_name = None):
-    """
     
+    # 사용 가능한 폴더 목록을 문자열로 변환
+    available_folders_str = ""
+    if context.availableFolders:
+        folders_list = []
+        for folder in context.availableFolders:
+            folders_list.append(f"Name: {folder.name}, Path: {folder.path}")
+        available_folders_str = "\n".join(folders_list)
+    else:
+        available_folders_str = "No available folders"
+    
+    # get_description 함수와 동일하게 한국어 버전 프롬프트는 삭제했다. 그러나 language 데이터는 프롬프트에 추가하지 않았다. 이유는 목적지 값은 번역이 필요없기 때문에.
+    prompt_template = """
+        <Instructions>
+You need to extract the destination folder name that the user wants to {operation_type} files to from the user's command.
+
+First, analyze the user's command to understand what destination folder they want.
+Then check if that destination folder exists in the available folders list.
+
+If the destination exists in available folders, return the corresponding path.
+If the destination doesn't exist in available folders, return "create_folder/[folder_name]".
+If no specific destination is mentioned, return "/".
+
+Output format:
+<destination>destination_path_here</destination>
+        </Instructions>
+        
+        <User's command>{command}</User's command>
+        
+        <Available folders>
+{available_folders}
+        </Available folders>
+        
+        Answer:
+        """
+    
+    prompt = PromptTemplate.from_template(prompt_template)
+    
+    # OpenAI 모델 객체 생성
+    llm = ChatOpenAI(
+        temperature=0.1,
+        max_tokens=1000,
+        model_name="gpt-4o-mini"
+    )
+    
+    # 체인 생성
+    chain = prompt | llm | StrOutputParser()
+    
+    # 체인 실행
+    try:
+        result = chain.invoke({
+            "command": command,
+            "operation_type": operation_type,
+            "available_folders": available_folders_str
+        })
+        
+        # 모델 출력에서 destination 추출
+        if "<destination>" in result and "</destination>" in result:
+            destination = result.split("<destination>")[1].split("</destination>")[0].strip()
+            return destination
+        else:
+            logger.warning(f"Could not parse destination from LLM output: {result}")
+            return "/"
+            
+    except Exception as e:
+        logger.error(f"Error in get_destination: {e}")
+        return "/"
+
+def get_description(command, context, destination='/', operation_type="default", language='ko', new_name=None):
+    """
+    LLM을 사용하여 작업 설명을 생성하는 함수
+    
+    Args:
+        command: 사용자의 자연어 명령
+        context: 작업 컨텍스트 정보
+        destination: 목적지 경로
+        operation_type: 작업 타입
+        language: 사용자 언어 ('ko' 또는 'en')
+        new_name: 새로운 이름
     
     Returns:
-        str: output_description
+        str: 작업 설명 문장
     """
-    if operation_type == 'move':
-        output_description = generate_move_description(context, destination)
-    elif operation_type == 'copy':
-        output_description = generate_copy_description(context, destination)
-    elif operation_type == 'delete':
-        output_description = generate_delete_description(context)
-    elif operation_type == 'rename':
-        output_description = generate_rename_description(context, new_name)
+    
+    # 선택된 파일 정보를 문자열로 변환
+    selected_files_str = ""
+    if context.selectedFiles:
+        files_list = []
+        for file in context.selectedFiles:
+            files_list.append(f"Name: {file.name}, Type: {file.type}")
+        selected_files_str = "\n".join(files_list)
     else:
-        output_description = "작업 설명 문장 생성 오류"
+        selected_files_str = "No files selected"
+    
+    # destination에서 create_folder 제거 (있다면)
+    clean_destination = destination
+    if destination.startswith('create_folder/'):
+        clean_destination = destination.replace('create_folder/', '', 1)
+    
+    prompt_template = """
+        <Instructions>
+        User's Language: {language}
+        
+You must respond in the language specified by the user's language setting:
+- If language is "ko" or starts with "ko", respond in Korean
+- If language is "en" or starts with "en", respond in English
 
-    return output_description
+Based on the user's command and the selected files, generate a short and clear description of what will happen when this {operation_type} operation is executed.
+
+The description should be:
+- Concise and informative
+- Maximum 2 sentences
+- Written in the user's specified language
+
+IMPORTANT - Different formats based on operation type:
+
+1. For DELETE operations:
+   - Do NOT mention destination at all
+   - Focus only on what files/folders will be deleted
+   - Format: "Will delete [files]" or "선택된 파일들을 삭제합니다"
+
+2. For RENAME operations:
+   - Do NOT mention destination at all
+   - Focus on the original name and new name
+   - Format: "Will rename [original_name] to [new_name]" or "[바뀌기 전의 아이템 이름]을 [new_name]으로 변경합니다"
+   - Use the name from selected files as the original name
+   - Use the provided new_name parameter as the target name
+
+3. For other operations (move, copy, etc.):
+   - Include destination information
+   - Format: "Will {operation_type} [files] to [destination]" or "선택된 파일들을 [destination]로 {operation_type}합니다"
+   - If destination starts with "/" it means an existing folder
+   - If destination doesn't start with "/" it means a new folder will be created
+
+        </Instructions>
+        
+        <User's command>{command}</User's command>
+        
+        <Operation type>{operation_type}</Operation type>
+        
+        <Selected files>
+{selected_files}
+        </Selected files>
+        
+        <Destination>{destination}</Destination>
+        
+        <New name (for rename operations)>{new_name}</New name (for rename operations)>
+        
+        <Description format>
+<description>Your description here</description>
+        </Description format>
+        
+        Answer:
+        """
+    
+    prompt = PromptTemplate.from_template(prompt_template)
+    
+    # OpenAI 모델 객체 생성
+    llm = ChatOpenAI(
+        temperature=0.3,
+        max_tokens=1000,
+        model_name="gpt-4o-mini"
+    )
+    
+    # 체인 생성
+    chain = prompt | llm | StrOutputParser()
+    
+    # 체인 실행
+    try:
+        result = chain.invoke({
+            "command": command,
+            "operation_type": operation_type,
+            "selected_files": selected_files_str,
+            "destination": clean_destination,
+            "language": language,
+            "new_name": new_name or ""
+        })
+        
+        # 모델 출력에서 description 추출
+        if "<description>" in result and "</description>" in result:
+            description = result.split("<description>")[1].split("</description>")[0].strip()
+            return description
+        else:
+            logger.warning(f"Could not parse description from LLM output: {result}")
+            # 기본 설명 생성
+            if language.startswith('en'):
+                return f"Will {operation_type} selected files to {clean_destination}"
+            else:
+                return f"선택된 파일들을 {clean_destination}로 {operation_type}합니다"
+            
+    except Exception as e:
+        logger.error(f"Error in get_description: {e}")
+        # 기본 설명 생성
+        if language.startswith('en'):
+            return f"Will {operation_type} selected files to {clean_destination}"
+        else:
+            return f"선택된 파일들을 {clean_destination}로 {operation_type}합니다"
 
 def extract_move_destination(command, context):
     """
@@ -938,47 +1122,105 @@ def generate_delete_description(context):
     return desc_result
 
     
-def get_new_name(command):
+def get_new_name(command, context, language):
     """
-    이름 변경 작업에 대한 새로운 이름을 추출하는 함수
+    LLM을 사용하여 이름 변경 작업에 대한 새로운 이름을 추출하는 함수
     
     Args:
         command: 사용자의 자연어 명령
+        context: 작업 컨텍스트 정보
+        language: 사용자 언어
     
     Returns:
         str: 추출된 새로운 이름 (없으면 None)
     """
-    # 1. 사용자 명령에서 새 이름 추출
-    new_name = None
     
-    # 다양한 패턴으로 새 이름 추출 시도
-    patterns = [
-        r'(\w+?)으로\s*바꿔',  # "새이름으로 바꿔" → "새이름"
-        r'(\w+?)으로\s*변경',  # "새이름으로 변경" → "새이름" 
-        r'(\w+?)으로\s*수정',  # "새이름으로 수정" → "새이름"
-        r'(\w+?)으로\s*이름변경',  # "새이름으로 이름변경" → "새이름"
-        r'(\w+?)으로\s*리네임',  # "새이름으로 리네임" → "새이름"
-        r'(\w+?)으로\s*rename',  # "새이름으로 rename" → "새이름"
-        r'(\w+)로\s*바꿔',  # "새이름로 바꿔"
-        r'(\w+)로\s*변경',  # "새이름로 변경"
-        r'(\w+)로\s*수정',  # "새이름로 수정"
-        r'(\w+)로\s*이름변경',  # "새이름로 이름변경"
-        r'(\w+)로\s*리네임',  # "새이름로 리네임"
-        r'(\w+)로\s*rename',  # "새이름로 rename" (영어 혼용)
-        r'이름을\s*(\w+)로',  # "이름을 새이름로"
-        r'이름을\s*(\w+?)으로',  # "이름을 새이름으로" → "새이름"
-        r'파일명을\s*(\w+)로',  # "파일명을 새이름로"
-        r'파일명을\s*(\w+?)으로',  # "파일명을 새이름으로" → "새이름"
-    ]
+    # 선택된 파일 정보를 문자열로 변환
+    selected_files_str = ""
+    if context.selectedFiles:
+        files_list = []
+        for file in context.selectedFiles:
+            files_list.append(f"Name: {file.name}, Type: {file.type}")
+        selected_files_str = "\n".join(files_list)
+    else:
+        selected_files_str = "No files selected"
     
-    # 각 패턴을 순서대로 시도하여 새 이름 추출
-    for pattern in patterns:
-        match = re.search(pattern, command)
-        if match:
-            new_name = match.group(1)
-            break  # 첫 번째 매칭되는 패턴에서 중단
+    prompt_template = """
+        <Instructions>
+        User's Language: {language}
+        
+You must respond in the language specified by the user's language setting:
+- If language is "ko" or starts with "ko", respond in Korean
+- If language is "en" or starts with "en", respond in English
+
+Analyze the user's command and the selected files to extract the new name that the user wants to rename the file/folder to.
+
+Steps to follow:
+1. Look at the selected files to understand what file/folder is being renamed
+2. Analyze the user's command to find what new name they want to give to the file/folder
+3. Extract only the new name (without file extension unless specifically mentioned)
+4. If no clear new name is found, return "None"
+
+Important rules:
+- Extract only the new name part, not the entire command
+- Do not include words like "으로", "로", "바꿔", "변경", "수정" etc.
+- If the user mentions a file extension, include it in the new name
+- If the original file has an extension but user doesn't mention it, do NOT include extension in the new name
+
+Output format:
+<new_name>extracted_new_name_here</new_name>
+
+If no new name is found, output:
+<new_name>None</new_name>
+        </Instructions>
+        
+        <User's command>{command}</User's command>
+        
+        <Selected files>
+{selected_files}
+        </Selected files>
+        
+        <New name format>
+<new_name>Your extracted new name here</new_name>
+        </New name format>
+        
+        Answer:
+        """
     
-    return new_name
+    prompt = PromptTemplate.from_template(prompt_template)
+    
+    # OpenAI 모델 객체 생성
+    llm = ChatOpenAI(
+        temperature=0.1,
+        max_tokens=1000,
+        model_name="gpt-4o-mini"
+    )
+    
+    # 체인 생성
+    chain = prompt | llm | StrOutputParser()
+    
+    # 체인 실행
+    try:
+        result = chain.invoke({
+            "command": command,
+            "selected_files": selected_files_str,
+            "language": language
+        })
+        
+        # 모델 출력에서 new_name 추출
+        if "<new_name>" in result and "</new_name>" in result:
+            new_name = result.split("<new_name>")[1].split("</new_name>")[0].strip()
+            # "None"이면 실제 None 반환
+            if new_name.lower() == "none":
+                return None
+            return new_name
+        else:
+            logger.warning(f"Could not parse new name from LLM output: {result}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error in get_new_name: {e}")
+        return None
 
 def generate_rename_description(context, new_name):
     """
@@ -1010,86 +1252,123 @@ def generate_rename_description(context, new_name):
     
     return desc_result
 
-def get_new_folder_name(command):
+def get_new_folder_name_and_parent_path(command, context):
     """
-    새 폴더 이름을 추출하는 함수
+    LLM을 사용하여 새 폴더 이름과 부모 경로를 추출하는 함수
     
     Args:
         command: 사용자의 자연어 명령
+        context: 작업 컨텍스트 정보
+
+    Returns:
+        tuple: (새 폴더 이름, 새 폴더 부모 경로)
     """
-    # 1. 사용자 명령에서 새 폴더 이름 추출
-    new_dir_name = None
     
-    # 다양한 패턴으로 새 폴더 이름 추출 시도
-    patterns = [
-        # 기본 생성 패턴
-        r'(\w+)\s*폴더를\s*생성',  # "신규프로젝트 폴더를 생성"
-        r'(\w+)\s*폴더\s*생성',   # "신규프로젝트 폴더 생성"
-        r'(\w+)\s*디렉토리를\s*생성',  # "신규프로젝트 디렉토리를 생성"
-        r'(\w+)\s*디렉토리\s*생성',   # "신규프로젝트 디렉토리 생성"
-        
-        # 만들기 패턴
-        r'(\w+)\s*폴더를\s*만들',  # "신규프로젝트 폴더를 만들"
-        r'(\w+)\s*폴더\s*만들',   # "신규프로젝트 폴더 만들"
-        r'(\w+)\s*디렉토리를\s*만들',  # "신규프로젝트 디렉토리를 만들"
-        r'(\w+)\s*디렉토리\s*만들',   # "신규프로젝트 디렉토리 만들"
-        r'(\w+)를\s*만들어',  # "신규프로젝트를 만들어"
-        r'(\w+)\s*만들어',   # "신규프로젝트 만들어"
-        
-        # 추가 패턴
-        r'새\s*(\w+)를\s*추가',  # "새 프로젝트를 추가"
-        r'새\s*(\w+)\s*추가',   # "새 프로젝트 추가"
-        r'(\w+)를\s*추가',  # "신규프로젝트를 추가"
-        r'(\w+)\s*추가',   # "신규프로젝트 추가"
-        r'(\w+)\s*폴더를\s*추가',  # "신규프로젝트 폴더를 추가"
-        r'(\w+)\s*디렉토리를\s*추가',  # "신규프로젝트 디렉토리를 추가"
-        
-        # 기본 생성 패턴 (간단한 형태)
-        r'(\w+)를\s*생성',  # "신규프로젝트를 생성"
-        r'(\w+)\s*생성',   # "신규프로젝트 생성"
-        r'새\s*(\w+)를\s*생성',  # "새 프로젝트를 생성"
-        r'새\s*(\w+)\s*생성',   # "새 프로젝트 생성"
-        
-        # '라는/이라는' 패턴
-        r'(\w+)라는\s*폴더를\s*생성',  # "프로젝트라는 폴더를 생성"
-        r'(\w+)라는\s*폴더\s*생성',   # "프로젝트라는 폴더 생성"
-        r'(\w+)라는\s*디렉토리를\s*생성',  # "프로젝트라는 디렉토리를 생성"
-        r'(\w+)라는\s*디렉토리\s*생성',   # "프로젝트라는 디렉토리 생성"
-        r'(\w+)이라는\s*폴더를\s*생성',  # "프로젝트이라는 폴더를 생성"
-        r'(\w+)이라는\s*폴더\s*생성',   # "프로젝트이라는 폴더 생성"
-        
-        # 새로운/신규 패턴
-        r'새로운\s*(\w+)를\s*생성',  # "새로운 프로젝트를 생성"
-        r'새로운\s*(\w+)\s*생성',   # "새로운 프로젝트 생성"
-        r'신규\s*(\w+)를\s*생성',  # "신규 프로젝트를 생성"
-        r'신규\s*(\w+)\s*생성',   # "신규 프로젝트 생성"
-        
-        # 영어 혼용 패턴
-        r'new\s*(\w+)를\s*생성',  # "new 프로젝트를 생성"
-        r'new\s*(\w+)\s*생성',   # "new 프로젝트 생성"
-        r'(\w+)\s*create',  # "프로젝트 create"
-        r'create\s*(\w+)',  # "create 프로젝트"
-        
-        # 위치 표현과 함께
-        r'여기에\s*(\w+)를\s*생성',  # "여기에 프로젝트를 생성"
-        r'이곳에\s*(\w+)를\s*생성',  # "이곳에 프로젝트를 생성"
-        r'(\w+)를\s*여기에\s*생성',  # "프로젝트를 여기에 생성"
-        
-        # 기타 표현
-        r'(\w+)\s*폴더를\s*구성',  # "프로젝트 폴더를 구성"
-        r'(\w+)\s*디렉토리를\s*구성',  # "프로젝트 디렉토리를 구성"
-        r'(\w+)\s*이름의\s*폴더를\s*생성',  # "프로젝트 이름의 폴더를 생성"
-        r'(\w+)\s*이름으로\s*폴더를\s*생성',  # "프로젝트 이름으로 폴더를 생성"
-    ]
+    # 사용 가능한 폴더 목록을 문자열로 변환
+    available_folders_str = ""
+    if context.availableFolders:
+        folders_list = []
+        for folder in context.availableFolders:
+            folders_list.append(f"Name: {folder.name}, Path: {folder.path}")
+        available_folders_str = "\n".join(folders_list)
+    else:
+        available_folders_str = "No available folders"
     
-    # 각 패턴을 순서대로 시도하여 새 폴더 이름 추출
-    for pattern in patterns:
-        match = re.search(pattern, command)
-        if match:
-            new_dir_name = match.group(1)
-            break  # 첫 번째 매칭되는 패턴에서 중단
+    # 현재 경로 정보
+    current_path = context.currentPath or "/"
     
-    return new_dir_name
+    prompt_template = """
+        <Instructions>
+You need to analyze the user's command to extract:
+1. The name of the new folder that the user wants to create
+2. The parent path where the new folder should be created
+
+Rules for folder name extraction:
+- Extract only the folder name that the user wants to create
+- Do not include words like "폴더", "디렉토리", "생성", "만들", "추가" etc.
+- Just extract the actual name (e.g., if user says "프로젝트 폴더를 생성", extract "프로젝트")
+
+Rules for parent path extraction:
+1. If the user specifies a location in their command:
+   - Check if the specified location exists in the available folders list
+   - If it exists, return the corresponding path from available folders
+   - If it doesn't exist, return "create_folder/[specified_location]"
+
+2. If the user mentions current location (현재, 여기, 이곳, etc.):
+   - Return the current path
+
+3. If no specific location is mentioned:
+   - Return "/" (root path)
+
+Output format:
+<new_folder_name>extracted_folder_name</new_folder_name>
+<parent_path>extracted_parent_path</parent_path>
+
+If extraction fails, return:
+<new_folder_name>None</new_folder_name>
+<parent_path>/</parent_path>
+        </Instructions>
+        
+        <User's command>{command}</User's command>
+        
+        <Current path>{current_path}</Current path>
+        
+        <Available folders>
+{available_folders}
+        </Available folders>
+        
+        <Output format>
+<new_folder_name>Your extracted folder name here</new_folder_name>
+<parent_path>Your extracted parent path here</parent_path>
+        </Output format>
+        
+        Answer:
+        """
+    
+    prompt = PromptTemplate.from_template(prompt_template)
+    
+    # OpenAI 모델 객체 생성
+    llm = ChatOpenAI(
+        temperature=0.1,
+        max_tokens=1000,
+        model_name="gpt-4o-mini"
+    )
+    
+    # 체인 생성
+    chain = prompt | llm | StrOutputParser()
+    
+    # 체인 실행
+    try:
+        result = chain.invoke({
+            "command": command,
+            "current_path": current_path,
+            "available_folders": available_folders_str
+        })
+        
+        # 모델 출력에서 new_folder_name과 parent_path 추출
+        new_folder_name = None
+        parent_path = "/"
+        
+        if "<new_folder_name>" in result and "</new_folder_name>" in result:
+            new_folder_name = result.split("<new_folder_name>")[1].split("</new_folder_name>")[0].strip()
+            if new_folder_name.lower() == "none":
+                new_folder_name = None
+        
+        if "<parent_path>" in result and "</parent_path>" in result:
+            parent_path = result.split("<parent_path>")[1].split("</parent_path>")[0].strip()
+            if not parent_path:
+                parent_path = "/"
+        
+        # 추출에 실패한 경우 기본값 사용
+        if not new_folder_name:
+            logger.warning(f"Could not parse folder name from LLM output: {result}")
+            new_folder_name = "새폴더"  # 기본 폴더명
+        
+        return (new_folder_name, parent_path)
+            
+    except Exception as e:
+        logger.error(f"Error in get_new_folder_name_and_parent_path: {e}")
+        return ("새폴더", "/")
 
 
 def get_parent_path(command, context):
@@ -1154,13 +1433,14 @@ def get_parent_path(command, context):
     # 부모 디렉토리가 명시되지 않은 경우 현재 경로 사용
     return context.currentPath or '/'
 
-def generate_create_folder_description(folder_name, parent_path):
+def generate_create_folder_description(folder_name, parent_path, language):
     """
     폴더 생성 작업에 대한 설명 문장을 생성하는 함수
     
     Args:
         folder_name: 생성할 폴더 이름
         parent_path: 폴더 생성 위치
+        language: 사용자 언어 ('ko' 또는 'en')
             
     Returns:
         str: 폴더 생성 작업에 대한 설명 문장
@@ -1176,34 +1456,108 @@ def generate_create_folder_description(folder_name, parent_path):
         if path_parts and path_parts[0]:
             parent_dir_name = path_parts[-1]
         else:
-            parent_dir_name = '루트'
+            # 언어에 따른 루트 표현
+            parent_dir_name = 'Root' if language.startswith('en') else '루트'
     
-    # 결과 문자열 생성
-    result_desc = f"{parent_dir_name} 내에 {folder_name} 폴더를 생성합니다."
+    # 언어에 따른 결과 문자열 생성
+    if language.startswith('en'):
+        result_desc = f"Create '{folder_name}' folder in {parent_dir_name}."
+    else:
+        result_desc = f"{parent_dir_name} 내에 {folder_name} 폴더를 생성합니다."
     
     return result_desc
 
 
-def get_search_term(command):
+def get_search_term(command, language):
     """
-    사용자의 명령에서 검색하고 싶은 내용을 추출한다.
+    LLM을 사용하여 사용자의 명령에서 검색하고 싶은 내용을 추출한다.
     
     Args:
         command: 사용자의 자연어 명령
+        language: 사용자 언어 ('ko' 또는 'en')
         
     Returns:
         str: 추출된 검색 키워드
     """
-    # 1. 파일명 검색 패턴 (확장자 포함) - 이것은 그대로 유지
-    filename_pattern = r'([^\s]+\.\w+)'
-    filename_match = re.search(filename_pattern, command)
-    if filename_match:
-        return filename_match.group(1)
     
-    # 2. 검색 명령어와 불필요한 부분 제거
-    search_term = clean_search_command(command)
+    prompt_template = """
+        <Instructions>
+        User's Language: {language}
+        
+You must respond in the language specified by the user's language setting:
+- If language is "ko" or starts with "ko", respond in Korean
+- If language is "en" or starts with "en", respond in English
+
+Analyze the user's search command and generate an appropriate search term based on what they're looking for.
+
+Rules for search term generation:
+1. If the user asks for file location (예: "파일의 위치를 알려줘", "where is the file"):
+   - Korean: Extract "[파일명]의 위치" 
+   - English: Extract "location of [filename]"
+
+2. If the user asks which folder contains a file (예: "파일은 어떤 폴더에 있어?", "which folder contains the file"):
+   - Korean: Extract "[파일명]이 저장된 디렉토리" or "[파일명]이 저장된 폴더"
+   - English: Extract "directory containing [filename]" or "folder containing [filename]"
+
+3. If the user asks about file content (예: "계약서에서 조건 관련 내용", "contract terms"):
+   - Keep the search intent as is, but make it clear and searchable
+   - Korean: "[문서명]에서 [검색내용]" or just "[검색내용]"
+   - English: "[search content] in [document]" or just "[search content]"
+
+4. For general searches:
+   - Extract the main search keywords
+   - Remove unnecessary command words like "찾아줘", "검색해", "find", "search"
+   - Keep the essential search terms
+
+Output format:
+<search_term>your_generated_search_term_here</search_term>
+
+If no clear search intent is found, return:
+<search_term>None</search_term>
+        </Instructions>
+        
+        <User's command>{command}</User's command>
+        
+        <Search term format>
+<search_term>Your generated search term here</search_term>
+        </Search term format>
+        
+        Answer:
+        """
     
-    return search_term
+    prompt = PromptTemplate.from_template(prompt_template)
+    
+    # OpenAI 모델 객체 생성
+    llm = ChatOpenAI(
+        temperature=0.1,
+        max_tokens=1000,
+        model_name="gpt-4o-mini"
+    )
+    
+    # 체인 생성
+    chain = prompt | llm | StrOutputParser()
+    
+    # 체인 실행
+    try:
+        result = chain.invoke({
+            "command": command,
+            "language": language
+        })
+        
+        # 모델 출력에서 search_term 추출
+        if "<search_term>" in result and "</search_term>" in result:
+            search_term = result.split("<search_term>")[1].split("</search_term>")[0].strip()
+            # "None"이면 기본 검색어 사용
+            if search_term.lower() == "none":
+                return command.strip()
+            return search_term
+        else:
+            logger.warning(f"Could not parse search term from LLM output: {result}")
+            return command.strip()
+            
+    except Exception as e:
+        logger.error(f"Error in get_search_term: {e}")
+        return command.strip()
 
 def clean_search_command(command):
     """
@@ -1320,52 +1674,142 @@ def handle_special_cases(cleaned, original):
     
     return cleaned
 
-def generate_search_description(search_term):
-    description = f"'{search_term}'에 대한 검색을 실행합니다."
+def generate_search_description(search_term, language):
+    if language.startswith('en'):
+        description = f"Search for '{search_term}'."
+    else:
+        description = f"'{search_term}'에 대한 검색을 실행합니다."
     return description
 
-def generate_summarize_description(context):
+def generate_summarize_description(command, context, language):
     """
-    요약 작업에 대한 설명 문장을 생성하는 함수
+    LLM을 사용하여 요약 작업에 대한 설명 문장을 생성하는 함수
     
     Args:
+        command: 사용자의 자연어 명령
         context: 작업 컨텍스트 정보 (selectedFiles 포함)
+        language: 사용자 언어 ('ko' 또는 'en')
         
     Returns:
         str: "파일명의 주요 내용을 요약합니다." 또는 "선택한 X개 문서의 주요 내용을 요약합니다." 형태의 설명 문장
     """
-    # 1. selectedFiles에서 파일 이름들 추출
+    
+    # 선택된 파일이 없는 경우 처리
     if not context.selectedFiles or len(context.selectedFiles) == 0:
-        return "선택된 문서가 없습니다."
+        if language.startswith('en'):
+            return "No documents selected."
+        else:
+            return "선택된 문서가 없습니다."
+    
+    # 선택된 파일 정보를 문자열로 변환
+    selected_files_str = ""
+    files_list = []
+    for file in context.selectedFiles:
+        files_list.append(f"Name: {file.name}, Type: {file.type}")
+    selected_files_str = "\n".join(files_list)
     
     file_count = len(context.selectedFiles)
     
-    # 2. 단일 파일인 경우
-    if file_count == 1:
-        file_name = context.selectedFiles[0].get('name', '문서')
-        # 파일 확장자 제거하여 더 자연스러운 문장 생성
-        clean_name = file_name.rsplit('.', 1)[0] if '.' in file_name else file_name
-        result_desc = f"{clean_name}의 주요 내용을 요약합니다."
-    
-    # 3. 복수 파일인 경우
-    else:
-        # 파일 개수가 3개 이하인 경우 모든 파일명 나열
-        if file_count <= 3:
-            file_names = []
-            for file in context.selectedFiles:
-                file_name = file.get('name', '')
-                # 파일 확장자 제거
-                clean_name = file_name.rsplit('.', 1)[0] if '.' in file_name else file_name
-                file_names.append(clean_name)
-            
-            names_str = ', '.join(file_names)
-            result_desc = f"{names_str}의 주요 내용을 요약합니다."
+    prompt_template = """
+        <Instructions>
+        User's Language: {language}
         
-        # 파일 개수가 많은 경우 개수로 표시
-        else:
-            result_desc = f"선택한 {file_count}개 문서의 주요 내용을 요약합니다."
+You must respond in the language specified by the user's language setting:
+- If language is "ko" or starts with "ko", respond in Korean
+- If language is "en" or starts with "en", respond in English
 
-    return result_desc
+Based on the user's command and the selected files, generate a clear description of what summarization will be performed.
+
+Rules for description generation:
+1. For single file:
+   - Korean: "[파일명]의 주요 내용을 요약합니다."
+   - English: "Summarize the main content of [filename]."
+   - Remove file extensions for more natural sentences
+
+2. For multiple files (3 or fewer):
+   - Korean: "[파일명1], [파일명2]의 주요 내용을 요약합니다."
+   - English: "Summarize the main content of [filename1], [filename2]."
+   - List all file names, removing extensions
+
+3. For many files (more than 3):
+   - Korean: "선택한 {count}개 문서의 주요 내용을 요약합니다."
+   - English: "Summarize the main content of {count} selected documents."
+
+Important notes:
+- Remove file extensions from names for cleaner sentences
+- Use appropriate counting and grammar for the target language
+- Keep the description concise and informative
+- File count: {file_count}
+
+Output format:
+<description>Your description here</description>
+        </Instructions>
+        
+        <User's command>{command}</User's command>
+        
+        <Selected files (total: {file_count})>
+{selected_files}
+        </Selected files>
+        
+        <Description format>
+<description>Your description here</description>
+        </Description format>
+        
+        Answer:
+        """
+    
+    prompt = PromptTemplate.from_template(prompt_template)
+    
+    # OpenAI 모델 객체 생성
+    llm = ChatOpenAI(
+        temperature=0.1,
+        max_tokens=1000,
+        model_name="gpt-4o-mini"
+    )
+    
+    # 체인 생성
+    chain = prompt | llm | StrOutputParser()
+    
+    # 체인 실행
+    try:
+        result = chain.invoke({
+            "command": command,
+            "selected_files": selected_files_str,
+            "file_count": file_count,
+            "language": language
+        })
+        
+        # 모델 출력에서 description 추출
+        if "<description>" in result and "</description>" in result:
+            description = result.split("<description>")[1].split("</description>")[0].strip()
+            return description
+        else:
+            logger.warning(f"Could not parse description from LLM output: {result}")
+            # 기본 설명 생성
+            if language.startswith('en'):
+                if file_count == 1:
+                    return "Summarize the main content of the selected document."
+                else:
+                    return f"Summarize the main content of {file_count} selected documents."
+            else:
+                if file_count == 1:
+                    return "선택된 문서의 주요 내용을 요약합니다."
+                else:
+                    return f"선택한 {file_count}개 문서의 주요 내용을 요약합니다."
+            
+    except Exception as e:
+        logger.error(f"Error in generate_summarize_description: {e}")
+        # 기본 설명 생성
+        if language.startswith('en'):
+            if file_count == 1:
+                return "Summarize the main content of the selected document."
+            else:
+                return f"Summarize the main content of {file_count} selected documents."
+        else:
+            if file_count == 1:
+                return "선택된 문서의 주요 내용을 요약합니다."
+            else:
+                return f"선택한 {file_count}개 문서의 주요 내용을 요약합니다."
 
 
 # ===== 작업 실행 로직 헬퍼 함수들 =====

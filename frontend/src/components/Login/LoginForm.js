@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import axios from "axios";
+import { useTranslation } from "../../hooks/useTranslation";
 import "./LoginForm.css";
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000/fast_api";
 
 const LoginForm = ({ onLoginSuccess, onShowRegister }) => {
+  const { t } = useTranslation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -30,7 +32,7 @@ const LoginForm = ({ onLoginSuccess, onShowRegister }) => {
       onLoginSuccess();
     } catch (error) {
       console.error("Login error:", error);
-      setError("로그인에 실패했습니다. 사용자 이름과 비밀번호를 확인해주세요.");
+      setError(t('auth.login.error'));
     } finally {
       setIsLoading(false);
     }
@@ -40,46 +42,46 @@ const LoginForm = ({ onLoginSuccess, onShowRegister }) => {
     <div className="login-container">
       <div className="login-form">
         <div className="login-header">
-          <h2>로그인</h2>
-          <p>파일 관리 시스템에 오신 것을 환영합니다</p>
+          <h2>{t('auth.login.title')}</h2>
+          <p>{t('auth.login.subtitle')}</p>
         </div>
 
         {error && <div className="error-message">{error}</div>}
 
         <form onSubmit={handleLogin}>
           <div className="form-group">
-            <label htmlFor="username">사용자 이름</label>
+            <label htmlFor="username">{t('auth.login.username')}</label>
             <input
               type="text"
               id="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
-              placeholder="사용자 이름을 입력하세요"
+              placeholder={t('auth.login.usernamePlaceholder')}
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">비밀번호</label>
+            <label htmlFor="password">{t('auth.login.password')}</label>
             <input
               type="password"
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              placeholder="비밀번호를 입력하세요"
+              placeholder={t('auth.login.passwordPlaceholder')}
             />
           </div>
 
           <button type="submit" className="login-button" disabled={isLoading}>
-            {isLoading ? "로그인 중..." : "로그인"}
+            {isLoading ? t('auth.login.loginInProgress') : t('auth.login.loginButton')}
           </button>
         </form>
 
         <div className="login-footer">
-          <p>계정이 없으신가요?</p>
+          <p>{t('auth.login.noAccount')}</p>
           <button onClick={onShowRegister} className="register-link">
-            회원가입
+            {t('auth.login.signUp')}
           </button>
         </div>
       </div>

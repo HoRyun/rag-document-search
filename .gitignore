@@ -4,6 +4,13 @@ uploads/
 ollama/*
 ollama/
 
+#lambda file
+lambda-py39-env/
+temp_custom_layer/
+temp_lambda_layer/
+temp_postgresql_layer/
+temp_postgresql_pgvector_only_layer/
+
 
 #aws
 aws/

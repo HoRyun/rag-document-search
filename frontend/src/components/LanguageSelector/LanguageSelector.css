@@ -1,0 +1,251 @@
+.language-selector {
+  position: relative;
+  display: inline-block;
+}
+
+.language-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  min-width: 100px;
+  justify-content: space-between;
+}
+
+.language-toggle:hover {
+  background-color: var(--item-hover);
+  border-color: var(--highlight-color);
+}
+
+.language-toggle:focus {
+  outline: none;
+  border-color: var(--highlight-color);
+  box-shadow: 0 0 0 2px rgba(var(--highlight-color-rgb), 0.2);
+}
+
+.language-flag {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.language-name {
+  flex: 1;
+  text-align: left;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  transition: transform 0.2s ease;
+  color: var(--text-secondary);
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.language-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px var(--shadow-color);
+  z-index: 1000;
+  min-width: 140px;
+  overflow: hidden;
+  animation: dropdown-appear 0.2s ease;
+}
+
+@keyframes dropdown-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.language-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+  text-align: left;
+}
+
+.language-option:hover {
+  background-color: var(--item-hover);
+}
+
+.language-option:focus {
+  outline: none;
+  background-color: var(--item-hover);
+}
+
+.language-option.active {
+  background-color: rgba(var(--highlight-color-rgb), 0.1);
+  color: var(--highlight-color);
+  font-weight: 500;
+}
+
+.language-option .language-flag {
+  font-size: 14px;
+}
+
+.language-option .language-name {
+  flex: 1;
+}
+
+.check-mark {
+  color: var(--highlight-color);
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* 반응형 스타일 */
+
+/* 태블릿 크기 (1024px 이하) */
+@media (max-width: 1024px) {
+  .language-toggle {
+    padding: 5px 8px;
+    font-size: 13px;
+    min-width: 90px;
+  }
+  
+  .language-flag {
+    font-size: 14px;
+  }
+  
+  .language-dropdown {
+    min-width: 120px;
+  }
+  
+  .language-option {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+}
+
+/* 작은 태블릿/모바일 크기 (768px 이하) */
+@media (max-width: 768px) {
+  .language-toggle {
+    padding: 4px 6px;
+    min-width: 70px;
+    gap: 4px;
+  }
+  
+  .language-name {
+    display: none; /* 모바일에서는 국기만 표시 */
+  }
+  
+  .language-flag {
+    font-size: 16px;
+  }
+  
+  .dropdown-arrow {
+    font-size: 8px;
+  }
+  
+  .language-dropdown {
+    right: -10px; /* 모바일에서 더 오른쪽으로 */
+    min-width: 110px;
+  }
+  
+  .language-option {
+    padding: 10px;
+    gap: 6px;
+  }
+  
+  .language-option .language-name {
+    display: block; /* 드롭다운에서는 이름 표시 */
+  }
+}
+
+/* 매우 작은 모바일 크기 (480px 이하) */
+@media (max-width: 480px) {
+  .language-toggle {
+    padding: 3px 5px;
+    min-width: 60px;
+  }
+  
+  .language-flag {
+    font-size: 14px;
+  }
+  
+  .dropdown-arrow {
+    font-size: 7px;
+  }
+  
+  .language-dropdown {
+    right: -15px;
+    min-width: 100px;
+    box-shadow: 0 2px 8px var(--shadow-color);
+  }
+  
+  .language-option {
+    padding: 8px;
+    font-size: 12px;
+  }
+  
+  .language-option .language-flag {
+    font-size: 12px;
+  }
+}
+
+/* 다크 모드 최적화 */
+[data-theme="dark"] .language-dropdown {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .language-toggle:focus {
+  box-shadow: 0 0 0 2px rgba(var(--highlight-color-rgb), 0.3);
+}
+
+/* 고대비 모드 지원 */
+@media (prefers-contrast: high) {
+  .language-toggle {
+    border-width: 2px;
+  }
+  
+  .language-dropdown {
+    border-width: 2px;
+  }
+  
+  .language-option.active {
+    background-color: var(--highlight-color);
+    color: white;
+  }
+}
+
+/* 감소된 모션 지원 */
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-arrow,
+  .language-toggle,
+  .language-option {
+    transition: none;
+  }
+  
+  .language-dropdown {
+    animation: none;
+  }
+}

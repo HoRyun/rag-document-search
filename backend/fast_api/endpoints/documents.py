@@ -179,7 +179,7 @@ async def upload_document(
     
     # path는 사용자가 유저 인터페이스 창에서 선택한 경로이다.
     current_upload_path = path
-
+    # debugging.stop_debugger()
     try:
         results = {
             "success": True,
