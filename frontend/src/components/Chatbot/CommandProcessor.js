@@ -87,13 +87,13 @@ class OperationService {
     const url = `${this.baseURL}/operations/stage`;
     const requestData = {
       command,
+      language: context.language || 'ko', // 최상위 레벨에만 language 포함
       context: {
         currentPath: context.currentPath,
         selectedFiles: context.selectedFiles,
         availableFolders: context.availableFolders,
         timestamp: new Date().toISOString()
-      },
-      language: context.language || 'ko'
+      }
     };
 
     debugLog('language', '🌍 언어 정보와 함께 작업 준비 요청', { 
@@ -152,10 +152,9 @@ class OperationService {
       executionTime: new Date().toISOString()
     };
 
-    debugLog('language', '🌍 언어 정보와 함께 작업 실행 요청', { 
+    debugLog('execute', '🚀 작업 실행 요청', { 
       operationId, 
-      userConfirmation, 
-      language 
+      userConfirmation
     });
     logNetworkRequest('POST', url, requestData);
 
@@ -165,7 +164,7 @@ class OperationService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Accept-Language': language
+          'Accept-Language': 'ko' // 고정값으로 설정
         },
         body: JSON.stringify(requestData)
       });
@@ -178,16 +177,12 @@ class OperationService {
           operationId,
           status: response.status, 
           statusText: response.statusText,
-          response: responseData,
-          language
+          response: responseData
         });
         throw new Error(`작업 실행 실패: ${response.statusText}`);
       }
 
-      debugLog('execute', '✅ 작업 실행 성공 (다국어)', { 
-        ...responseData, 
-        language 
-      });
+      debugLog('execute', '✅ 작업 실행 성공', responseData);
       return responseData;
 
     } catch (error) {
@@ -195,8 +190,7 @@ class OperationService {
         operationId,
         error: error.message,
         url,
-        requestData,
-        language
+        requestData
       });
       throw error;
     }
@@ -206,7 +200,7 @@ class OperationService {
     const url = `${this.baseURL}/operations/${operationId}/cancel`;
     const requestData = {};
 
-    debugLog('language', '🌍 언어 정보와 함께 작업 취소 요청', { operationId, language });
+    debugLog('cancel', '⏹️ 작업 취소 요청', { operationId });
     logNetworkRequest('POST', url, requestData);
 
     try {
@@ -215,7 +209,7 @@ class OperationService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Accept-Language': language
+          'Accept-Language': 'ko' // 고정값으로 설정
         },
         body: JSON.stringify(requestData)
       });
@@ -228,24 +222,19 @@ class OperationService {
           operationId,
           status: response.status, 
           statusText: response.statusText,
-          response: responseData,
-          language
+          response: responseData
         });
         throw new Error(`작업 취소 실패: ${response.statusText}`);
       }
 
-      debugLog('cancel', '✅ 작업 취소 성공 (다국어)', { 
-        ...responseData, 
-        language 
-      });
+      debugLog('cancel', '✅ 작업 취소 성공', responseData);
       return responseData;
 
     } catch (error) {
       debugLog('error', '💥 Cancel 네트워크 오류', { 
         operationId,
         error: error.message,
-        url,
-        language
+        url
       });
       throw error;
     }
@@ -258,10 +247,9 @@ class OperationService {
       undoTime: new Date().toISOString()
     };
 
-    debugLog('language', '🌍 언어 정보와 함께 작업 되돌리기 요청', { 
+    debugLog('undo', '↩️ 작업 되돌리기 요청', { 
       operationId, 
-      reason, 
-      language 
+      reason
     });
     logNetworkRequest('POST', url, requestData);
 
@@ -271,7 +259,7 @@ class OperationService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Accept-Language': language
+          'Accept-Language': 'ko' // 고정값으로 설정
         },
         body: JSON.stringify(requestData)
       });
@@ -284,16 +272,12 @@ class OperationService {
           operationId,
           status: response.status, 
           statusText: response.statusText,
-          response: responseData,
-          language
+          response: responseData
         });
-        throw new Error(`작업 취소 실패: ${response.statusText}`);
+        throw new Error(`작업 되돌리기 실패: ${response.statusText}`);
       }
 
-      debugLog('undo', '✅ 작업 되돌리기 성공 (다국어)', { 
-        ...responseData, 
-        language 
-      });
+      debugLog('undo', '✅ 작업 되돌리기 성공', responseData);
       return responseData;
 
     } catch (error) {
@@ -301,8 +285,7 @@ class OperationService {
         operationId,
         error: error.message,
         url,
-        requestData,
-        language
+        requestData
       });
       throw error;
     }
@@ -416,90 +399,83 @@ export const CommandProcessor = {
     }
   },
 
-  // 작업 실행 (언어 정보 포함)
-  executeOperation: async function(operationId, userConfirmation, language = 'ko') {
-    debugLog('language', '🚀 다국어 작업 실행 시작', { 
+  // 작업 실행 (language 매개변수 제거)
+  executeOperation: async function(operationId, userConfirmation) {
+    debugLog('execute', '🚀 작업 실행 시작', { 
       operationId, 
-      userConfirmation, 
-      language 
+      userConfirmation
     });
     
     try {
-      const result = await this.operationService.executeOperation(operationId, userConfirmation, language);
+      const result = await this.operationService.executeOperation(operationId, userConfirmation);
       
       const successResult = {
         success: true,
-        result,
-        language
+        result
       };
       
-      debugLog('execute', '✅ 다국어 작업 실행 성공', successResult);
+      debugLog('execute', '✅ 작업 실행 성공', successResult);
       return successResult;
 
     } catch (error) {
       const errorResult = {
         success: false,
-        error: error.message,
-        language
+        error: error.message
       };
       
-      debugLog('error', '❌ 다국어 작업 실행 실패', errorResult);
+      debugLog('error', '❌ 작업 실행 실패', errorResult);
       return errorResult;
     }
   },
 
-  // 작업 취소 (언어 정보 포함)
-  cancelOperation: async function(operationId, language = 'ko') {
-    debugLog('language', '⏹️ 다국어 작업 취소 시작', { operationId, language });
+  // 작업 취소 (language 매개변수 제거)
+  cancelOperation: async function(operationId) {
+    debugLog('cancel', '⏹️ 작업 취소 시작', { operationId });
     
     try {
-      const result = await this.operationService.cancelOperation(operationId, language);
+      const result = await this.operationService.cancelOperation(operationId);
       
       const successResult = {
         success: true,
-        result,
-        language
+        result
       };
       
-      debugLog('cancel', '✅ 다국어 작업 취소 성공', successResult);
+      debugLog('cancel', '✅ 작업 취소 성공', successResult);
       return successResult;
 
     } catch (error) {
       const errorResult = {
         success: false,
-        error: error.message,
-        language
+        error: error.message
       };
       
-      debugLog('error', '❌ 다국어 작업 취소 실패', errorResult);
+      debugLog('error', '❌ 작업 취소 실패', errorResult);
       return errorResult;
     }
   },
 
-  // 작업 되돌리기 (언어 정보 포함)
-  undoOperation: async function(operationId, reason, language = 'ko') {
-    debugLog('language', '↩️ 다국어 작업 되돌리기 시작', { operationId, reason, language });
+  // 작업 되돌리기 (language 매개변수 제거)
+  undoOperation: async function(operationId, reason) {
+    debugLog('undo', '↩️ 작업 되돌리기 시작', { operationId, reason });
     
     try {
-      const result = await this.operationService.undoOperation(operationId, reason, language);
+      const result = await this.operationService.undoOperation(operationId, reason);
       
       const successResult = {
         success: true,
-        result,
-        language
+        result
       };
       
-      debugLog('undo', '✅ 다국어 작업 되돌리기 성공', successResult);
+      debugLog('undo', '✅ 작업 되돌리기 성공', successResult);
       return successResult;
 
     } catch (error) {
       const errorResult = {
         success: false,
-        error: error.message,
-        language
+        error: error.message
       };
       
-      debugLog('error', '❌ 다국어 작업 되돌리기 실패', errorResult);
+      debugLog('error', '❌ 작업 되돌리기 실패', errorResult);
       return errorResult;
     }
   },
