@@ -78,9 +78,9 @@ def add_documents(db: Session, filename: str, s3_key: str, upload_time: datetime
     return db_document
 
 # 문서 ID로 문서 정보 가져오기
-def get_document_by_id(db: Session, document_id: int):
+def get_document_by_id(db: Session, document_id: int, user_id: int):
     """문서 ID로 documents 테이블에서 문서 정보를 가져온다."""
-    return db.query(models.Document).filter(models.Document.id == document_id).first()
+    return db.query(models.Document).filter(models.Document.id == document_id, models.Document.user_id == user_id).first()
 
 # 사용자 ID로 모든 문서 가져오기
 def get_documents_by_user_id(db: Session, user_id: int):
