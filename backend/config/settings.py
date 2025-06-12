@@ -19,8 +19,8 @@ S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
 
 # Redis Setting
 REDIS_HOST = os.environ.get("REDIS_HOST")
-REDIS_PORT = int(os.environ.get("REDIS_PORT"))
-REDIS_DB = int(os.environ.get("REDIS_DB"))
+REDIS_PORT = os.environ.get("REDIS_PORT")
+REDIS_DB = os.environ.get("REDIS_DB")
 REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD")  # 선택사항
 
 # .env 파일에 TEST_MODE 키가 true이면 테스트 모드가 활성화되고, 없거나 False로 설정되어 있으면 테스트 모드가 비활성화됩니다.
