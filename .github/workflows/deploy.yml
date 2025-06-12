@@ -33,10 +33,15 @@ jobs:
           flake8 backend --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
       - name: Run unit tests
+        env:
+          TEST_MODE: "true"
+          REDIS_HOST: "localhost"
+          REDIS_PORT: "6379"
+          REDIS_DB: "0"
         run: |
           cd backend
-          export TEST_MODE=True
           pytest -xvs
+
 
   build-and-deploy-backend:
     needs: lint-and-test
@@ -67,6 +72,9 @@ jobs:
             ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
             ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
           build-args: |
+            REDIS_HOST=${{ secrets.REDIS_HOST }}
+            REDIS_PORT=${{ secrets.REDIS_PORT }}
+            REDIS_DB=${{ secrets.REDIS_DB }}
             RDS_USER=${{ secrets.RDS_USER }}
             RDS_PASSWORD=${{ secrets.RDS_PASSWORD }}
             RDS_ENDPOINT=${{ secrets.RDS_ENDPOINT }}
@@ -107,6 +115,10 @@ jobs:
             LANGCHAIN_TRACING_V2=${{ secrets.LANGCHAIN_TRACING_V2 }}
             S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
             DATABASE_URL=postgresql+psycopg://${{ secrets.RDS_USER }}:${{ secrets.RDS_PASSWORD }}@${{ secrets.RDS_ENDPOINT }}:5432/${{ secrets.RDS_DB_NAME }}
+            REDIS_HOST=${{ secrets.REDIS_HOST }}
+            REDIS_PORT=${{ secrets.REDIS_PORT }}
+            REDIS_DB=${{ secrets.REDIS_DB }}
+            
 
       - name: Deploy ECS service with new task definition
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2

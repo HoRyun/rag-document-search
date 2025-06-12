@@ -15,6 +15,13 @@ temp_postgresql_pgvector_only_layer/
 #aws
 aws/
 
+
+#lambda관련
+backend/lambda/python
+backend/package
+db_layer/
+.serverless/
+
 #deploy
 package/
 
@@ -123,6 +130,7 @@ isu_*.txt
 *.bak5
 *.bak6
 *.bak7
+
 
 #커서 룰 파일
 .cursor/*
