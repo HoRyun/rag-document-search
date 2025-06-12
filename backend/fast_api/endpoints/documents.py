@@ -596,7 +596,7 @@ async def process_file_uploads(files, current_upload_path, current_user, db):
 
     try:
     # 3-2. 해당 디렉토리에 포함된 파일 처리
-    # [해결]ㅈ버그 발견 : files에 파일이 2개 이상일 경우에 1번째 파일은 읽는데 성공하지만 2번째 파일부터는 파일이 닫혀서 읽을 수 없다.
+    # ㅈ버그 발견 : files에 파일이 2개 이상일 경우에 1번째 파일은 읽는데 성공하지만 2번째 파일부터는 파일이 닫혀서 읽을 수 없다.
         for upload_file in files:
             # 파일 이름을 추출 & 파일 이름 중복 처리.
             file_name = set_filename(upload_file, db, user_id)
@@ -708,7 +708,7 @@ async def process_directory_operations(operations, user_id: int, db):
                     # 새로운 path 설정
                     item_path = reserved_path +"/"+ target_item_new_name
                     # 새 폴더가 생성되는 디렉토리의 id를 가져온다.
-                    parent_id = crud.get_directory_id_by_path(db,reserved_path, user_id)
+                    parent_id = crud.get_directory_id_by_path(db,reserved_path)
                     # 디렉토리 테이블에 저장할 데이터 준비
                     directory_value_dict = {
                         "id": new_folder_id,
@@ -735,7 +735,7 @@ async def process_directory_operations(operations, user_id: int, db):
                 # target item의 타입 가져오기
                 target_item_type = crud.get_file_is_directory_by_id(db, reserved_item_id)
                 # 목적지의 id값 가져오기
-                destination_id = crud.get_directory_id_by_path(db, new_path, user_id)
+                destination_id = crud.get_directory_id_by_path(db, new_path)
 
                 # target item의 새로운 parent_id 준비
                 target_new_parent_id = destination_id
@@ -1052,7 +1052,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                     child_new_path = crud.get_file_path_by_id(db, child_directory).replace(target_item_original_name,target_new_name)
                                     
                                     # parent_id
-                                    child_new_parent_id = crud.get_directory_id_by_path(db, child_new_path.replace("/"+child_original_name,""), user_id)
+                                    child_new_parent_id = crud.get_directory_id_by_path(db,child_new_path.replace("/"+child_original_name,""))
                                     
                                     # 저장될 데이터를 일반화
                                     id = child_new_directory_id
@@ -1080,7 +1080,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                         # 파일을 새로 생성해야 하므로 이름을 새로 짓는다.
                                     # 자식 파일의 기존 이름 가져오기
                                     child_file_original_name = crud.get_file_name_by_id(db,child_file)
-                                    child_file_new_name = generate_unique_filename(db, child_file_original_name, user_id)
+                                    child_file_new_name = generate_unique_filename(db, child_file_original_name)
                                     # 파일의 새 s3_key 설정
                                         # 기존 s3_key
                                     child_file_original_s3_key = crud.get_s3_key_by_id(db, child_file)
@@ -1094,7 +1094,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                         # 1. 경로 부분 변경, 2. 기존 파일 이름을 새 파일 이름으로 교체.
                                     child_file_new_path = child_file_original_path.replace(target_item_original_name,target_new_name).replace(child_file_original_name,child_file_new_name)
                                     
-                                    child_file_new_parent_id = crud.get_directory_id_by_path(db,child_file_new_path.replace("/"+child_file_new_name,""), user_id)
+                                    child_file_new_parent_id = crud.get_directory_id_by_path(db,child_file_new_path.replace("/"+child_file_new_name,""))
                                     # s3로 복사
                                     # 버킷 내 다른 위치로 파일 복사
                                     s3_client.copy_object(
@@ -1177,7 +1177,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                     # 경로
                                     child_new_path = crud.get_file_path_by_id(db, child_directory).replace(target_item_original_name,target_new_name)
                                     # parent_id
-                                    child_new_parent_id = crud.get_directory_id_by_path(db,child_new_path.replace("/"+child_original_name,""), user_id)
+                                    child_new_parent_id = crud.get_directory_id_by_path(db,child_new_path.replace("/"+child_original_name,""))
                                     
                                     # 저장될 데이터를 일반화
                                     id = child_new_directory_id
@@ -1205,7 +1205,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                         # 파일을 새로 생성해야 하므로 이름을 새로 짓는다.
                                     # 자식 파일의 기존 이름 가져오기
                                     child_file_original_name = crud.get_file_name_by_id(db,child_file)
-                                    child_file_new_name = generate_unique_filename(db, child_file_original_name, user_id)
+                                    child_file_new_name = generate_unique_filename(db, child_file_original_name)
                                     # 파일의 새 s3_key 설정
                                         # 기존 s3_key
                                     child_file_original_s3_key = crud.get_s3_key_by_id(db, child_file)
@@ -1218,7 +1218,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                     child_file_original_path = crud.get_file_path_by_id(db, child_file)
                                         # 1. 경로 부분 변경, 2. 기존 파일 이름을 새 파일 이름으로 교체.
                                     child_file_new_path = child_file_original_path.replace(target_item_original_name,target_new_name).replace(child_file_original_name,child_file_new_name)
-                                    child_file_new_parent_id = crud.get_directory_id_by_path(db,child_file_new_path.replace("/"+child_file_new_name,""), user_id)
+                                    child_file_new_parent_id = crud.get_directory_id_by_path(db,child_file_new_path.replace("/"+child_file_new_name,""))
                                     # s3로 복사
                                     # 버킷 내 다른 위치로 파일 복사
                                     s3_client.copy_object(
@@ -1306,7 +1306,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                 child_new_path = crud.get_file_path_by_id(db, child_directory).replace(parent_path_of_target,"")
                                 # parent_id
                                     # 본인 path에서 "/"+<본인 name>을 찾아 ""으로 교체한 값이 directories테이블의 path필드값에 존재하면 그 존재하는 레코드의 id값으로 설정.
-                                child_new_parent_id = crud.get_directory_id_by_path(db,child_new_path.replace("/"+child_original_name,""), user_id)
+                                child_new_parent_id = crud.get_directory_id_by_path(db,child_new_path.replace("/"+child_original_name,""))
                                 
                                 # 저장될 데이터를 일반화
                                 id = child_new_directory_id
@@ -1334,7 +1334,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                     # 파일을 새로 생성해야 하므로 이름을 새로 짓는다.
                                 # 자식 파일의 기존 이름 가져오기
                                 child_file_original_name = crud.get_file_name_by_id(db,child_file)
-                                child_file_new_name = generate_unique_filename(db, child_file_original_name, user_id)
+                                child_file_new_name = generate_unique_filename(db, child_file_original_name)
                                 # 파일의 새 s3_key 설정
                                     # 기존 s3_key
                                 child_file_original_s3_key = crud.get_s3_key_by_id(db, child_file)
@@ -1347,7 +1347,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                 child_file_original_path = crud.get_file_path_by_id(db, child_file)
                                     # 1. 경로 부분 변경, 2. 기존 파일 이름을 새 파일 이름으로 교체.
                                 child_file_new_path = child_file_original_path.replace(parent_path_of_target,"").replace(child_file_original_name,child_file_new_name)
-                                child_file_new_parent_id = crud.get_directory_id_by_path(db,child_file_new_path.replace("/"+child_file_new_name,""), user_id)
+                                child_file_new_parent_id = crud.get_directory_id_by_path(db,child_file_new_path.replace("/"+child_file_new_name,""))
                                 # s3로 복사
                                 # 버킷 내 다른 위치로 파일 복사
                                 s3_client.copy_object(
@@ -1401,7 +1401,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                 # 디렉토리의 새 경로 설정
                             target_item_new_path = target_destination_path + "/" + target_item_original_name
                                 # 디렉토리의 새 부모 설정
-                            target_item_new_parent_id = crud.get_directory_id_by_path(db, target_destination_path, user_id)
+                            target_item_new_parent_id = crud.get_directory_id_by_path(db, target_destination_path)
 
                             # 저장될 데이터를 일반화
                             id = new_directory_id
@@ -1434,7 +1434,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                 child_new_path = crud.get_file_path_by_id(db, child_directory).replace(parent_path_of_target,target_destination_path,1)
                                 # parent_id
                                     # 본인 path에서 "/"+<본인 name>을 찾아 ""으로 교체한 값이 directories테이블의 path필드값에 존재하면 그 존재하는 레코드의 id값으로 설정.
-                                child_new_parent_id = crud.get_directory_id_by_path(db,child_new_path.replace("/"+child_original_name,"",1), user_id)
+                                child_new_parent_id = crud.get_directory_id_by_path(db,child_new_path.replace("/"+child_original_name,"",1))
                                 
                                 # 저장될 데이터를 일반화
                                 id = child_new_directory_id
@@ -1462,7 +1462,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                     # 파일을 새로 생성해야 하므로 이름을 새로 짓는다.
                                 # 자식 파일의 기존 이름 가져오기
                                 child_file_original_name = crud.get_file_name_by_id(db,child_file)
-                                child_file_new_name = generate_unique_filename(db, child_file_original_name, user_id)
+                                child_file_new_name = generate_unique_filename(db, child_file_original_name)
                                 # 파일의 새 s3_key 설정
                                     # 기존 s3_key
                                 child_file_original_s3_key = crud.get_s3_key_by_id(db, child_file)
@@ -1477,7 +1477,7 @@ async def process_directory_operations(operations, user_id: int, db):
                                     # 1. 경로 부분 변경, 2. 기존 파일 이름을 새 파일 이름으로 교체.  <-여기서 오류날 것. 여기서부터 다시 테스트.
                                 child_file_new_path = child_file_original_path.replace(parent_path_of_target,target_destination_path,1).replace(child_file_original_name,child_file_new_name,1)
                                 
-                                child_file_new_parent_id = crud.get_directory_id_by_path(db,child_file_new_path.replace("/"+child_file_new_name,"",1), user_id)
+                                child_file_new_parent_id = crud.get_directory_id_by_path(db,child_file_new_path.replace("/"+child_file_new_name,"",1))
                                 
                                 # s3로 복사
                                 # 버킷 내 다른 위치로 파일 복사
@@ -1534,7 +1534,7 @@ async def process_directory_operations(operations, user_id: int, db):
                             # 아이템의 기존 경로에서 기존 이름을 새 이름으로 replace.
                             target_item_new_path = target_item_original_path.replace(target_item_original_name, target_item_new_name)
                             # 디렉토리의 새 부모 설정
-                            target_item_new_parent_id = crud.get_directory_id_by_path(db, target_destination_path, user_id)
+                            target_item_new_parent_id = crud.get_directory_id_by_path(db, target_destination_path)
 
                             # 저장될 데이터를 일반화
                             id = new_directory_id
@@ -1566,7 +1566,7 @@ async def process_directory_operations(operations, user_id: int, db):
                             # 디렉토리의 새 경로 설정
                             target_item_new_path = target_destination_path + "/" + target_item_original_name
                             # 디렉토리의 새 부모 설정
-                            target_item_new_parent_id = crud.get_directory_id_by_path(db, target_destination_path, user_id)
+                            target_item_new_parent_id = crud.get_directory_id_by_path(db, target_destination_path)
 
                             # 저장될 데이터를 일반화
                             id = new_directory_id
@@ -1596,7 +1596,7 @@ async def process_directory_operations(operations, user_id: int, db):
                     # 공통인 부분
                     # 파일의 새 이름 설정
                         # 파일을 새로 생성해야 하므로 이름을 새로 짓는다.
-                    target_item_new_name = generate_unique_filename(db, target_item_original_name, user_id)
+                    target_item_new_name = generate_unique_filename(db, target_item_original_name)
                     # 파일의 새 s3_key 설정
                         # 기존 s3_key
                     target_item_original_s3_key = crud.get_s3_key_by_id(db, target_item_id)
@@ -1654,7 +1654,7 @@ async def process_directory_operations(operations, user_id: int, db):
                         # 파일의 새 경로 설정
                         target_item_new_path = target_destination_path + "/" + target_item_new_name
                         # 파일의 새 부모 설정
-                        target_item_new_parent_id = crud.get_directory_id_by_path(db, target_destination_path, user_id)
+                        target_item_new_parent_id = crud.get_directory_id_by_path(db, target_destination_path)
                         # s3 에서 해당 파일 데이터를 가져오기.
                         response = s3_client.get_object(
                             Bucket=S3_BUCKET_NAME,
@@ -1737,7 +1737,7 @@ def get_file_type(filename):
     return "blank"
 
 
-def generate_unique_filename(db: Session, file_name: str, user_id: int) -> str:
+def generate_unique_filename(db: Session, file_name: str) -> str:
     """
     DB에 없는 고유한 파일명을 돌려줍니다.
 
@@ -1763,7 +1763,7 @@ def generate_unique_filename(db: Session, file_name: str, user_id: int) -> str:
     next_n = int(num_str) + 1 if num_str else 1
 
     candidate = file_name  # 우선 그대로 시도
-    while crud.get_file_info_by_filename(db, candidate, user_id):
+    while crud.get_file_info_by_filename(db, candidate):
         candidate = f"{base}({next_n}){ext}"
         next_n += 1
 
@@ -2011,7 +2011,7 @@ def set_filename(upload_file: any, db: Session, user_id: int):
     file_info = crud.get_file_info_by_filename(db, file_name, user_id)
     if file_info:
         # 중복 파일명 처리
-        file_name = generate_unique_filename(db, file_name, user_id)
+        file_name = generate_unique_filename(db, file_name)
     return file_name
 
 # 필요 없는 함수가 맞으면 바로 삭제.
@@ -2184,7 +2184,7 @@ async def rename_and_reupload_document(db: Session, user_id: int, reserved_item_
     # 새로운 이름과 경로, s3_key로 s3에 새 파일을 업로드
     # 새 s3_key 생성
     # 이름 중복 확인
-    target_item_new_name = generate_unique_filename(db, reserved_item_new_name, user_id)
+    target_item_new_name = generate_unique_filename(db, reserved_item_new_name)
     # 새 s3_key 생성
     target_item_new_s3_key = target_item_original_s3_key.replace(target_item_original_name, target_item_new_name)
     # 아이템의 새 주소 설정
@@ -2297,7 +2297,7 @@ async def copy_file(db: Session, target_item_id: str, target_destination_path: s
     # 공통인 부분
     # 파일의 새 이름 설정
         # 파일을 새로 생성해야 하므로 이름을 새로 짓는다.
-    target_item_new_name = generate_unique_filename(db, target_item_original_name, user_id)
+    target_item_new_name = generate_unique_filename(db, target_item_original_name)
     # 파일의 새 s3_key 설정
         # 기존 s3_key
     target_item_original_s3_key = crud.get_s3_key_by_id(db, target_item_id)
@@ -2353,7 +2353,7 @@ async def copy_file(db: Session, target_item_id: str, target_destination_path: s
         # 파일의 새 경로 설정
         target_item_new_path = target_destination_path + "/" + target_item_new_name
         # 파일의 새 부모 설정
-        target_item_new_parent_id = crud.get_directory_id_by_path(db, target_destination_path, user_id)
+        target_item_new_parent_id = crud.get_directory_id_by_path(db, target_destination_path)
         # s3 에서 해당 파일 데이터를 가져오기.
         response = s3_client.get_object(
             Bucket=S3_BUCKET_NAME,
@@ -2439,7 +2439,7 @@ def copy_directory(db: Session, target_item_id: str, target_destination_path: st
         # 아이템의 기존 경로에서 기존 이름을 새 이름으로 replace.
         target_item_new_path = target_item_original_path.replace(target_item_original_name, target_item_new_name)
         # 디렉토리의 새 부모 설정
-        target_item_new_parent_id = crud.get_directory_id_by_path(db, target_destination_path, user_id)
+        target_item_new_parent_id = crud.get_directory_id_by_path(db, target_destination_path)
 
         # 저장될 데이터를 일반화
         id = new_directory_id
@@ -2454,7 +2454,7 @@ def copy_directory(db: Session, target_item_id: str, target_destination_path: st
         # 디렉토리의 새 경로 설정
         target_item_new_path = target_destination_path + "/" + target_item_original_name
         # 디렉토리의 새 부모 설정
-        target_item_new_parent_id = crud.get_directory_id_by_path(db, target_destination_path, user_id)
+        target_item_new_parent_id = crud.get_directory_id_by_path(db, target_destination_path)
 
         # 저장될 데이터를 일반화
         id = new_directory_id

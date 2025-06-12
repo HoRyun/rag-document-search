@@ -2342,7 +2342,6 @@ async def execute_undo_logic(operation_type: str, undo_data: dict, reason: str, 
     Returns:
         dict: undo 결과 정보
     """
-    user_id = current_user.id
     # operation_type이 제대로 전달되지 않은 경우 undo_data에서 추출
     if not operation_type and undo_data:
         operation = undo_data.get("operation", {})
@@ -2352,11 +2351,11 @@ async def execute_undo_logic(operation_type: str, undo_data: dict, reason: str, 
     
     try:
         if operation_type == "move":
-            return await undo_move_logic(undo_data, reason, user_id, db)
+            return await undo_move_logic(undo_data, reason, current_user, db)
         elif operation_type == "rename":
-            return await undo_rename_logic(undo_data, reason, user_id, db)
+            return await undo_rename_logic(undo_data, reason, current_user, db)
         elif operation_type == "create_folder":
-            return await undo_create_folder_logic(undo_data, reason, user_id, db)
+            return await undo_create_folder_logic(undo_data, reason, current_user, db)
         else:
             return op_schemas.UndoResult(
                 success=False,
@@ -2371,7 +2370,7 @@ async def execute_undo_logic(operation_type: str, undo_data: dict, reason: str, 
         ).dict()
 
 
-async def undo_move_logic(undo_data: dict, reason: str, user_id: int, db: Session) -> dict:
+async def undo_move_logic(undo_data: dict, reason: str, current_user: User, db: Session) -> dict:
     """이동 작업 되돌리기 로직"""
     from fast_api.endpoints.documents import process_directory_operations
     from db import crud
@@ -2410,7 +2409,7 @@ async def undo_move_logic(undo_data: dict, reason: str, user_id: int, db: Sessio
             })
         
         # 작업 실행
-        results = await process_directory_operations(operations, user_id, db)
+        results = await process_directory_operations(operations, current_user.id, db)
         
         # 결과 확인
         success_count = sum(1 for r in results if r.get("status") == "success")
@@ -2434,7 +2433,7 @@ async def undo_move_logic(undo_data: dict, reason: str, user_id: int, db: Sessio
         ).dict()
 
 
-async def undo_rename_logic(undo_data: dict, reason: str, user_id: int, db: Session) -> dict:
+async def undo_rename_logic(undo_data: dict, reason: str, current_user: User, db: Session) -> dict:
     """이름 변경 작업 되돌리기 로직"""
     from fast_api.endpoints.documents import process_directory_operations
     from db import crud
@@ -2460,7 +2459,7 @@ async def undo_rename_logic(undo_data: dict, reason: str, user_id: int, db: Sess
         }]
         
         # 작업 실행
-        results = await process_directory_operations(operations, user_id, db)
+        results = await process_directory_operations(operations, current_user.id, db)
         
         # 결과 확인
         if results and results[0].get("status") == "success":
@@ -2482,7 +2481,7 @@ async def undo_rename_logic(undo_data: dict, reason: str, user_id: int, db: Sess
         ).dict()
 
 
-async def undo_create_folder_logic(undo_data: dict, reason: str, user_id: int, db: Session) -> dict:
+async def undo_create_folder_logic(undo_data: dict, reason: str, current_user: User, db: Session) -> dict:
     """폴더 생성 작업 되돌리기 로직"""
     from fast_api.endpoints.documents import process_directory_operations
     from db import crud
@@ -2502,7 +2501,7 @@ async def undo_create_folder_logic(undo_data: dict, reason: str, user_id: int, d
     
     try:
         # 폴더의 ID 찾기
-        folder_id = crud.get_directory_id_by_path(db, folder_path, user_id)
+        folder_id = crud.get_directory_id_by_path(db, folder_path)
         
         if not folder_id:
             return op_schemas.UndoResult(
@@ -2518,7 +2517,7 @@ async def undo_create_folder_logic(undo_data: dict, reason: str, user_id: int, d
         }]
         
         # 작업 실행
-        results = await process_directory_operations(operations, user_id, db)
+        results = await process_directory_operations(operations, current_user.id, db)
         
         # 결과 확인
         if results and results[0].get("status") == "success":
