@@ -645,8 +645,8 @@ def process_search(command, language):
     """
     # 데이터 준비
     operationId = "op-"+str(uuid.uuid4())
-    search_term = get_search_term(command,language)
-    description = generate_search_description(search_term)
+    search_term = get_search_term(command, language)
+    description = generate_search_description(search_term, language)
 
     # Pydantic 모델 사용
     search_operation = op_schemas.SearchOperation(
@@ -1453,26 +1453,96 @@ def generate_create_folder_description(folder_name, parent_path, language):
     return result_desc
 
 
-def get_search_term(command):
+def get_search_term(command, language):
     """
-    사용자의 명령에서 검색하고 싶은 내용을 추출한다.
+    LLM을 사용하여 사용자의 명령에서 검색하고 싶은 내용을 추출한다.
     
     Args:
         command: 사용자의 자연어 명령
+        language: 사용자 언어 ('ko' 또는 'en')
         
     Returns:
         str: 추출된 검색 키워드
     """
-    # 1. 파일명 검색 패턴 (확장자 포함) - 이것은 그대로 유지
-    filename_pattern = r'([^\s]+\.\w+)'
-    filename_match = re.search(filename_pattern, command)
-    if filename_match:
-        return filename_match.group(1)
     
-    # 2. 검색 명령어와 불필요한 부분 제거
-    # search_term = clean_search_command(command)
+    prompt_template = """
+        <Instructions>
+        User's Language: {language}
+        
+You must respond in the language specified by the user's language setting:
+- If language is "ko" or starts with "ko", respond in Korean
+- If language is "en" or starts with "en", respond in English
+
+Analyze the user's search command and generate an appropriate search term based on what they're looking for.
+
+Rules for search term generation:
+1. If the user asks for file location (예: "파일의 위치를 알려줘", "where is the file"):
+   - Korean: Extract "[파일명]의 위치" 
+   - English: Extract "location of [filename]"
+
+2. If the user asks which folder contains a file (예: "파일은 어떤 폴더에 있어?", "which folder contains the file"):
+   - Korean: Extract "[파일명]이 저장된 디렉토리" or "[파일명]이 저장된 폴더"
+   - English: Extract "directory containing [filename]" or "folder containing [filename]"
+
+3. If the user asks about file content (예: "계약서에서 조건 관련 내용", "contract terms"):
+   - Keep the search intent as is, but make it clear and searchable
+   - Korean: "[문서명]에서 [검색내용]" or just "[검색내용]"
+   - English: "[search content] in [document]" or just "[search content]"
+
+4. For general searches:
+   - Extract the main search keywords
+   - Remove unnecessary command words like "찾아줘", "검색해", "find", "search"
+   - Keep the essential search terms
+
+Output format:
+<search_term>your_generated_search_term_here</search_term>
+
+If no clear search intent is found, return:
+<search_term>None</search_term>
+        </Instructions>
+        
+        <User's command>{command}</User's command>
+        
+        <Search term format>
+<search_term>Your generated search term here</search_term>
+        </Search term format>
+        
+        Answer:
+        """
     
-    return search_term
+    prompt = PromptTemplate.from_template(prompt_template)
+    
+    # OpenAI 모델 객체 생성
+    llm = ChatOpenAI(
+        temperature=0.1,
+        max_tokens=1000,
+        model_name="gpt-4o-mini"
+    )
+    
+    # 체인 생성
+    chain = prompt | llm | StrOutputParser()
+    
+    # 체인 실행
+    try:
+        result = chain.invoke({
+            "command": command,
+            "language": language
+        })
+        
+        # 모델 출력에서 search_term 추출
+        if "<search_term>" in result and "</search_term>" in result:
+            search_term = result.split("<search_term>")[1].split("</search_term>")[0].strip()
+            # "None"이면 기본 검색어 사용
+            if search_term.lower() == "none":
+                return command.strip()
+            return search_term
+        else:
+            logger.warning(f"Could not parse search term from LLM output: {result}")
+            return command.strip()
+            
+    except Exception as e:
+        logger.error(f"Error in get_search_term: {e}")
+        return command.strip()
 
 def clean_search_command(command):
     """
@@ -1589,8 +1659,11 @@ def handle_special_cases(cleaned, original):
     
     return cleaned
 
-def generate_search_description(search_term):
-    description = f"'{search_term}'에 대한 검색을 실행합니다."
+def generate_search_description(search_term, language):
+    if language.startswith('en'):
+        description = f"Search for '{search_term}'."
+    else:
+        description = f"'{search_term}'에 대한 검색을 실행합니다."
     return description
 
 def generate_summarize_description(context):
