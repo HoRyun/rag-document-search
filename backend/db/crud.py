@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from . import models
 from datetime import datetime
 from sqlalchemy import select, func, delete, text
-from db.models import User
+
 """인덱스
 
 인덱스는 임시로 작성한 정보이다.
@@ -137,11 +137,9 @@ def get_parent_id_by_id(db: Session, item_id: str):
 
 
 
-def get_directory_id_by_path(db: Session, path: str, user_id: int):
-    """아이템의 경로 값으로 해당 아이템의 id값을 가져온다.
-    현재 접속한 사용자의 db에서만 검색함.
-    """
-    stmt = select(models.Directory.id).where(models.Directory.path == path, models.Directory.owner_id == user_id)
+def get_directory_id_by_path(db: Session, path: str):
+    """아이템의 경로 값으로 해당 아이템의 id값을 가져온다."""
+    stmt = select(models.Directory.id).where(models.Directory.path == path)
     result = db.execute(stmt)
     return result.scalar()
 
@@ -162,11 +160,9 @@ def get_file_info_by_s3_key(db: Session, s3_key: str):
 #     return db.query(models.Document).filter(models.Document.filename == filename).first()
 
 # 동일한 파일 이름이 존재하는 지 확인 수정 후
-def get_file_info_by_filename(db: Session, filename: str, user_id: int):
-    """Document 테이블에 filename이 존재하면 해당 레코드를 반환한다.
-    현재 접속한 사용자의 db에서만 검색함.
-    """
-    stmt = select(models.Document).where(models.Document.filename == filename, models.Document.user_id == user_id)
+def get_file_info_by_filename(db: Session, filename: str):
+    """Document 테이블에 filename이 존재하면 해당 레코드를 반환한다."""
+    stmt = select(models.Document).where(models.Document.filename == filename)
     result = db.execute(stmt).scalar_one_or_none()
     return result
 
@@ -501,15 +497,10 @@ def update_target_directory_path_parent_id_and_child_dirs(
     db.commit()
     return db.query(models.Directory).filter(models.Directory.id == target_id).first()
 
-def get_directory_by_id(db: Session, item_id: any, current_user: User):
+def get_directory_by_id(db: Session, item_id: any):
     """아이템의 id로 해당 아이템 레코드를 가져온다."""
     if isinstance(item_id, int):
         item_id = str(item_id)
-    
-    if item_id == "root":
-        stmt = select(models.Directory).where(models.Directory.id == item_id)
-    else:
-        stmt = select(models.Directory).where(models.Directory.id == item_id, models.Directory.owner_id == current_user.id)
-
+    stmt = select(models.Directory).where(models.Directory.id == item_id)
     result = db.execute(stmt).scalar_one_or_none()
     return result    

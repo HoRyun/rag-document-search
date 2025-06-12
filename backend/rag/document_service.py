@@ -21,8 +21,8 @@ from rag.file_load import (
 from rag.chunking import chunk_documents
 
 # from fast_api.endpoints.documents import stop_debugger
-from debug import debugging
-from db.models import User
+
+
 
 
 
@@ -69,10 +69,8 @@ async def process_document(
         # DB의 documents 테이블에 문서 정보 저장. # 이 코드는 이 위치에 있어야 함.
         
         # 문서 정보 저장 중 오류 발생 시 예외 처리
-        # 디버깅 여기서부터 다시 시작
         try:
-            if crud.get_file_info_by_filename(db, file_name, user_id):
-                debugging.stop_debugger()
+            if crud.get_file_info_by_filename(db, file_name):
                 # 만약 이 파일이 db에 이미 존재한다면 이 파일을 또 저장하지 않는다.
                 pass
             else:
@@ -92,14 +90,12 @@ async def process_document(
             documents = await load_docx(file_content) # file 대신 file_content를 매개변수로 전달
         elif file_extension in ['hwp', 'hwpx']:
             documents = await load_hwp(file_content, file_extension)
-        debugging.stop_debugger()
 
 
 
         # 4. 문서 청킹
         # 문자열 리스트화 된 문서를 조각으로 나눈다.
         chunked_documents = chunk_documents(documents, file_path, file_name)
-        debugging.stop_debugger()
         # 4. 문서 청킹
 
 
@@ -108,12 +104,12 @@ async def process_document(
         try:
             # chunked_documents를 db로 보낼때 비동기 처리를 하면 됨.
             # chunked_documents는 문서에 따라 여러 개의 데이터가 들어가니까 비동기 처리를 해야 함.
-            document_id = save_to_vector_store(db, chunked_documents, file_name, file_path, user_id)
-            debugging.stop_debugger()
+            document_id = await save_to_vector_store(db, chunked_documents, file_name, file_path)
             print(f"Document {file_name} uploaded and processed successfully")
         except Exception as ve:
             print(f"벡터 저장 중 오류 발생 {str(ve)}")
             print(traceback.format_exc())
+
 
         return document_id
         
