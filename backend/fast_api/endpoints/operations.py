@@ -490,7 +490,7 @@ def process_delete(command, context):
         preview=preview
     )
 
-def process_error(command, operation_type):
+def process_error(command, operation_type, language):
     """
     오류 상황을 처리하는 함수
     
@@ -498,6 +498,7 @@ def process_error(command, operation_type):
         command: 사용자의 자연어 명령
         context: 작업 컨텍스트 정보
         error_type: 에러 타입 (err-1 또는 err-2)
+        language: 사용자 언어 ('ko' 또는 'en')
         
     Returns:
         에러 정보를 담은 결과 객체
@@ -505,17 +506,30 @@ def process_error(command, operation_type):
     # 데이터 준비
     operation_id = "error-"+str(uuid.uuid4())
     
+    # 언어별 메시지 설정
+    is_english = language.startswith('en')
+    
     # 에러 타입별 메시지 및 가이드 설정
     if operation_type == "error":
         # 부정표현 또는 파일관련이지만 매칭안됨
-        message = "파일 관리와 관련없는 명령이거나, 명령을 이해할 수 없습니다. 다시 입력해주세요."
-        description = f"입력하신 명령 '{command}'을(를) 처리할 수 없습니다."
-        warnings = ["적절한 명령을 다시 입력해주십시오."]
+        if is_english:
+            message = "The command is not related to file management or cannot be understood. Please try again."
+            description = f"Unable to process the command '{command}'."
+            warnings = ["Please enter an appropriate command."]
+        else:
+            message = "파일 관리와 관련없는 명령이거나, 명령을 이해할 수 없습니다. 다시 입력해주세요."
+            description = f"입력하신 명령 '{command}'을(를) 처리할 수 없습니다."
+            warnings = ["적절한 명령을 다시 입력해주십시오."]
     else:
         # 기본 에러 메시지
-        message = "알 수 없는 오류가 발생했습니다."
-        description = "시스템에서 오류가 발생했습니다."
-        warnings = ["잠시 후 다시 시도해주세요."]
+        if is_english:
+            message = "An unknown error has occurred."
+            description = "A system error has occurred."
+            warnings = ["Please try again later."]
+        else:
+            message = "알 수 없는 오류가 발생했습니다."
+            description = "시스템에서 오류가 발생했습니다."
+            warnings = ["잠시 후 다시 시도해주세요."]
     
     # 로그 기록
     logger.warning(f"Error processing command: '{command}', Error type: error")
