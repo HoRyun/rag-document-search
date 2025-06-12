@@ -144,12 +144,11 @@ class OperationService {
     }
   }
 
-  async executeOperation(operationId, userConfirmation = {}, language = 'ko') {
+  async executeOperation(operationId, userConfirmation = {}) {
     const url = `${this.baseURL}/operations/${operationId}/execute`;
     const requestData = {
       confirmed: true,
       userOptions: userConfirmation,
-      language: language, // 언어 정보 추가
       executionTime: new Date().toISOString()
     };
 
@@ -203,9 +202,9 @@ class OperationService {
     }
   }
 
-  async cancelOperation(operationId, language = 'ko') {
+  async cancelOperation(operationId) {
     const url = `${this.baseURL}/operations/${operationId}/cancel`;
-    const requestData = { language }; // 언어 정보 추가
+    const requestData = {};
 
     debugLog('language', '🌍 언어 정보와 함께 작업 취소 요청', { operationId, language });
     logNetworkRequest('POST', url, requestData);
@@ -252,11 +251,10 @@ class OperationService {
     }
   }
 
-  async undoOperation(operationId, reason = '', language = 'ko') {
+  async undoOperation(operationId, reason = '') {
     const url = `${this.baseURL}/operations/${operationId}/undo`;
     const requestData = {
       reason,
-      language, // 언어 정보 추가
       undoTime: new Date().toISOString()
     };
 
