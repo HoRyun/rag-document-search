@@ -114,7 +114,7 @@ jobs:
             LANGCHAIN_ENDPOINT=${{ secrets.LANGCHAIN_ENDPOINT }}
             LANGCHAIN_TRACING_V2=${{ secrets.LANGCHAIN_TRACING_V2 }}
             S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
-            DATABASE_URL=postgresql+psycopg://${{ secrets.RDS_USER }}:${{ secrets.RDS_PASSWORD }}@${{ secrets.RDS_ENDPOINT }}:5432/${{ secrets.RDS_DB_NAME }}
+            DATABASE_URL=postgresql+psycopg2://${{ secrets.RDS_USER }}:${{ secrets.RDS_PASSWORD }}@${{ secrets.RDS_ENDPOINT }}:5432/${{ secrets.RDS_DB_NAME }}
             REDIS_HOST=${{ secrets.REDIS_HOST }}
             REDIS_PORT=${{ secrets.REDIS_PORT }}
             REDIS_DB=${{ secrets.REDIS_DB }}
