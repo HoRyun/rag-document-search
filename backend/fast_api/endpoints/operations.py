@@ -80,19 +80,19 @@ async def stage_operation(
         if operation_type == "move":
             result = process_move(command, context, language)
         elif operation_type == "copy":
-            result = process_copy(command, context)
+            result = process_copy(command, context, language)
         elif operation_type == "delete":
-            result = process_delete(command, context)
+            result = process_delete(command, context, language)
         elif operation_type == "rename":
-            result = process_rename(command, context)
+            result = process_rename(command, context, language)
         elif operation_type == "create_folder":
-            result = process_create_folder(command, context)
+            result = process_create_folder(command, context, language)
         elif operation_type == "search":
-            result = process_search(command)
+            result = process_search(command, language)
         elif operation_type == "summarize":
-            result = process_summarize(command, context)
+            result = process_summarize(command, context, language)
         elif operation_type == "error":
-            result = process_error(command, operation_type)
+            result = process_error(command, operation_type, language)
 
         # ✅ Redis에 작업 정보 저장 (error 타입 제외)
         if operation_type != "error":
@@ -371,7 +371,7 @@ def process_move(command, context, language):
         작업 결과 정보
     """
     # LLM을 사용하여 목적지 설정
-    destination = get_destination(command, context, 'move', language)
+    destination = get_destination(command, context, 'move')
     # debugging.stop_debugger()
     # LLM을 사용하여 작업 설명 생성
     description = get_description(command, context, destination, 'move', language)
@@ -407,7 +407,7 @@ def process_move(command, context, language):
         preview=preview
     )
 
-def process_copy(command, context):
+def process_copy(command, context, language):
     """
     복사 작업을 처리하는 함수
     
@@ -540,7 +540,7 @@ def process_error(command, operation_type):
         preview=preview
     )
 
-def process_rename(command, context):
+def process_rename(command, context, language):
     """
     이름 변경 작업을 처리하는 함수
     
@@ -554,8 +554,12 @@ def process_rename(command, context):
 
     # 데이터 준비
     operationId = "op-"+str(uuid.uuid4())
-    new_name = get_new_name(command)
-    description = generate_rename_description(context, new_name)
+    
+    # 파일의 새로운 이름을 추출하는 함수는 아래의 get
+    new_name = get_new_name(command, context, language)
+
+    # description = generate_rename_description(context, new_name)
+    description = get_description(command, context, None, 'rename', language, new_name)
     # debugging.stop_debugger()
 
     # Pydantic 모델 사용
@@ -696,7 +700,7 @@ def process_summarize(command, context):
 
 
 
-def get_destination(command, context, operation_type, language='ko'):
+def get_destination(command, context, operation_type):
     """
     LLM을 사용하여 목적지 경로를 결정하는 함수
     
@@ -704,7 +708,6 @@ def get_destination(command, context, operation_type, language='ko'):
         command: 사용자의 자연어 명령
         context: 작업 컨텍스트 정보
         operation_type: 작업 타입 ('move' 또는 'copy')
-        language: 사용자 언어 ('ko' 또는 'en')
     
     Returns:
         str: 목적지 경로
@@ -762,8 +765,7 @@ Output format:
         result = chain.invoke({
             "command": command,
             "operation_type": operation_type,
-            "available_folders": available_folders_str,
-            "language": language
+            "available_folders": available_folders_str
         })
         
         # 모델 출력에서 destination 추출
@@ -778,7 +780,7 @@ Output format:
         logger.error(f"Error in get_destination: {e}")
         return "/"
 
-def get_description(command, context, destination='/', operation_type="default", language='ko'):
+def get_description(command, context, destination='/', operation_type="default", language='ko', new_name=None):
     """
     LLM을 사용하여 작업 설명을 생성하는 함수
     
@@ -788,6 +790,7 @@ def get_description(command, context, destination='/', operation_type="default",
         destination: 목적지 경로
         operation_type: 작업 타입
         language: 사용자 언어 ('ko' 또는 'en')
+        new_name: 새로운 이름
     
     Returns:
         str: 작업 설명 문장
@@ -830,7 +833,14 @@ IMPORTANT - Different formats based on operation type:
    - Focus only on what files/folders will be deleted
    - Format: "Will delete [files]" or "선택된 파일들을 삭제합니다"
 
-2. For other operations (move, copy, etc.):
+2. For RENAME operations:
+   - Do NOT mention destination at all
+   - Focus on the original name and new name
+   - Format: "Will rename [original_name] to [new_name]" or "[바뀌기 전의 아이템 이름]을 [new_name]으로 변경합니다"
+   - Use the name from selected files as the original name
+   - Use the provided new_name parameter as the target name
+
+3. For other operations (move, copy, etc.):
    - Include destination information
    - Format: "Will {operation_type} [files] to [destination]" or "선택된 파일들을 [destination]로 {operation_type}합니다"
    - If destination starts with "/" it means an existing folder
@@ -848,6 +858,8 @@ IMPORTANT - Different formats based on operation type:
         
         <Destination>{destination}</Destination>
         
+        <New name (for rename operations)>{new_name}</New name (for rename operations)>
+        
         <Description format>
 <description>Your description here</description>
         </Description format>
@@ -860,7 +872,7 @@ IMPORTANT - Different formats based on operation type:
     # OpenAI 모델 객체 생성
     llm = ChatOpenAI(
         temperature=0.3,
-        max_tokens=500,
+        max_tokens=1000,
         model_name="gpt-4o-mini"
     )
     
@@ -874,7 +886,8 @@ IMPORTANT - Different formats based on operation type:
             "operation_type": operation_type,
             "selected_files": selected_files_str,
             "destination": clean_destination,
-            "language": language
+            "language": language,
+            "new_name": new_name or ""
         })
         
         # 모델 출력에서 description 추출
@@ -1090,47 +1103,105 @@ def generate_delete_description(context):
     return desc_result
 
     
-def get_new_name(command):
+def get_new_name(command, context, language):
     """
-    이름 변경 작업에 대한 새로운 이름을 추출하는 함수
+    LLM을 사용하여 이름 변경 작업에 대한 새로운 이름을 추출하는 함수
     
     Args:
         command: 사용자의 자연어 명령
+        context: 작업 컨텍스트 정보
+        language: 사용자 언어
     
     Returns:
         str: 추출된 새로운 이름 (없으면 None)
     """
-    # 1. 사용자 명령에서 새 이름 추출
-    new_name = None
     
-    # 다양한 패턴으로 새 이름 추출 시도
-    patterns = [
-        r'(\w+?)으로\s*바꿔',  # "새이름으로 바꿔" → "새이름"
-        r'(\w+?)으로\s*변경',  # "새이름으로 변경" → "새이름" 
-        r'(\w+?)으로\s*수정',  # "새이름으로 수정" → "새이름"
-        r'(\w+?)으로\s*이름변경',  # "새이름으로 이름변경" → "새이름"
-        r'(\w+?)으로\s*리네임',  # "새이름으로 리네임" → "새이름"
-        r'(\w+?)으로\s*rename',  # "새이름으로 rename" → "새이름"
-        r'(\w+)로\s*바꿔',  # "새이름로 바꿔"
-        r'(\w+)로\s*변경',  # "새이름로 변경"
-        r'(\w+)로\s*수정',  # "새이름로 수정"
-        r'(\w+)로\s*이름변경',  # "새이름로 이름변경"
-        r'(\w+)로\s*리네임',  # "새이름로 리네임"
-        r'(\w+)로\s*rename',  # "새이름로 rename" (영어 혼용)
-        r'이름을\s*(\w+)로',  # "이름을 새이름로"
-        r'이름을\s*(\w+?)으로',  # "이름을 새이름으로" → "새이름"
-        r'파일명을\s*(\w+)로',  # "파일명을 새이름로"
-        r'파일명을\s*(\w+?)으로',  # "파일명을 새이름으로" → "새이름"
-    ]
+    # 선택된 파일 정보를 문자열로 변환
+    selected_files_str = ""
+    if context.selectedFiles:
+        files_list = []
+        for file in context.selectedFiles:
+            files_list.append(f"Name: {file.name}, Type: {file.type}")
+        selected_files_str = "\n".join(files_list)
+    else:
+        selected_files_str = "No files selected"
     
-    # 각 패턴을 순서대로 시도하여 새 이름 추출
-    for pattern in patterns:
-        match = re.search(pattern, command)
-        if match:
-            new_name = match.group(1)
-            break  # 첫 번째 매칭되는 패턴에서 중단
+    prompt_template = """
+        <Instructions>
+        User's Language: {language}
+        
+You must respond in the language specified by the user's language setting:
+- If language is "ko" or starts with "ko", respond in Korean
+- If language is "en" or starts with "en", respond in English
+
+Analyze the user's command and the selected files to extract the new name that the user wants to rename the file/folder to.
+
+Steps to follow:
+1. Look at the selected files to understand what file/folder is being renamed
+2. Analyze the user's command to find what new name they want to give to the file/folder
+3. Extract only the new name (without file extension unless specifically mentioned)
+4. If no clear new name is found, return "None"
+
+Important rules:
+- Extract only the new name part, not the entire command
+- Do not include words like "으로", "로", "바꿔", "변경", "수정" etc.
+- If the user mentions a file extension, include it in the new name
+- If the original file has an extension but user doesn't mention it, do NOT include extension in the new name
+
+Output format:
+<new_name>extracted_new_name_here</new_name>
+
+If no new name is found, output:
+<new_name>None</new_name>
+        </Instructions>
+        
+        <User's command>{command}</User's command>
+        
+        <Selected files>
+{selected_files}
+        </Selected files>
+        
+        <New name format>
+<new_name>Your extracted new name here</new_name>
+        </New name format>
+        
+        Answer:
+        """
     
-    return new_name
+    prompt = PromptTemplate.from_template(prompt_template)
+    
+    # OpenAI 모델 객체 생성
+    llm = ChatOpenAI(
+        temperature=0.1,
+        max_tokens=1000,
+        model_name="gpt-4o-mini"
+    )
+    
+    # 체인 생성
+    chain = prompt | llm | StrOutputParser()
+    
+    # 체인 실행
+    try:
+        result = chain.invoke({
+            "command": command,
+            "selected_files": selected_files_str,
+            "language": language
+        })
+        
+        # 모델 출력에서 new_name 추출
+        if "<new_name>" in result and "</new_name>" in result:
+            new_name = result.split("<new_name>")[1].split("</new_name>")[0].strip()
+            # "None"이면 실제 None 반환
+            if new_name.lower() == "none":
+                return None
+            return new_name
+        else:
+            logger.warning(f"Could not parse new name from LLM output: {result}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error in get_new_name: {e}")
+        return None
 
 def generate_rename_description(context, new_name):
     """
