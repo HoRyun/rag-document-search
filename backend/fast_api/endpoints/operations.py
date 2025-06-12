@@ -17,6 +17,12 @@ from services.operation_store import get_operation_store, OperationStore
 import uuid
 import re
 
+# LLM 관련 import 추가
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+
 
 router = APIRouter()
 
@@ -72,9 +78,9 @@ async def stage_operation(
 
         # 타입 별 AI 호출 분기. 각 함수의 매개변수로 command, context전달.
         if operation_type == "move":
-            result = await process_move(command, context)
+            result = process_move(command, context, language)
         elif operation_type == "copy":
-            result = await process_copy(command, context)
+            result = process_copy(command, context)
         elif operation_type == "delete":
             result = process_delete(command, context)
         elif operation_type == "rename":
@@ -353,46 +359,38 @@ async def undo_operation(
 
 # operation_type별 function 만들기
 
-async def process_move(command, context):
+def process_move(command, context, language):
     """
-    이동 작업을 처리하는 함수
+    이동 작업을 처리하는 함수 (LLM 기반으로 리팩토링됨)
     
     Args:
         command: 사용자의 자연어 명령
         context: 작업 컨텍스트 정보
-        
+        language: 사용자 언어 ('ko' 또는 'en')
     Returns:
         작업 결과 정보
     """
-    # 명령 분석
-    destination = get_destination(command, context, 'move')
-    # 작업 설명 요약 생성.
-    description = get_description(context, destination, 'move')
+    # LLM을 사용하여 목적지 설정
+    destination = get_destination(command, context, 'move', language)
+    # debugging.stop_debugger()
+    # LLM을 사용하여 작업 설명 생성
+    description = get_description(command, context, destination, 'move', language)
+    # debugging.stop_debugger()
 
     # 데이터 준비
     operationId = "op-"+str(uuid.uuid4())
     
-    # destination 파싱. 만약 '/'로 파싱 시 'create_folder'가 존재하는 경우,
-    # destination에서 'create_folder' 문자열이 있으면 제거
-    if destination.startswith('create_folder'):
-        code_remove_ver = destination.replace('create_folder', '', 1)
-
-        # destination에 코드를 제거한 경로 데이터 저장.
-        destination = code_remove_ver
-
-        additional_desc = code_remove_ver + " 폴더를 생성합니다."
-        # 추가 설명 문장 추가.
-        description += " "+ additional_desc
-    else:
-        destination = destination
-        description = description
+    # destination에서 create_folder 접두사 제거 (실제 작업에서는 깨끗한 경로 사용)
+    clean_destination = destination
+    if destination.startswith('create_folder/'):
+        clean_destination = destination.replace('create_folder/', '', 1)
     
     warnings = [] 
-    
+    # debugging.stop_debugger()
     # Pydantic 모델 사용
     move_operation = op_schemas.MoveOperation(
         targets=context.selectedFiles,
-        destination=destination
+        destination=clean_destination
     )
     
     preview = op_schemas.OperationPreview(
@@ -409,7 +407,7 @@ async def process_move(command, context):
         preview=preview
     )
 
-async def process_copy(command, context):
+def process_copy(command, context):
     """
     복사 작업을 처리하는 함수
     
@@ -708,48 +706,246 @@ def process_summarize(command, context):
 
 
 
-def get_destination(command, context, operation_type):
+def get_destination(command, context, operation_type, language='ko'):
     """
-    목적지 경로를 결정하는 함수
+    LLM을 사용하여 목적지 경로를 결정하는 함수
     
     Args:
         command: 사용자의 자연어 명령
         context: 작업 컨텍스트 정보
         operation_type: 작업 타입 ('move' 또는 'copy')
+        language: 사용자 언어 ('ko' 또는 'en')
     
     Returns:
         str: 목적지 경로
     """
-
-    # 목적지 경로 추출
-    if operation_type == 'move':
-        output_destination = extract_move_destination(command, context)
-    elif operation_type == 'copy':
-        # copy 로직은 나중에 구현
-        output_destination = extract_copy_destination(command, context)
-    # ...
-
-    return output_destination
-
-def get_description(context, destination = '/', operation_type = "default", new_name = None):
-    """
     
+    # 사용 가능한 폴더 목록을 문자열로 변환
+    available_folders_str = ""
+    if context.availableFolders:
+        folders_list = []
+        for folder in context.availableFolders:
+            folders_list.append(f"Name: {folder.name}, Path: {folder.path}")
+        available_folders_str = "\n".join(folders_list)
+    else:
+        available_folders_str = "No available folders"
+    
+    # 언어별 프롬프트 설정
+    if language.startswith('en'):
+        prompt_template = """
+        <Instructions>
+You need to extract the destination folder name that the user wants to {operation_type} files to from the user's command.
+
+First, analyze the user's command to understand what destination folder they want.
+Then check if that destination folder exists in the available folders list.
+
+If the destination exists in available folders, return the corresponding path.
+If the destination doesn't exist in available folders, return "create_folder/[folder_name]".
+If no specific destination is mentioned, return "/".
+
+Output format:
+<destination>destination_path_here</destination>
+        </Instructions>
+        
+        <User's command>{command}</User's command>
+        
+        <Available folders>
+{available_folders}
+        </Available folders>
+        
+        Answer:
+        """
+    else:  # Korean (default)
+        prompt_template = """
+        <Instructions>
+사용자의 명령에서 파일을 {operation_type}하고자 하는 목적지 폴더명을 추출해야 합니다.
+
+먼저 사용자의 명령을 분석하여 어떤 목적지 폴더를 원하는지 파악하세요.
+그 다음 해당 목적지 폴더가 사용 가능한 폴더 목록에 있는지 확인하세요.
+
+목적지가 사용 가능한 폴더에 존재하면 해당 path를 반환하세요.
+목적지가 사용 가능한 폴더에 없으면 "create_folder/[폴더명]"을 반환하세요.
+특정 목적지가 언급되지 않았으면 "/"를 반환하세요.
+
+출력 형식:
+<destination>목적지_경로</destination>
+        </Instructions>
+        
+        <사용자 명령>{command}</사용자 명령>
+        
+        <사용 가능한 폴더>
+{available_folders}
+        </사용 가능한 폴더>
+        
+        답변:
+        """
+    
+    prompt = PromptTemplate.from_template(prompt_template)
+    
+    # OpenAI 모델 객체 생성
+    llm = ChatOpenAI(
+        temperature=0.1,
+        max_tokens=1000,
+        model_name="gpt-4o-mini"
+    )
+    
+    # 체인 생성
+    chain = prompt | llm | StrOutputParser()
+    
+    # 체인 실행
+    try:
+        result = chain.invoke({
+            "command": command,
+            "operation_type": operation_type,
+            "available_folders": available_folders_str
+        })
+        
+        # 모델 출력에서 destination 추출
+        if "<destination>" in result and "</destination>" in result:
+            destination = result.split("<destination>")[1].split("</destination>")[0].strip()
+            return destination
+        else:
+            logger.warning(f"Could not parse destination from LLM output: {result}")
+            return "/"
+            
+    except Exception as e:
+        logger.error(f"Error in get_destination: {e}")
+        return "/"
+
+def get_description(command, context, destination='/', operation_type="default", language='ko'):
+    """
+    LLM을 사용하여 작업 설명을 생성하는 함수
+    
+    Args:
+        command: 사용자의 자연어 명령
+        context: 작업 컨텍스트 정보
+        destination: 목적지 경로
+        operation_type: 작업 타입
+        language: 사용자 언어 ('ko' 또는 'en')
     
     Returns:
-        str: output_description
+        str: 작업 설명 문장
     """
-    if operation_type == 'move':
-        output_description = generate_move_description(context, destination)
-    elif operation_type == 'copy':
-        output_description = generate_copy_description(context, destination)
-    elif operation_type == 'delete':
-        output_description = generate_delete_description(context)
-    elif operation_type == 'rename':
-        output_description = generate_rename_description(context, new_name)
+    
+    # 선택된 파일 정보를 문자열로 변환
+    selected_files_str = ""
+    if context.selectedFiles:
+        files_list = []
+        for file in context.selectedFiles:
+            files_list.append(f"Name: {file.name}, Type: {file.type}")
+        selected_files_str = "\n".join(files_list)
     else:
-        output_description = "작업 설명 문장 생성 오류"
+        selected_files_str = "No files selected"
+    
+    # destination에서 create_folder 제거 (있다면)
+    clean_destination = destination
+    if destination.startswith('create_folder/'):
+        clean_destination = destination.replace('create_folder/', '', 1)
+    
+    # 언어별 프롬프트 설정
+    if language.startswith('en'):
+        prompt_template = """
+        <Instructions>
+Based on the user's command and the selected files, generate a short and clear description of what will happen when this {operation_type} operation is executed.
 
-    return output_description
+The description should be:
+- Concise and informative
+- In the format "Will {operation_type} [files] to [destination]"
+- Maximum 2 sentences
+
+If destination starts with "/" it means an existing folder.
+If destination doesn't start with "/" it means a new folder will be created. In this case, please add an explanation at the very end of the answer stating that the folder name will be newly created by removing 'create\_folder/' from the <destination>. (Example: If the <destination> is 'create\_folder/New Folder' – a new folder named 'New Folder' will be created.)
+
+
+        </Instructions>
+        
+        <User's command>{command}</User's command>
+        
+        <Operation type>{operation_type}</Operation type>
+        
+        <Selected files>
+{selected_files}
+        </Selected files>
+        
+        <Destination>{destination}</Destination>
+        
+        <Description format>
+<description>Your description here</description>
+        </Description format>
+        
+        Answer:
+        """
+    else:  # Korean (default)
+        prompt_template = """
+        <Instructions>
+사용자의 명령과 선택된 파일들을 바탕으로 이 {operation_type} 작업이 실행될 때 어떤 일이 일어날지 짧고 명확하게 설명하세요.
+
+설명은 다음과 같아야 합니다:
+- 간결하고 정보를 잘 전달
+- "[파일들]을(를) [목적지]로 {operation_type}합니다" 형식
+- 최대 2문장
+
+목적지가 "/"로 시작하면 기존 폴더를 의미합니다.
+목적지가 "/"로 시작하지 않으면 새 폴더가 생성될 것을 의미합니다. 이 경우, 답변의 맨 끝에, <목적지>에서 'create_folder/'를 제거한 폴더의 이름을 새로 생성할 것이라는 설명을 붙이세요. (예시:<목적지>가 'create_folder/새 폴더'일 경우 - 새 폴더를 새로 생성합니다.
+        </Instructions>
+        
+        <사용자 명령>{command}</사용자 명령>
+        
+        <작업 타입>{operation_type}</작업 타입>
+        
+        <선택된 파일>
+{selected_files}
+        </선택된 파일>
+        
+        <목적지>{destination}</목적지>
+        
+        <설명 형식>
+<description>여기에 설명을 작성하세요</description>
+        </설명 형식>
+        
+        답변:
+        """
+    
+    prompt = PromptTemplate.from_template(prompt_template)
+    
+    # OpenAI 모델 객체 생성
+    llm = ChatOpenAI(
+        temperature=0.3,
+        max_tokens=500,
+        model_name="gpt-4o-mini"
+    )
+    
+    # 체인 생성
+    chain = prompt | llm | StrOutputParser()
+    
+    # 체인 실행
+    try:
+        result = chain.invoke({
+            "command": command,
+            "operation_type": operation_type,
+            "selected_files": selected_files_str,
+            "destination": clean_destination
+        })
+        
+        # 모델 출력에서 description 추출
+        if "<description>" in result and "</description>" in result:
+            description = result.split("<description>")[1].split("</description>")[0].strip()
+            return description
+        else:
+            logger.warning(f"Could not parse description from LLM output: {result}")
+            # 기본 설명 생성
+            if language.startswith('en'):
+                return f"Will {operation_type} selected files to {clean_destination}"
+            else:
+                return f"선택된 파일들을 {clean_destination}로 {operation_type}합니다"
+            
+    except Exception as e:
+        logger.error(f"Error in get_description: {e}")
+        # 기본 설명 생성
+        if language.startswith('en'):
+            return f"Will {operation_type} selected files to {clean_destination}"
+        else:
+            return f"선택된 파일들을 {clean_destination}로 {operation_type}합니다"
 
 def extract_move_destination(command, context):
     """

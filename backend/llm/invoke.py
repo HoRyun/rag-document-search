@@ -53,7 +53,7 @@ Write only the output.
     # OpenAI 모델 객체를 생성한다.
     llm = ChatOpenAI(
     temperature=0.1,
-    max_tokens=100,
+    max_tokens=500,
     model_name="gpt-4o-mini",)
 
     # 체인 생성
