@@ -104,10 +104,9 @@ def get_document_chunks_by_document_id(db: Session, document_id: int):
     return db.query(models.DocumentChunk).filter(models.DocumentChunk.document_id == document_id).all()
 
 # 디렉토리 관련 CRUD
-def create_directory(db: Session, id: str, name: str, path: str, is_directory: bool, parent_id: str, created_at: datetime, owner_id: any=None):
+def create_directory(db: Session, id: str, name: str, path: str, is_directory: bool, parent_id: str, created_at: datetime, owner_id: int):
     """새로운 정보로, directories 테이블에 새로운 레코드를 생성하고, 생성한 그 레코드를 반환한다."""
-    if owner_id is not None:
-        owner_id = int(owner_id)    
+    
     db_directory = models.Directory(
         id=id, 
         name=name, 
