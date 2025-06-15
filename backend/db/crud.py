@@ -122,7 +122,7 @@ def create_directory(db: Session, id: str, name: str, path: str, is_directory: b
     return db_directory
 
 # 디렉토리의 정보만 가져오는 함수
-def get_only_directory(db: Session, user_id: any):
+def get_only_directory(db: Session, user_id: int):
     stmt = select(models.Directory).where(models.Directory.is_directory == True, models.Directory.owner_id == user_id)
     result = db.execute(stmt)
     directories = result.scalars().all()

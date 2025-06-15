@@ -118,38 +118,70 @@ async def list_items(
             crud.create_directory(db, "root", "Home", "/", True, None, datetime.now(), user_id)
 
         # 프론트 엔드에서 선택한 경로
-        selected_path = path
+            # 만약 최초 로그인 시 프론트 엔드에서 잘못된 경로('')를 전송한다면
+        if path == '':
+            # selected_path를 '/'로 설정.
+            selected_path = '/'
+        else:
+            # 그렇지 않다면 프론트 엔드에서 전송한 경로를 사용.
+            selected_path = path
+
         # <db에서 디렉토리 정보와 파일 정보 가져오기>
 
         # 커넥션 풀에서 직접 연결 가져오기
         with db.connection() as connection:
             # 파일 목록 쿼리
-            file_query = text("""
-                SELECT id, name, 'file' as type, path 
-                FROM directories 
-                WHERE path LIKE :selected_path || '/%' 
-                AND path NOT LIKE :selected_path || '/%/%' 
-                AND is_directory = FALSE
-                AND owner_id = :user_id
-            """)
+            if selected_path == '/':
+                # selected_path 가 '/'일 경우 쿼리문은 달라야 한다. issue # 77 참고.
+                file_query = text("""
+                    SELECT id, name, 'file' as type, path
+                    FROM directories
+                    WHERE path LIKE '/%' 
+                    AND path NOT LIKE '/%/%'
+                    AND is_directory = FALSE
+                    AND owner_id = :user_id
+                """)
+            else:
+                # selected_path가 '/'가 아니면 일반적인 경로 처리.
+                file_query = text("""
+                    SELECT id, name, 'file' as type, path 
+                    FROM directories 
+                    WHERE path LIKE :selected_path || '/%' 
+                    AND path NOT LIKE :selected_path || '/%/%' 
+                    AND is_directory = FALSE
+                    AND owner_id = :user_id
+                """)
             file_result = connection.execute(file_query, {"selected_path": selected_path, "user_id": user_id}).mappings().fetchall()
             
             # 디렉토리 목록 쿼리
-            dir_query = text("""
-                SELECT id, name, 'folder' as type, path 
-                FROM directories 
-                WHERE path LIKE :selected_path || '/%' 
-                AND path NOT LIKE :selected_path || '/%/%' 
-                AND is_directory = TRUE
-                AND id <> 'root'
-                AND owner_id = :user_id
-            """)
+            if selected_path == '/':
+                # selected_path 가 '/'일 경우 쿼리문은 달라야 한다. issue # 77 참고.
+                dir_query = text("""
+                    SELECT id, name, 'folder' as type, path 
+                    FROM directories 
+                    WHERE path LIKE '/%' 
+                    AND path NOT LIKE '/%/%' 
+                    AND is_directory = TRUE
+                    AND id <> 'root'
+                    AND owner_id = :user_id
+                """)
+            else:
+                # selected_path가 '/'가 아니면 일반적인 경로 처리.
+                dir_query = text("""
+                    SELECT id, name, 'folder' as type, path 
+                    FROM directories 
+                    WHERE path LIKE :selected_path || '/%' 
+                    AND path NOT LIKE :selected_path || '/%/%' 
+                    AND is_directory = TRUE
+                    AND id <> 'root'
+                    AND owner_id = :user_id
+                """)
             dir_result = connection.execute(dir_query, {"selected_path": selected_path, "user_id": user_id}).mappings().fetchall()
         # </db에서 디렉토리 정보와 파일 정보 가져오기>
 
         # <가져온 정보를 filtered_items에 추가>
-        filtered_items.extend([dict(item) for item in file_result])
         filtered_items.extend([dict(item) for item in dir_result])
+        filtered_items.extend([dict(item) for item in file_result])
         # </가져온 정보를 filtered_items에 추가>
         
         return {"items": filtered_items}
@@ -237,9 +269,10 @@ async def get_filesystem_structure(
         user_id = current_user.id
 
         # 루트 디렉토리 존재여부 확인 및 생성
-        # 루트 디렉토리가 존재하지 않으면 생성하고, 존재하면 아무 작업도 하지 않는다.
-        if not crud.get_directory_by_id(db, "root", current_user):
-            # 루트 디렉토리 생성
+        # 루트 디렉토리가  
+        # 존재하면 아무 작업도 하지 않는다.
+        if not crud.get_directory_by_id(db, "root", user_id):
+            # 존재하지 않으면 루트 디렉토리 생성
             crud.create_directory(db, "root", "/", True, None, datetime.now())
 
         # 디렉토리만 필터링. 디렉토리 구조만 보내면 됨.
