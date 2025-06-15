@@ -505,15 +505,16 @@ def update_target_directory_path_parent_id_and_child_dirs(
     db.commit()
     return db.query(models.Directory).filter(models.Directory.id == target_id).first()
 
-def get_directory_by_id(db: Session, item_id: any, current_user: User):
+def get_directory_by_id(db: Session, item_id: any, user_id: int):
     """아이템의 id로 해당 아이템 레코드를 가져온다."""
     if isinstance(item_id, int):
         item_id = str(item_id)
     
     if item_id == "root":
+        # 가져오는 아이템이 root 디렉토리인 경우, root 디렉토리는 모든 유저가 공유하는 디렉토리이므로 유저 정보 없이 검색.
         stmt = select(models.Directory).where(models.Directory.id == item_id)
     else:
-        stmt = select(models.Directory).where(models.Directory.id == item_id, models.Directory.owner_id == current_user.id)
+        stmt = select(models.Directory).where(models.Directory.id == item_id, models.Directory.owner_id == user_id)
 
     result = db.execute(stmt).scalar_one_or_none()
     return result    
