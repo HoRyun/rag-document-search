@@ -115,7 +115,7 @@ async def list_items(
         # 루트 디렉토리가 존재하지 않으면 생성하고, 존재하면 아무 작업도 하지 않는다.
         if not crud.get_directory_by_id(db, "root", user_id):
             # 루트 디렉토리 생성
-            crud.create_directory(db, "root", "/", True, None, datetime.now())
+            crud.create_directory(db, "root", "Home", "/", True, None, datetime.now(), user_id)
 
         # 프론트 엔드에서 선택한 경로
         selected_path = path
