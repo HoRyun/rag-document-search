@@ -2,6 +2,7 @@ import traceback
 from langchain_core.documents import Document
 import numpy as np
 from sqlalchemy import text
+from db import crud
 
 def search_similarity(user_id, embed_query_data, engine):
     """db에서 유사도 검색 수행"""
@@ -102,7 +103,7 @@ def search_similarity(user_id, embed_query_data, engine):
         return (docs)                 # 쿼리의 결과는 candidates 리스트에 저장된다.
 
 
-def do_mmr(embed_query_data, candidate_docs):
+def do_mmr(db,embed_query_data, candidate_docs, user_id):
     """MMR 알고리즘 수행."""
     import numpy as np
     
@@ -220,10 +221,13 @@ def do_mmr(embed_query_data, candidate_docs):
     for doc in selected_docs:
         try:
             # meta 필드 참조 대신 빈 딕셔너리 사용
-            metadata = {}
+            document_name = crud.get_file_name_by_id(db, doc['document_id'], user_id)
+            document_path = crud.get_file_path_by_id(db, doc['document_id'], user_id)
+            metadata = {'document_name': document_name, 'document_path': document_path}
             
             doc_obj = Document(
                 page_content=doc["content"] or "",  # content가 None인 경우 빈 문자열로 대체
+                metadata=metadata
             )
             docs.append(doc_obj)
         except Exception as e:

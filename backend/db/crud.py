@@ -213,17 +213,21 @@ def get_s3_key_by_id(db: Session, document_id: any):
         document_id = int(document_id)
     return db.query(models.Document).filter(models.Document.id == document_id).first().s3_key
 
-def get_file_path_by_id(db: Session, item_id: any):
-    """아이템의 id로 해당 아이템 레코드에서 path 필드의 값을 가져온다."""
+def get_file_path_by_id(db: Session, item_id: any, user_id: int):
+    """아이템의 id로 해당 아이템 레코드에서 path 필드의 값을 가져온다.
+    접속중인 유저의 db에서만 검색하도록 수정*
+    """
     if isinstance(item_id, int):
         item_id = str(item_id)
-    return db.query(models.Directory).filter(models.Directory.id == item_id).first().path
+    return db.query(models.Directory).filter(models.Directory.id == item_id, models.Directory.owner_id == user_id).first().path
 
-def get_file_name_by_id(db: Session, item_id: any):
-    """아이템의 id로 해당 아이템 레코드에서 name 필드의 값을 가져온다."""
+def get_file_name_by_id(db: Session, item_id: any, user_id: int):
+    """아이템의 id로 해당 아이템 레코드에서 name 필드의 값을 가져온다.
+    접속중인 유저의 db에서만 검색하도록 수정*
+    """
     if isinstance(item_id, int):
         item_id = str(item_id)    
-    return db.query(models.Directory).filter(models.Directory.id == item_id).first().name
+    return db.query(models.Directory).filter(models.Directory.id == item_id, models.Directory.owner_id == user_id).first().name
 
 from sqlalchemy import select
 
