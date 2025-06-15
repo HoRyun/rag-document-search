@@ -421,7 +421,7 @@ def process_copy(command, context, language):
     # 명령 분석
     destination = get_destination(command, context, 'copy')
     # 작업 설명 요약 생성.
-    description = get_description(context, destination, 'copy')
+    description = get_description(command, context, destination, 'copy', language)
 
     # 데이터 준비
     operationId = "op-"+str(uuid.uuid4())
@@ -453,7 +453,7 @@ def process_copy(command, context, language):
         preview=preview
     )
 
-def process_delete(command, context):
+def process_delete(command, context, language):
     """
     삭제 작업을 처리하는 함수
     
@@ -465,7 +465,7 @@ def process_delete(command, context):
         작업 결과 정보
     """
     # 작업 설명 요약 생성.
-    description = get_description(context, None, 'delete')
+    description = get_description(command, context, None, 'delete', language)
 
     # 데이터 준비
     operationId = "op-"+str(uuid.uuid4())
@@ -2144,7 +2144,7 @@ async def execute_search_logic(operation: dict, user_options: dict, current_user
     try:
         # RAG 검색 실행
         # process_query는 유사한 문서 청크들을 반환
-        docs = process_query(current_user.id, search_term, engine)
+        docs = process_query(db, current_user.id, search_term, engine)
         
         # LLM을 통해 자연스러운 답변 생성
         answer = get_llms_answer(docs, search_term)
