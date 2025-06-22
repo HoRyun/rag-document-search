@@ -1,4 +1,4 @@
-# After
+# README 수정 후
 
 > # 2025 캡스톤 디자인 
 > ## Team 멋진러닝
@@ -50,9 +50,109 @@ Retrieval-Augmented Generation(RAG) 기술을 활용한 문서 검색 및 질의
 ||검색|
 ||기타 파일 관리 작업(폴더 생성, 복사, 잘라내기, 삭제, 이름 변경)|
 
+</br>
+
+# 기술 스택
+
+### **백엔드**
+
+- **FastAPI**
+- **LangChain**
+- **PostgreSQL (AWS RDS)**
+- **Redis** 
+
+### **프론트엔드**
+
+- **React**: 사용자 인터페이스 구현
+
+
+### **인프라/클라우드**
+
+- **AWS S3**: 문서 파일 저장소
+- **AWS ECR**: 컨테이너 이미지 저장소
+- **AWS ECS Fargate**: 서버리스 백엔드 컨테이너 오케스트레이션
+- **AWS RDS**: 관리형 PostgreSQL 데이터베이스
+- **Docker**: 애플리케이션 컨테이너화 및 환경 통일
+
+</br>
+
+# 아키텍처
+
+```mermaid
+flowchart TB
+    %% 클라이언트 층
+    user(["User"])
+    
+    %% 프론트엔드
+    react["React Front-end"]
+    
+    %% AWS 인프라
+    alb["ALB<br/>(Application&nbsp;Load&nbsp;Balancer)"]
+    ecs["ECS&nbsp;Fargate<br/>(FastAPI&nbsp;Backend)"]
+    s3["S3<br/>(문서저장)"]
+    ecr["ECR<br/>(이미지저장)"]
+    rds["RDS&nbsp;PostgreSQL<br/>(벡터&nbsp;+&nbsp;일반&nbsp;DB)"]
+    
+    %% 계층 및 흐름
+    user --> react --> alb --> ecs
+    ecs --> s3
+    ecs --> ecr
+    ecs --> rds
+```
+
+- **문서 저장**: 업로드 문서는 AWS S3에 저장
+- **컨테이너 관리**: 백엔드는 Docker 이미지로 빌드, ECR에 저장, ECS Fargate에서 실행
+- **DB 관리**: 벡터 검색 및 RAG 데이터는 AWS RDS PostgreSQL에서 관리
+
+
+</br>
+
+# 설치 및 실행 방법
+
+<이 항목에서 환경 변수 설정 방법도 안내>
+
+### 1. 사전 요구사항
+
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) 설치
+- AWS CLI 및 필요한 자격증명(로컬 테스트 시)
+
+**OR**
+
+< 모든 기능을 컨테이너로 실행하는 방법에 대한 사전 요구사항 기재 >
+
+### 2. 설치 및 실행
+
+```bash
+# 저장소 복제
+git clone https://github.com/HoRyun/rag-document-search.git
+cd rag-document-search
+
+# 애플리케이션 빌드 및 실행
+docker-compose up --build
+```
+
+**OR**
+
+< 모든 기능을 컨테이너로 실행하는 방법에 대한 설치 및 실행 방법 기재 >
+
+
+</br>
+
+# API 문서
+contents
+
+</br>
+
+# 환경 변수
+
+contents
+
+---
+---
 ---
 
-# Before
+# README 수정 전
 
 [![RAG Document Search Frontend CI/CD Pipeline](https://github.com/HoRyun/rag-document-search/actions/workflows/frontend-ci-cd.yml/badge.svg)](https://github.com/HoRyun/rag-document-search/actions/workflows/frontend-ci-cd.yml)
 
