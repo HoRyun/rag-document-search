@@ -140,7 +140,18 @@ docker-compose up --build
 </br>
 
 # API 문서
-contents
+컨테이너 실행 후:
+
+```
+http://localhost:8000/docs
+```
+OR
+```
+http://localhost:8000/redoc
+```
+
+
+
 
 </br>
 
